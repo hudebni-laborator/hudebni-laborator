@@ -651,7 +651,6 @@ class GuitarTrainer {
     }
   }
 
-  // Spuštění a zastavení přes kruhové tlačítko
   async toggleIncrementalMetronome() {
     if (this.isMetroRunning) {
       this.stopMetronome();
@@ -670,11 +669,17 @@ class GuitarTrainer {
     const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.metroCurrentBpm = startBpm;
     this.isMetroRunning = true;
-    this.metroPhase = 'leadin'; // 1. fáze: 1 takt sám naprázdno (Oranžová)
+    this.metroPhase = 'leadin'; // Startuje s přípravným taktem
     this.metroBeatIndex = 0;
     this.metroMeasureIndexInCycle = 0;
 
-    this.updateMetronomeUI();
+    // Aktualizujeme texty BPM, ale kruh se barevně přepne až PŘESNĚ s 1. dobou
+    const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
+    const stepBpm = Number(document.getElementById('metroStepBpm')?.value) || 2;
+    const curText = document.getElementById('metroCurrentBpmText');
+    const targetText = document.getElementById('metroTargetBpmText');
+    if (curText) curText.innerText = this.metroCurrentBpm;
+    if (targetText) targetText.innerText = `➔ Cíl: ${targetBpm} (+${stepBpm})`;
 
     this.metroNextBeatTime = this.audioCtx.currentTime + 0.05;
     this.metroTimerId = setInterval(() => this.schedulerLoop(), this.lookaheadMs);
@@ -690,13 +695,14 @@ class GuitarTrainer {
     this.metroBeatIndex = 0;
 
     this.clearBeatLights();
-    this.updateMetronomeUI();
+    this.updateCircleUI('idle');
   }
 
   resetMetronomeTempo() {
     const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.metroCurrentBpm = startBpm;
-    this.updateMetronomeUI();
+    const curText = document.getElementById('metroCurrentBpmText');
+    if (curText) curText.innerText = this.metroCurrentBpm;
   }
 
   schedulerLoop() {
@@ -711,16 +717,24 @@ class GuitarTrainer {
     const beatsPerBar = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
     const isAccent = (this.metroBeatIndex === 0);
     const isLeadIn = (this.metroPhase === 'leadin');
+    const scheduledBeat = this.metroBeatIndex;
+    const scheduledPhase = this.metroPhase;
+    const scheduledBpm = this.metroCurrentBpm;
 
     this.playClickSound(time, isAccent, isLeadIn);
 
     const delayMs = Math.max(0, (time - this.audioCtx.currentTime) * 1000);
-    const scheduledBeat = this.metroBeatIndex;
-    const scheduledPhase = this.metroPhase;
 
     setTimeout(() => {
       if (!this.isMetroRunning) return;
       this.renderBeatLight(scheduledBeat, beatsPerBar, scheduledPhase);
+
+      // ZMĚNA BARVY KRUHU NASTÁVÁ PŘESNĚ S PRVNÍ DOBOU DANÉHO REŽIMU
+      if (scheduledBeat === 0) {
+        this.updateCircleUI(scheduledPhase);
+        const curText = document.getElementById('metroCurrentBpmText');
+        if (curText) curText.innerText = scheduledBpm;
+      }
     }, delayMs);
   }
 
@@ -728,7 +742,6 @@ class GuitarTrainer {
     const beatsPerBar = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
     const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
     const stepBpm = Number(document.getElementById('metroStepBpm')?.value) || 2;
-    // Kolikrát odehrát zobrazený takt v daném tempu před zrychlením
     const barsCountToPlay = Number(document.getElementById('metroBarsCount')?.value) || 1;
 
     const secondsPerBeat = 60.0 / this.metroCurrentBpm;
@@ -740,57 +753,44 @@ class GuitarTrainer {
       this.metroBeatIndex = 0;
 
       if (this.metroPhase === 'leadin') {
-        // Po 1 taktu přípravy (Oranžová) přecházíme do hraní (Zelená)
+        // Po přípravném taktu přechází do hraní (zelená naskočí s 1. dobou hraní)
         this.metroPhase = 'playing';
         this.metroMeasureIndexInCycle = 0;
-        setTimeout(() => this.updateMetronomeUI(), 0);
       } else if (this.metroPhase === 'playing') {
         this.metroMeasureIndexInCycle++;
 
-        // Metronom takt nepřepíná! Zůstává na aktuálně zobrazeném taktu.
-
-        // Pokud se odehrál zadaný počet taktů (barsCountToPlay) -> zrychlíme
         if (this.metroMeasureIndexInCycle >= barsCountToPlay) {
           if (this.metroCurrentBpm < targetBpm) {
             this.metroCurrentBpm = Math.min(targetBpm, this.metroCurrentBpm + stepBpm);
-            this.metroPhase = 'leadin'; // Před novou rychlostí 1 takt přípravy
+            this.metroPhase = 'leadin'; // Nové tempo zahájí příprava (oranžová s 1. dobou přípravy)
           } else {
-            this.metroPhase = 'goal'; // Dosaženo cíle
+            this.metroPhase = 'goal';
           }
           this.metroMeasureIndexInCycle = 0;
-          setTimeout(() => this.updateMetronomeUI(), 0);
         }
       }
     }
   }
 
-  // Aktualizace kruhového tlačítka bez textu a údajů o tempu
-  updateMetronomeUI() {
+  // Přepínání stylů kruhového indikátoru
+  updateCircleUI(phase) {
     const circleBtn = document.getElementById('metroCircleBtn');
     const circleIcon = document.getElementById('metroCircleIcon');
-    const curText = document.getElementById('metroCurrentBpmText');
-    const targetText = document.getElementById('metroTargetBpmText');
-    const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
-    const stepBpm = Number(document.getElementById('metroStepBpm')?.value) || 2;
+    if (!circleBtn || !circleIcon) return;
 
-    if (curText) curText.innerText = this.metroCurrentBpm;
-    if (targetText) targetText.innerText = `➔ Cíl: ${targetBpm} (+${stepBpm})`;
-
-    if (circleBtn && circleIcon) {
-      circleBtn.className = 'metro-circle-btn';
-      if (this.metroPhase === 'idle') {
-        circleBtn.classList.add('circle-idle'); // Červená
-        circleIcon.innerText = '▶';
-      } else if (this.metroPhase === 'leadin') {
-        circleBtn.classList.add('circle-leadin'); // Oranžová
-        circleIcon.innerText = '⏸';
-      } else if (this.metroPhase === 'playing') {
-        circleBtn.classList.add('circle-playing'); // Zelená
-        circleIcon.innerText = '⏸';
-      } else if (this.metroPhase === 'goal') {
-        circleBtn.classList.add('circle-playing');
-        circleIcon.innerText = '🏆';
-      }
+    circleBtn.className = 'metro-circle-btn';
+    if (phase === 'idle') {
+      circleBtn.classList.add('circle-idle'); // Červená s ikonou play
+      circleIcon.innerText = '▶';
+    } else if (phase === 'leadin') {
+      circleBtn.classList.add('circle-leadin'); // Oranžová s pauzou
+      circleIcon.innerText = '⏸';
+    } else if (phase === 'playing') {
+      circleBtn.classList.add('circle-playing'); // Zelená s pauzou
+      circleIcon.innerText = '⏸';
+    } else if (phase === 'goal') {
+      circleBtn.classList.add('circle-playing');
+      circleIcon.innerText = '🏆';
     }
   }
 
