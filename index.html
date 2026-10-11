@@ -147,7 +147,7 @@
   <!-- 3. ZÁLOŽKA: CVIČENÍ (S ukotveným tréninkovým metronomem dole) -->
   <div class="view-panel practice-panel" id="practiceView" style="display:none;">
     
-    <!-- Horní ovládání počtu taktů a přepínání smyčky -->
+    <!-- Horní ovládání počtu taktů -->
     <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
       <div class="measure-stepper" style="gap:6px;">
         <button class="btn compact-btn" onclick="app.prevMeasure()">◀</button>
@@ -177,13 +177,12 @@
 
       <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
         <canvas id="practiceCanvas"></canvas>
-        <div class="tap-hint">◀ klepnutí vlevo / vpravo ▶</div>
+        <div class="tap-hint">◀ klepnutí vlevo / vpravo pro přepnutí taktu ▶</div>
       </div>
     </div>
 
     <!-- DOLŮ PŘILEPENÝ TRÉNINKOVÝ METRONOM -->
     <div class="docked-metronome" id="dockedMetronome">
-      <!-- 1. Řádek: Informace o stavu, fázi a indikace dob -->
       <div class="metro-header-row">
         <div class="metro-phase-badge badge-idle" id="metroPhaseBadge">⏸ Připraveno</div>
         
@@ -201,7 +200,6 @@
         </div>
       </div>
 
-      <!-- 2. Řádek: Nastavení tempa, zrychlování a spuštění -->
       <div class="metro-controls-row">
         <div class="metro-input-group">
           <label>Start:</label>
@@ -235,7 +233,6 @@
 
   </div>
 
-  <!-- Plovoucí zvětšovací lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
