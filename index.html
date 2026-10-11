@@ -22,36 +22,31 @@
     </div>
   </header>
 
-  <!-- Lišta nástrojů pro značkování -->
+  <!-- Lišta nástrojů pro značkování (pouze běžné pracovní akce) -->
   <div class="toolbar" id="editToolbar">
     <button class="btn" onclick="app.openLibraryModal()">📚 Knihovna (<span class="lib-count-span">0</span>)</button>
 
-    <!-- Přímé focení fotoaparátem ze stojanu -->
     <label class="btn btn-primary" title="Vyfotit noty fotoaparátem">
       📷 Vyfotit noty
       <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
     </label>
 
-    <!-- Nahrání existujícího souboru (PDF nebo obrázek) -->
     <label class="btn" title="Nahrát PDF nebo obrázek z úložiště">
       📁 Soubor
       <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
     </label>
 
-    <!-- Tlačítko pro přidání další vyfocené strany k otevřené skladbě -->
     <label class="btn" id="addPageBtn" style="display:none;" title="Vyfotit a přidat další list k této skladbě">
       📷 + Další strana
       <input type="file" id="addPageInput" class="file-input" accept="image/*" capture="environment">
     </label>
 
-    <!-- Přepínač stránek -->
     <div class="page-switcher" id="pageSwitcher" style="display:none;">
       <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
       <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
       <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
     </div>
 
-    <!-- Tlačítka pro takt a klíč s předznamenáním -->
     <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
       ✔ Uložit takt <span id="nextMeasureNum">1</span>
     </button>
@@ -60,9 +55,6 @@
     </button>
     <button id="deleteSelectedMeasureBtn" class="btn btn-danger" style="display:none;" onclick="app.deleteSelectedMeasure()">
       🗑 Smazat tento takt
-    </button>
-    <button id="clearMeasuresBtn" class="btn btn-danger" style="display:none;" onclick="app.clearMeasures()">
-      Smazat vše (<span id="measureCountSpan">0</span>)
     </button>
   </div>
 
@@ -88,18 +80,23 @@
   </div>
 
   <main>
-    <!-- 1. EDIT VIEW: Celá stránka not pro výběr taktů a klíče -->
+    <!-- 1. EDIT VIEW -->
     <div class="view-panel" id="editView">
       <div class="canvas-box">
         <canvas id="scoreCanvas"></canvas>
       </div>
       <div class="status-msg" id="statusHint">Vyfoťte noty z pultu nebo vyberte z knihovny a klepněte na takt.</div>
+
+      <!-- Bezpečná zóna dole pod notami pro smazání všech taktů -->
+      <div class="danger-zone">
+        <button id="clearMeasuresBtn" class="btn btn-subtle-danger" style="display:none;" onclick="app.clearMeasures()">
+          🗑 Smazat všechny označené takty (<span id="measureCountSpan">0</span>)
+        </button>
+      </div>
     </div>
 
-    <!-- 2. PRACTICE VIEW: Čistý trenažér bez metronomu -->
+    <!-- 2. PRACTICE VIEW -->
     <div class="view-panel" id="practiceView">
-      
-      <!-- Lišta s Knihovnou a volbou zobrazení taktů pod sebou -->
       <div class="toolbar" style="width:100%; border-radius:8px;">
         <button class="btn" onclick="app.openLibraryModal()">📚 Knihovna (<span class="lib-count-span">0</span>)</button>
         <div class="ctrl-group" style="margin-left:auto;">
@@ -115,7 +112,6 @@
       </div>
 
       <div class="practice-card">
-        <!-- ZÁHLAVÍ: Klíč a předznamenání -->
         <div class="clef-banner" id="clefBanner">
           <span class="clef-label">Klíč & Předznamenání:</span>
           <div class="clef-preview-wrap" id="clefPreviewWrap">
@@ -124,14 +120,12 @@
           <span class="clef-empty-hint" id="clefEmptyHint" style="display:none;">(Lze označit v záložce Značkování)</span>
         </div>
 
-        <!-- ZOBRAZENÍ CVIČENÝCH TAKTŮ -->
         <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
           <canvas id="practiceCanvas"></canvas>
           <div class="tap-hint">◀ klepnutí vlevo / vpravo pro přepnutí taktu ▶</div>
         </div>
       </div>
 
-      <!-- Navigace taktů a nastavení smyčky -->
       <div class="trainer-controls">
         <div class="measure-stepper">
           <button class="btn btn-nav" onclick="app.prevMeasure()">◀ Předchozí takt</button>
@@ -151,12 +145,10 @@
     </div>
   </main>
 
-  <!-- Lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
 
-  <!-- Modální okno knihovny -->
   <div class="modal-overlay" id="libraryModal">
     <div class="modal">
       <div class="modal-header">
@@ -167,7 +159,6 @@
     </div>
   </div>
 
-  <!-- Skripty načítané ze složky src/ -->
   <script src="src/wakeLock.js"></script>
   <script src="src/db.js"></script>
   <script src="src/app.js"></script>

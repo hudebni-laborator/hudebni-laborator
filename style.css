@@ -269,6 +269,34 @@ canvas {
   padding: 4px;
 }
 
+/* Bezpečná zóna pro smazání všech taktů (dole pod notami) */
+.danger-zone {
+  margin-top: 14px;
+  margin-bottom: 20px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-subtle-danger {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  opacity: 0.8;
+  transition: all 0.2s;
+}
+
+.btn-subtle-danger:active {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--danger);
+  color: #fca5a5;
+}
+
 /* Lupa nad prstem */
 .touch-loupe {
   position: fixed;
@@ -309,7 +337,6 @@ canvas {
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
-/* Horní lišta klíče a předznamenání */
 .clef-banner {
   background: #27272a;
   border-bottom: 1px solid var(--border);
