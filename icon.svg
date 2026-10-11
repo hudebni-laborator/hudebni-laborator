@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="110" fill="#18181b"/>
+  <!-- Vnější zlatý akcent -->
+  <rect x="24" y="24" width="464" height="464" rx="90" fill="none" stroke="#eab308" stroke-width="8" opacity="0.4"/>
+  <!-- Notová osnova -->
+  <g stroke="#3f3f46" stroke-width="6">
+    <line x1="80" y1="180" x2="432" y2="180"/>
+    <line x1="80" y1="215" x2="432" y2="215"/>
+    <line x1="80" y1="250" x2="432" y2="250"/>
+    <line x1="80" y1="285" x2="432" y2="285"/>
+    <line x1="80" y1="320" x2="432" y2="320"/>
+  </g>
+  <!-- Zvýrazněný zelený taktový rámeček -->
+  <rect x="190" y="155" width="160" height="190" rx="12" fill="rgba(34, 197, 94, 0.2)" stroke="#22c55e" stroke-width="8"/>
+  <rect x="190" y="155" width="48" height="34" rx="6" fill="#22c55e"/>
+  <text x="214" y="179" font-family="sans-serif" font-weight="900" font-size="22" fill="#ffffff" text-anchor="middle">1</text>
+  <!-- Houslový klíč / kytarový motiv vlevo -->
+  <path d="M140 330 C130 330 115 320 115 300 C115 270 150 250 150 220 C150 195 135 180 135 160 C135 140 145 130 150 130 C155 130 160 145 155 170 L135 345 C130 365 115 375 100 375" fill="none" stroke="#eab308" stroke-width="10" stroke-linecap="round"/>
+</svg>

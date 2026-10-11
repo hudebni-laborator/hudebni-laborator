@@ -29,8 +29,9 @@ body {
   overflow-x: hidden;
 }
 
+/* HLAVNÍ ZÁHLAVÍ */
 header {
-  background-color: var(--surface);
+  background-color: #18181b;
   border-bottom: 1px solid var(--border);
   padding: 8px 12px;
   display: flex;
@@ -40,16 +41,47 @@ header {
   flex-wrap: wrap;
 }
 
-.app-title {
-  font-size: 0.95rem;
-  font-weight: 700;
+.brand {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 45%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.app-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f3f4f6;
+  letter-spacing: 0.3px;
+}
+
+/* Plný nezalamovaný pruh s názvem otevřené skladby */
+.active-file-banner {
+  background: #27272a;
+  border-bottom: 1px solid var(--border);
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  color: #93c5fd;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   white-space: nowrap;
+  overflow-x: auto;
+}
+
+.active-file-banner span.label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.active-file-banner span.name {
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .nav-tabs {
@@ -88,10 +120,6 @@ header {
   flex-wrap: wrap;
 }
 
-.compact-toolbar {
-  padding: 4px 10px;
-}
-
 .crop-toolbar {
   background: #1e293b;
   border-bottom: 2px solid #3b82f6;
@@ -102,7 +130,7 @@ header {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   font-size: 0.82rem;
   cursor: pointer;
   display: inline-flex;
@@ -143,7 +171,6 @@ header {
 
 .file-input { display: none; }
 
-/* Přepínač stránek a ovládání lupy/zoomu */
 .page-switcher, .zoom-controls {
   display: inline-flex;
   align-items: center;
@@ -180,12 +207,6 @@ header {
   background: var(--border);
 }
 
-.page-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-/* Lišta pro úpravu a rozšiřování rámečku */
 .edit-subbar {
   display: flex;
   align-items: center;
@@ -232,10 +253,9 @@ header {
   color: #93c5fd;
 }
 
-/* Hlavní panely */
 .view-panel {
   width: 100%;
-  max-width: 950px;
+  max-width: 1000px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -244,7 +264,7 @@ header {
   margin: 0 auto;
 }
 
-/* Přehled souborů v záložce Knihovna */
+/* KNIHOVNA */
 .library-container {
   width: 100%;
   background: var(--surface);
@@ -262,6 +282,9 @@ header {
   font-weight: 600;
   font-size: 0.88rem;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .library-list {
@@ -310,28 +333,29 @@ header {
   gap: 6px;
 }
 
-/* Kontejner plátna se scrollováním při přiblížení */
+/* KONTEJNER PLÁTNA (NEOMEZENÝ PINCH ZOOM A PAN) */
 .canvas-box {
   width: 100%;
-  max-height: 75vh;
-  background: #1f1f1f;
+  height: 72vh;
+  background: #18181b;
   border-radius: 8px;
   border: 1px solid var(--border);
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  display: flex;
-  justify-content: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
   position: relative;
+  touch-action: none; /* Klíčové: veškerá dotyková gesta řídí náš skript */
 }
 
-canvas {
-  width: 100%;
-  height: auto;
+.canvas-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+canvas#scoreCanvas {
   display: block;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
+  box-shadow: 0 4px 25px rgba(0,0,0,0.7);
 }
 
 .status-msg {
@@ -341,7 +365,6 @@ canvas {
   padding: 2px;
 }
 
-/* Bezpečná zóna pro smazání všech taktů */
 .danger-zone {
   margin-top: 10px;
   margin-bottom: 16px;
@@ -361,7 +384,7 @@ canvas {
   opacity: 0.8;
 }
 
-/* Lupa nad prstem */
+/* LUPA NAD PRSTEM */
 .touch-loupe {
   position: fixed;
   width: 130px;
@@ -383,7 +406,7 @@ canvas {
   display: block;
 }
 
-/* REŽIM CVIČENÍ - KOMPAKTNÍ ROZVRŽENÍ */
+/* REŽIM CVIČENÍ */
 .practice-card {
   width: 100%;
   background: var(--surface);
@@ -467,7 +490,6 @@ canvas {
   border-radius: 4px;
 }
 
-/* Kompaktní ovládání pod okénkem */
 .compact-controls {
   padding: 8px 12px;
   gap: 6px;
@@ -484,7 +506,7 @@ canvas {
 }
 
 .compact-indicator {
-  font-size: 0.98rem;
+  font-size: 0.95rem;
   font-weight: 700;
 }
 

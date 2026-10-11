@@ -3,17 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1f1f1f">
+  <meta name="theme-color" content="#18181b">
   <title>Kytarový Trenažér</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
-  <!-- HORNÍ ŘÁDEK: Titulek a 3 hlavní záložky: Knihovna, Značkování, Cvičení -->
+  <!-- HORNÍ ŘÁDEK -->
   <header>
-    <div class="app-title" id="scoreTitleDisplay">Kytarový Trenažér</div>
+    <div class="brand">
+      <img src="icon.svg" alt="Logo" class="brand-icon">
+      <div class="app-title">Kytarový Trenažér</div>
+    </div>
     <div class="nav-tabs">
       <button class="tab-btn active" id="tabLibrary" onclick="switchMode('library')">1. Knihovna</button>
       <button class="tab-btn" id="tabEdit" onclick="switchMode('edit')">2. Značkování</button>
@@ -21,67 +26,64 @@
     </div>
   </header>
 
-  <!-- 1. ZÁLOŽKA: KNIHOVNA / PŘEHLED SOUBORŮ (Startovní obrazovka aplikace) -->
+  <!-- PŘEHLEDNÝ PROUŽEK S CELÝM NÁZVEM SKLADBY -->
+  <div class="active-file-banner" id="activeFileBanner" style="display:none;">
+    <span class="label">Skladba:</span>
+    <span class="name" id="scoreTitleDisplay">Není vybrána žádná skladba</span>
+  </div>
+
+  <!-- 1. ZÁLOŽKA: KNIHOVNA / PŘEHLED SOUBORŮ -->
   <div class="view-panel" id="libraryView">
     <div class="toolbar" style="width:100%; border-radius:8px;">
-      <!-- Nahrání z disku -->
-      <label class="btn" title="Nahrát PDF nebo obrázek z úložiště">
-        📁 Soubor
-        <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
-      </label>
-
-      <!-- Focení fotoaparátem ze stojanu -->
       <label class="btn btn-primary" title="Vyfotit noty fotoaparátem">
         📷 Vyfotit noty
         <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
       </label>
 
-      <!-- Přidání další vyfocené strany k vybrané skladbě -->
-      <label class="btn" id="addPageBtn" style="display:none;" title="Vyfotit a přidat další list k otevřené skladbě">
+      <label class="btn" title="Nahrát PDF nebo obrázek z úložiště">
+        📁 Soubor
+        <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
+      </label>
+
+      <label class="btn" id="addPageBtn" style="display:none;" title="Vyfotit a přidat další list">
         📷 + Další strana
         <input type="file" id="addPageInput" class="file-input" accept="image/*" capture="environment">
       </label>
 
-      <!-- Úpravy vybrané skladby -->
-      <button class="btn" id="cropPaperBtn" style="display:none;" onclick="app.startPaperCrop()" title="Odříznout pult a okraje papíru">
+      <button class="btn" id="cropPaperBtn" style="display:none;" onclick="app.startPaperCrop()" title="Odříznout pult a okraje">
         ✂ Oříznout papír
       </button>
-      <button class="btn" id="renameScoreBtn" style="display:none;" onclick="app.renameCurrentScore()" title="Přejmenovat skladbu">
+      <button class="btn" id="renameScoreBtn" style="display:none;" onclick="app.renameCurrentScore()" title="Přejmenovat">
         ✏ Přejmenovat
+      </button>
+      <button class="btn" onclick="app.exportBackupJSON()" title="Zálohovat skladby na Disk / do souboru">
+        💾 Export na Disk
       </button>
     </div>
 
-    <!-- Seznam skladeb v úložišti -->
     <div class="library-container">
       <div class="library-header">
         <span>Uložené skladby v zařízení (<span id="libCountSpan">0</span>)</span>
       </div>
-      <div class="library-list" id="libraryList">
-        <!-- Generováno dynamicky -->
-      </div>
+      <div class="library-list" id="libraryList"></div>
     </div>
   </div>
 
-  <!-- 2. ZÁLOŽKA: ZNAČKOVÁNÍ (Jen horní menu, strany, zoom a možnosti značkování) -->
+  <!-- 2. ZÁLOŽKA: ZNAČKOVÁNÍ -->
   <div class="view-panel" id="editView" style="display:none;">
-    
-    <!-- Horní menu značkování -->
     <div class="toolbar" id="editToolbar">
-      <!-- Přepínač stránek -->
       <div class="page-switcher" id="pageSwitcher" style="display:none;">
         <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
         <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
         <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
       </div>
 
-      <!-- Přiblížení a oddálení stránky not -->
       <div class="zoom-controls">
         <button class="page-btn" onclick="app.zoomScore(-0.25)" title="Oddálit">🔍 -</button>
-        <span class="zoom-indicator" id="zoomLevelSpan" onclick="app.resetZoom()" title="Kliknutím obnovíte 100%">100%</span>
+        <span class="zoom-indicator" id="zoomLevelSpan" onclick="app.resetZoom()" title="Kliknutím obnovíte">100%</span>
         <button class="page-btn" onclick="app.zoomScore(0.25)" title="Přiblížit">🔍 +</button>
       </div>
 
-      <!-- Možnosti značkování -->
       <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
         ✔ Uložit takt <span id="nextMeasureNum">1</span>
       </button>
@@ -96,7 +98,6 @@
       </button>
     </div>
 
-    <!-- Režim ořezu papíru (zobrazí se pouze při ořezávání) -->
     <div class="toolbar crop-toolbar" id="cropToolbar" style="display:none;">
       <span style="font-weight:600; font-size:0.85rem; color:#93c5fd;">✂ Ořez papíru: Posuňte rohy rámečku k okrajům not</span>
       <div style="margin-left:auto; display:flex; gap:6px;">
@@ -105,12 +106,11 @@
       </div>
     </div>
 
-    <!-- Lišta pro skok o takt a jemné ladění rámečku -->
     <div class="edit-subbar" id="editSubbar" style="display:none;">
       <div class="subbar-group">
         <span class="subbar-label">Více taktů:</span>
-        <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('left')">◀ +1 Takt vlevo</button>
-        <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('right')">+1 Takt vpravo ▶</button>
+        <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('left')">◀ +1 Vlevo</button>
+        <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('right')">+1 Vpravo ▶</button>
       </div>
       <div class="subbar-group">
         <span class="subbar-label">Zúžit:</span>
@@ -126,13 +126,14 @@
       </div>
     </div>
 
-    <!-- Plátno s notami -->
+    <!-- KONTEJNER S NEOMEZENÝM PINCH ZOOM A PAN POSUVEM -->
     <div class="canvas-box" id="canvasBox">
-      <canvas id="scoreCanvas"></canvas>
+      <div class="canvas-viewport" id="canvasViewport">
+        <canvas id="scoreCanvas"></canvas>
+      </div>
     </div>
-    <div class="status-msg" id="statusHint">Klepněte prstem na takt pro ohraničení, nebo na začátek osnovy pro uložení Klíče.</div>
+    <div class="status-msg" id="statusHint">Dvěma prsty můžete noty libovolně zvětšit a posouvat. Klepnutím označíte takt.</div>
 
-    <!-- Zóna dole pod notami pro hromadné smazání -->
     <div class="danger-zone">
       <button id="clearMeasuresBtn" class="btn btn-subtle-danger" style="display:none;" onclick="app.clearMeasures()">
         🗑 Smazat všechny označené takty (<span id="measureCountSpan">0</span>)
@@ -140,10 +141,9 @@
     </div>
   </div>
 
-  <!-- 3. ZÁLOŽKA: CVIČENÍ (Kompaktní rozhraní na hraní) -->
+  <!-- 3. ZÁLOŽKA: CVIČENÍ -->
   <div class="view-panel" id="practiceView" style="display:none;">
-    
-    <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
+    <div class="toolbar" style="width:100%; border-radius:8px; padding:4px 10px;">
       <div class="ctrl-group" style="margin-left:auto;">
         <label for="stackCountSelect" style="font-size:0.78rem;">Zobrazit pod sebou:</label>
         <select id="stackCountSelect" onchange="app.updatePracticeStackCount()" style="padding:4px 8px; font-size:0.8rem;">
@@ -157,7 +157,6 @@
     </div>
 
     <div class="practice-card">
-      <!-- Klíč a předznamenání -->
       <div class="clef-banner" id="clefBanner">
         <span class="clef-label">Klíč & Předznamenání:</span>
         <div class="clef-preview-wrap" id="clefPreviewWrap">
@@ -166,14 +165,12 @@
         <span class="clef-empty-hint" id="clefEmptyHint" style="display:none;">(Lze označit v záložce Značkování)</span>
       </div>
 
-      <!-- Okénko zobrazení cvičených taktů -->
       <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
         <canvas id="practiceCanvas"></canvas>
-        <div class="tap-hint">◀ klepnutí vlevo / vpravo ▶</div>
+        <div class="tap-hint">◀ klepnutí vlevo / vpravo pro přepnutí taktu ▶</div>
       </div>
     </div>
 
-    <!-- Kompaktní ovládání pod okénkem cvičení -->
     <div class="trainer-controls compact-controls">
       <div class="measure-stepper">
         <button class="btn btn-nav compact-btn" onclick="app.prevMeasure()">◀ Předchozí</button>
@@ -192,7 +189,6 @@
     </div>
   </div>
 
-  <!-- Plovoucí zvětšovací lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>

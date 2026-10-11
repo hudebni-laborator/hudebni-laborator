@@ -2,8 +2,8 @@ if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-// 1. Zmenšení fotografie na optimální rozměr
-async function compressImageFile(file, maxDimension = 2400) {
+// 1. ZPRACOVÁNÍ A ZLEPŠENÍ KONTRASTU VYFOCENÝCH NOT Z PULTU
+async function processAndEnhancePhoto(file, maxDimension = 2400) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -26,14 +26,46 @@ async function compressImageFile(file, maxDimension = 2400) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
 
-      resolve(canvas.toDataURL('image/jpeg', 0.88));
+      // Algoritmus pro vybělení šedého papíru a ztmavení not
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+
+      // Zjistíme průměrný jas horních 5 % nejjasnějších bodů (papír)
+      let sampleSum = 0, sampleCount = 0;
+      for (let i = 0; i < data.length; i += 64) {
+        const lum = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+        sampleSum += lum;
+        sampleCount++;
+      }
+      const avgPaper = sampleCount > 0 ? (sampleSum / sampleCount) : 200;
+      const whitePoint = Math.min(255, Math.max(160, avgPaper * 0.92));
+      const blackPoint = 75;
+
+      for (let i = 0; i < data.length; i += 4) {
+        let lum = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+        // Plynulé roztažení kontrastu (černá černější, papír čistě bílý)
+        let enhanced;
+        if (lum >= whitePoint) {
+          enhanced = 255;
+        } else if (lum <= blackPoint) {
+          enhanced = 0;
+        } else {
+          enhanced = Math.round(((lum - blackPoint) / (whitePoint - blackPoint)) * 255);
+        }
+        data[i] = enhanced;
+        data[i+1] = enhanced;
+        data[i+2] = enhanced;
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.90));
     };
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
   });
 }
 
-// 2. Detekce taktových čar a osnov z čistého podkladu
+// 2. DETEKCE TAKTOVÝCH ČAR A OSNOV
 function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   const width = sourceCanvas.width;
   const height = sourceCanvas.height;
@@ -213,7 +245,7 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   };
 }
 
-// 3. Editor rámečku s lupou nad prstem
+// 3. EDITOR RÁMEČKU S PŘIZPŮSOBENÍM AKTUÁLNÍMU ZOOMU A POSUVU
 class MeasureBoxEditor {
   constructor(canvas, renderCallback, initialBox, onUpdate, isBarLineFn, isCropBox = false) {
     this.canvas = canvas;
@@ -233,23 +265,7 @@ class MeasureBoxEditor {
     this.loupeCanvas = document.getElementById('loupeCanvas');
     this.loupeCtx = this.loupeCanvas ? this.loupeCanvas.getContext('2d') : null;
 
-    this.onPointerDown = this.handlePointerDown.bind(this);
-    this.onPointerMove = this.handlePointerMove.bind(this);
-    this.onPointerUp = this.handlePointerUp.bind(this);
-
-    this.bindEvents();
     this.render();
-  }
-
-  getCoords(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-      tolerance: this.touchTolerance * scaleX
-    };
   }
 
   hitTest(x, y, tol) {
@@ -271,43 +287,20 @@ class MeasureBoxEditor {
     return null;
   }
 
-  bindEvents() {
-    this.canvas.addEventListener('pointerdown', this.onPointerDown);
-    this.canvas.addEventListener('pointermove', this.onPointerMove);
-    this.canvas.addEventListener('pointerup', this.onPointerUp);
-    this.canvas.addEventListener('pointercancel', this.onPointerUp);
-  }
+  startDrag(action, canvasX, canvasY, clientX, clientY) {
+    this.activeAction = action;
+    this.dragStart = { x: canvasX, y: canvasY };
+    this.initialBoxState = { ...this.box };
 
-  destroy() {
-    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
-    this.canvas.removeEventListener('pointermove', this.onPointerMove);
-    this.canvas.removeEventListener('pointerup', this.onPointerUp);
-    this.canvas.removeEventListener('pointercancel', this.onPointerUp);
-    if (this.loupeEl) this.loupeEl.style.display = 'none';
-  }
-
-  handlePointerDown(e) {
-    const { x, y, tolerance } = this.getCoords(e);
-    const action = this.hitTest(x, y, tolerance);
-
-    if (action) {
-      this.activeAction = action;
-      this.dragStart = { x, y };
-      this.initialBoxState = { ...this.box };
-      this.canvas.setPointerCapture(e.pointerId);
-
-      if (action !== 'drag') {
-        this.updateLoupe(e, x, y);
-      }
+    if (action !== 'drag') {
+      this.updateLoupe(clientX, clientY, canvasX, canvasY);
     }
   }
 
-  handlePointerMove(e) {
+  moveDrag(canvasX, canvasY, clientX, clientY) {
     if (!this.activeAction) return;
-
-    const { x, y } = this.getCoords(e);
-    const dx = x - this.dragStart.x;
-    const dy = y - this.dragStart.y;
+    const dx = canvasX - this.dragStart.x;
+    const dy = canvasY - this.dragStart.y;
     const init = this.initialBoxState;
 
     switch (this.activeAction) {
@@ -357,25 +350,28 @@ class MeasureBoxEditor {
     this.render();
     if (this.activeAction !== 'drag') {
       const targetX = this.activeAction.includes('left') ? this.box.left : (this.box.left + this.box.width);
-      this.updateLoupe(e, targetX, y);
+      this.updateLoupe(clientX, clientY, targetX, canvasY);
     }
     if (this.onUpdate) this.onUpdate(this.box);
   }
 
-  handlePointerUp(e) {
+  endDrag() {
     if (this.activeAction) {
-      this.canvas.releasePointerCapture(e.pointerId);
       this.activeAction = null;
       if (this.loupeEl) this.loupeEl.style.display = 'none';
     }
   }
 
-  updateLoupe(e, targetCanvasX, targetCanvasY) {
+  destroy() {
+    if (this.loupeEl) this.loupeEl.style.display = 'none';
+  }
+
+  updateLoupe(clientX, clientY, targetCanvasX, targetCanvasY) {
     if (!this.loupeEl || !this.loupeCanvas || !this.loupeCtx) return;
 
     this.loupeEl.style.display = 'block';
-    this.loupeEl.style.left = e.clientX + 'px';
-    this.loupeEl.style.top = e.clientY + 'px';
+    this.loupeEl.style.left = clientX + 'px';
+    this.loupeEl.style.top = clientY + 'px';
 
     const lw = this.loupeCanvas.width;
     const lh = this.loupeCanvas.height;
@@ -389,7 +385,7 @@ class MeasureBoxEditor {
     this.loupeCtx.clearRect(0, 0, lw, lh);
     this.loupeCtx.drawImage(this.canvas, sx, sy, cropW, cropH, 0, 0, lw, lh);
 
-    this.loupeCtx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+    this.loupeCtx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
     this.loupeCtx.lineWidth = 2;
     this.loupeCtx.beginPath();
     this.loupeCtx.moveTo(lw / 2, 0);
@@ -507,29 +503,30 @@ class MeasureBoxEditor {
 
     c.save();
     if (this.isCropBox) {
-      c.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      c.fillStyle = 'rgba(0, 0, 0, 0.60)';
       c.fillRect(0, 0, this.canvas.width, b.top);
       c.fillRect(0, b.top + b.height, this.canvas.width, this.canvas.height - (b.top + b.height));
       c.fillRect(0, b.top, b.left, b.height);
       c.fillRect(b.left + b.width, b.top, this.canvas.width - (b.left + b.width), b.height);
 
       c.strokeStyle = '#38bdf8';
-      c.lineWidth = 3;
+      c.lineWidth = 3.5;
       c.setLineDash([8, 6]);
       c.strokeRect(b.left, b.top, b.width, b.height);
       c.setLineDash([]);
     } else {
-      c.fillStyle = 'rgba(37, 99, 235, 0.18)';
+      // Výrazné zvýraznění aktivního rámečku
+      c.fillStyle = 'rgba(37, 99, 235, 0.22)';
       c.fillRect(b.left, b.top, b.width, b.height);
 
-      c.strokeStyle = '#2563eb';
-      c.lineWidth = 3;
+      c.strokeStyle = '#1d4ed8';
+      c.lineWidth = 4;
       c.strokeRect(b.left, b.top, b.width, b.height);
     }
 
     c.fillStyle = '#ffffff';
-    c.strokeStyle = this.isCropBox ? '#0284c7' : '#2563eb';
-    c.lineWidth = 3;
+    c.strokeStyle = this.isCropBox ? '#0284c7' : '#1d4ed8';
+    c.lineWidth = 3.5;
 
     const handles = [
       { x: b.left + b.width / 2, y: b.top },
@@ -544,7 +541,7 @@ class MeasureBoxEditor {
 
     handles.forEach(h => {
       c.beginPath();
-      c.arc(h.x, h.y, 9, 0, Math.PI * 2);
+      c.arc(h.x, h.y, 9.5, 0, Math.PI * 2);
       c.fill();
       c.stroke();
     });
@@ -553,11 +550,13 @@ class MeasureBoxEditor {
   }
 }
 
-// 4. Hlavní aplikace trenažéru
+// 4. HLAVNÍ APLIKACE S PODPOROU PINCH-TO-ZOOM A PAN
 class GuitarTrainer {
   constructor() {
     this.scoreCanvas = document.getElementById('scoreCanvas');
     this.scoreCtx = this.scoreCanvas.getContext('2d');
+    this.canvasBox = document.getElementById('canvasBox');
+    this.canvasViewport = document.getElementById('canvasViewport');
 
     this.practiceCanvas = document.getElementById('practiceCanvas');
     this.practiceCtx = this.practiceCanvas.getContext('2d');
@@ -573,7 +572,11 @@ class GuitarTrainer {
 
     this.currentIndex = 0;
     this.activeEditor = null;
-    this.currentZoom = 1.0;
+
+    // Viewport transformace (Pinch Zoom & Pan)
+    this.zoomScale = 1.0;
+    this.panX = 0;
+    this.panY = 0;
 
     this.activeType = null;
     this.editingId = null;
@@ -584,29 +587,264 @@ class GuitarTrainer {
     this.stackCount = 1;
 
     this.initLibrary();
-    this.initTouchMarking();
+    this.initTouchEngine();
     this.initPracticeGestures();
   }
 
-  // Zoom notové stránky v záložce značkování
-  zoomScore(delta) {
-    this.currentZoom = Math.max(0.5, Math.min(3.0, this.currentZoom + delta));
-    this.applyZoom();
-  }
-
-  resetZoom() {
-    this.currentZoom = 1.0;
-    this.applyZoom();
-  }
-
-  applyZoom() {
-    this.scoreCanvas.style.width = (this.currentZoom * 100) + '%';
+  // --- MATEMATIKA ZOOMU A PŘEPOČTU SOUŘADNIC ---
+  updateViewportTransform() {
+    if (!this.canvasViewport) return;
+    this.canvasViewport.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoomScale})`;
     const indicator = document.getElementById('zoomLevelSpan');
     if (indicator) {
-      indicator.innerText = Math.round(this.currentZoom * 100) + '%';
+      indicator.innerText = Math.round(this.zoomScale * 100) + '%';
     }
   }
 
+  zoomScore(delta) {
+    const boxRect = this.canvasBox.getBoundingClientRect();
+    const cx = boxRect.width / 2;
+    const cy = boxRect.height / 2;
+    this.applyZoomAt(this.zoomScale + delta, cx, cy);
+  }
+
+  resetZoom() {
+    this.fitCanvasToScreen();
+  }
+
+  fitCanvasToScreen() {
+    if (!this.scoreCanvas || this.scoreCanvas.width === 0) return;
+    const boxRect = this.canvasBox.getBoundingClientRect();
+    this.zoomScale = Math.min(1.0, (boxRect.width - 16) / this.scoreCanvas.width);
+    this.panX = (boxRect.width - this.scoreCanvas.width * this.zoomScale) / 2;
+    this.panY = 10;
+    this.updateViewportTransform();
+  }
+
+  applyZoomAt(newScale, centerScreenX, centerScreenY) {
+    const clampedScale = Math.max(0.4, Math.min(4.0, newScale));
+    const factor = clampedScale / this.zoomScale;
+
+    this.panX = centerScreenX - (centerScreenX - this.panX) * factor;
+    this.panY = centerScreenY - (centerScreenY - this.panY) * factor;
+    this.zoomScale = clampedScale;
+    this.updateViewportTransform();
+  }
+
+  screenToCanvasCoords(clientX, clientY) {
+    const boxRect = this.canvasBox.getBoundingClientRect();
+    const xInBox = clientX - boxRect.left;
+    const yInBox = clientY - boxRect.top;
+
+    return {
+      x: (xInBox - this.panX) / this.zoomScale,
+      y: (yInBox - this.panY) / this.zoomScale
+    };
+  }
+
+  // --- INTELIGENTNÍ DOTYKOVÝ ENGINE: 1 PRST (ZNAČKOVÁNÍ/TÁHLA/PAN) + 2 PRSTY (PINCH ZOOM & PAN) ---
+  initTouchEngine() {
+    const box = this.canvasBox;
+    const ongoingTouches = new Map();
+    let initialPinchDist = null;
+    let initialPinchScale = 1.0;
+    let isDraggingHandle = false;
+    let isPanningOneFinger = false;
+    let startPoint = null;
+
+    box.addEventListener('pointerdown', (e) => {
+      ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (ongoingTouches.size === 1) {
+        startPoint = { x: e.clientX, y: e.clientY };
+        const canvasCoords = this.screenToCanvasCoords(e.clientX, e.clientY);
+        const activeEditor = this.isCropMode ? this.cropEditor : this.activeEditor;
+
+        if (activeEditor) {
+          const tol = activeEditor.touchTolerance / this.zoomScale;
+          const action = activeEditor.hitTest(canvasCoords.x, canvasCoords.y, tol);
+          if (action) {
+            isDraggingHandle = true;
+            activeEditor.startDrag(action, canvasCoords.x, canvasCoords.y, e.clientX, e.clientY);
+            box.setPointerCapture(e.pointerId);
+            return;
+          }
+        }
+        // Pokud nesaháme na táhlo rámečku, umožníme posun not (pan)
+        isPanningOneFinger = true;
+        box.setPointerCapture(e.pointerId);
+      } else if (ongoingTouches.size === 2) {
+        // Zahájení pinch-to-zoom
+        isDraggingHandle = false;
+        isPanningOneFinger = false;
+        if (this.activeEditor) this.activeEditor.endDrag();
+        if (this.cropEditor) this.cropEditor.endDrag();
+
+        const touches = Array.from(ongoingTouches.values());
+        initialPinchDist = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+        initialPinchScale = this.zoomScale;
+      }
+    });
+
+    box.addEventListener('pointermove', (e) => {
+      if (!ongoingTouches.has(e.pointerId)) return;
+      const prev = ongoingTouches.get(e.pointerId);
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (ongoingTouches.size === 2) {
+        const touches = Array.from(ongoingTouches.values());
+        const currentDist = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+        const boxRect = box.getBoundingClientRect();
+        const centerScreenX = (touches[0].x + touches[1].x) / 2 - boxRect.left;
+        const centerScreenY = (touches[0].y + touches[1].y) / 2 - boxRect.top;
+
+        if (initialPinchDist > 0) {
+          const targetScale = initialPinchScale * (currentDist / initialPinchDist);
+          this.applyZoomAt(targetScale, centerScreenX, centerScreenY);
+        }
+        // Zároveň posunujeme při dvou prstech
+        this.panX += dx / 2;
+        this.panY += dy / 2;
+        this.updateViewportTransform();
+        return;
+      }
+
+      if (ongoingTouches.size === 1) {
+        if (isDraggingHandle) {
+          const canvasCoords = this.screenToCanvasCoords(e.clientX, e.clientY);
+          const activeEditor = this.isCropMode ? this.cropEditor : this.activeEditor;
+          if (activeEditor) {
+            activeEditor.moveDrag(canvasCoords.x, canvasCoords.y, e.clientX, e.clientY);
+          }
+        } else if (isPanningOneFinger) {
+          this.panX += dx;
+          this.panY += dy;
+          this.updateViewportTransform();
+        }
+      }
+    });
+
+    const finishPointer = (e) => {
+      if (ongoingTouches.has(e.pointerId)) {
+        ongoingTouches.delete(e.pointerId);
+      }
+
+      if (ongoingTouches.size === 0) {
+        if (isDraggingHandle) {
+          isDraggingHandle = false;
+          if (this.activeEditor) this.activeEditor.endDrag();
+          if (this.cropEditor) this.cropEditor.endDrag();
+        }
+
+        // Detekce čistého klepnutí (Tap)
+        if (startPoint && !this.isCropMode) {
+          const movedDist = Math.hypot(e.clientX - startPoint.x, e.clientY - startPoint.y);
+          if (movedDist < 8 && !isDraggingHandle) {
+            this.handleCanvasTap(e.clientX, e.clientY);
+          }
+        }
+        isPanningOneFinger = false;
+        startPoint = null;
+        initialPinchDist = null;
+      }
+    };
+
+    box.addEventListener('pointerup', finishPointer);
+    box.addEventListener('pointercancel', finishPointer);
+  }
+
+  // Klepnutí prstem na plátno (výběr existujícího rámečku nebo detekce nového)
+  handleCanvasTap(clientX, clientY) {
+    if (!this.currentScore) return;
+    const cleanCanvas = this.pageCache.get(this.currentPage);
+    if (!cleanCanvas) return;
+
+    const coords = this.screenToCanvasCoords(clientX, clientY);
+    const clickX = coords.x;
+    const clickY = coords.y;
+
+    if (clickX < 0 || clickX > cleanCanvas.width || clickY < 0 || clickY > cleanCanvas.height) return;
+
+    // 1. Klepnutí do existujícího uloženého TAKTU
+    const measures = this.currentScore.measures || [];
+    const clickedMeasure = measures.find(m => {
+      if ((m.page || 1) !== this.currentPage) return false;
+      const b = m.box;
+      return (clickX >= b.left && clickX <= b.left + b.width &&
+              clickY >= b.top && clickY <= b.top + b.height);
+    });
+
+    if (clickedMeasure) {
+      this.activeType = 'measure';
+      this.editingId = clickedMeasure.id;
+
+      const scanResult = scanStaffAndBarlinesFromCanvas(cleanCanvas, clickX, clickY);
+
+      if (this.activeEditor) this.activeEditor.destroy();
+      this.activeEditor = new MeasureBoxEditor(
+        this.scoreCanvas,
+        () => this.renderScoreView(),
+        clickedMeasure.box,
+        () => {},
+        scanResult.isBarLine
+      );
+
+      this.updateActiveControlButtons();
+      document.getElementById('statusHint').innerText = `Označen takt #${clickedMeasure.id}. Můžete upravit, smazat nebo změnit na Klíč.`;
+      return;
+    }
+
+    // 2. Klepnutí do existujícího uloženého KLÍČE
+    const keySigs = this.currentScore.keySignatures || [];
+    const clickedKeySig = keySigs.find(k => {
+      if ((k.page || 1) !== this.currentPage) return false;
+      const b = k.box;
+      return (clickX >= b.left && clickX <= b.left + b.width &&
+              clickY >= b.top && clickY <= b.top + b.height);
+    });
+
+    if (clickedKeySig) {
+      this.activeType = 'keySig';
+      this.editingId = clickedKeySig.id;
+
+      const scanResult = scanStaffAndBarlinesFromCanvas(cleanCanvas, clickX, clickY);
+
+      if (this.activeEditor) this.activeEditor.destroy();
+      this.activeEditor = new MeasureBoxEditor(
+        this.scoreCanvas,
+        () => this.renderScoreView(),
+        clickedKeySig.box,
+        () => {},
+        scanResult.isBarLine
+      );
+
+      this.updateActiveControlButtons();
+      document.getElementById('statusHint').innerText = `Označen Klíč/Předznamenání. Můžete upravit, smazat nebo převést na Takt.`;
+      return;
+    }
+
+    // 3. Nový výběr podle osnovy
+    this.activeType = 'new';
+    this.editingId = null;
+
+    const scanResult = scanStaffAndBarlinesFromCanvas(cleanCanvas, clickX, clickY);
+
+    if (this.activeEditor) this.activeEditor.destroy();
+    this.activeEditor = new MeasureBoxEditor(
+      this.scoreCanvas,
+      () => this.renderScoreView(),
+      scanResult.box,
+      () => {},
+      scanResult.isBarLine
+    );
+
+    this.updateActiveControlButtons();
+    document.getElementById('statusHint').innerText = 'Místo ohraničeno. Uložte jako takt, nebo jako Klíč/Předznamenání.';
+  }
+
+  // --- KNIHOVNA & ZÁLOHA NA GOOGLE DRIVE ---
   async initLibrary() {
     try {
       const all = await window.scoreDB.getAllScores();
@@ -628,7 +866,7 @@ class GuitarTrainer {
     listEl.innerHTML = '';
 
     if (!all || all.length === 0) {
-      listEl.innerHTML = '<div style="color:var(--text-muted); padding:16px; text-align:center;">V zařízení zatím nemáte žádné noty. Vyfoťte je ze stojanu nebo nahrajte soubor výše.</div>';
+      listEl.innerHTML = '<div style="color:var(--text-muted); padding:16px; text-align:center;">V zařízení zatím nemáte žádné noty. Vyfoťte je ze stojanu nebo nahrajte soubor.</div>';
       return;
     }
 
@@ -655,6 +893,25 @@ class GuitarTrainer {
     });
   }
 
+  async exportBackupJSON() {
+    try {
+      const all = await window.scoreDB.getAllScores();
+      if (!all || all.length === 0) {
+        alert('Knihovna je prázdná, není co exportovat.');
+        return;
+      }
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(all));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `kytarovy_trenazer_zaloha_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      alert('Chyba při exportu: ' + err.message);
+    }
+  }
+
   async loadScore(id, switchTabToEdit = true) {
     const score = await window.scoreDB.getScore(id);
     if (!score) return;
@@ -664,7 +921,6 @@ class GuitarTrainer {
     this.currentPage = 1;
     this.pageCache.clear();
     this.pdfDoc = null;
-    this.resetZoom();
 
     this.resetActiveSelection();
 
@@ -683,13 +939,17 @@ class GuitarTrainer {
       this.totalPages = 1;
     }
 
-    document.getElementById('scoreTitleDisplay').innerText = score.name || 'Kytarový Trenažér';
+    const titleEl = document.getElementById('scoreTitleDisplay');
+    if (titleEl) titleEl.innerText = score.name || 'Kytarový Trenažér';
+    document.getElementById('activeFileBanner').style.display = 'flex';
+
     document.getElementById('renameScoreBtn').style.display = 'inline-flex';
     document.getElementById('cropPaperBtn').style.display = score.isPdf ? 'none' : 'inline-flex';
     document.getElementById('addPageBtn').style.display = score.isPdf ? 'none' : 'inline-flex';
 
     this.updatePageSwitcherUI();
     await this.renderCurrentPage();
+    this.fitCanvasToScreen();
     this.updateUI();
 
     const all = await window.scoreDB.getAllScores();
@@ -763,7 +1023,6 @@ class GuitarTrainer {
   async applyPaperCrop() {
     if (!this.cropEditor || !this.isCropMode) return;
     const b = this.cropEditor.box;
-
     const cleanCanvas = this.pageCache.get(this.currentPage);
     if (!cleanCanvas) return;
 
@@ -775,11 +1034,7 @@ class GuitarTrainer {
     croppedCanvas.height = cropH;
     const cctx = croppedCanvas.getContext('2d');
 
-    cctx.drawImage(
-      cleanCanvas,
-      b.left, b.top, b.width, b.height,
-      0, 0, cropW, cropH
-    );
+    cctx.drawImage(cleanCanvas, b.left, b.top, b.width, b.height, 0, 0, cropW, cropH);
 
     const croppedDataUrl = croppedCanvas.toDataURL('image/jpeg', 0.90);
     const shiftX = Math.round(b.left);
@@ -814,6 +1069,7 @@ class GuitarTrainer {
     await this.persistCurrentScore();
     this.cancelPaperCrop();
     await this.renderCurrentPage();
+    this.fitCanvasToScreen();
     document.getElementById('statusHint').innerText = 'Papír byl úspěšně oříznut.';
   }
 
@@ -956,7 +1212,7 @@ class GuitarTrainer {
   async appendPageToCurrentScore(imageData) {
     if (!this.currentScore) return;
     if (this.currentScore.isPdf) {
-      alert('K PDF dokumentu nelze přidávat vyfocené strany. Založte novou skladbu focením.');
+      alert('K PDF dokumentu nelze přidávat vyfocené strany.');
       return;
     }
 
@@ -970,6 +1226,7 @@ class GuitarTrainer {
     await this.persistCurrentScore();
     this.updatePageSwitcherUI();
     await this.renderCurrentPage();
+    this.fitCanvasToScreen();
     document.getElementById('statusHint').innerText = `Přidána vyfocená strana ${this.currentPage}.`;
   }
 
@@ -998,7 +1255,8 @@ class GuitarTrainer {
           this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
           this.updatePageSwitcherUI();
           this.updateUI();
-          document.getElementById('scoreTitleDisplay').innerText = 'Kytarový Trenažér';
+          document.getElementById('scoreTitleDisplay').innerText = 'Není vybrána žádná skladba';
+          document.getElementById('activeFileBanner').style.display = 'none';
           document.getElementById('cropPaperBtn').style.display = 'none';
           document.getElementById('renameScoreBtn').style.display = 'none';
           document.getElementById('addPageBtn').style.display = 'none';
@@ -1019,117 +1277,6 @@ class GuitarTrainer {
   }
   adjustActiveEdge(edge, delta) {
     if (this.activeEditor) this.activeEditor.modifyEdge(edge, delta);
-  }
-
-  initTouchMarking() {
-    let downPos = null;
-
-    this.scoreCanvas.addEventListener('pointerdown', (e) => {
-      downPos = { x: e.clientX, y: e.clientY };
-    });
-
-    this.scoreCanvas.addEventListener('pointerup', (e) => {
-      if (!downPos || this.isCropMode) return;
-      const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
-      downPos = null;
-
-      if (dist > 8) return;
-
-      if (!this.currentScore) {
-        alert('Nejprve vyberte nebo vyfoťte skladbu v záložce Knihovna.');
-        return;
-      }
-
-      const cleanCanvas = this.pageCache.get(this.currentPage);
-      if (!cleanCanvas) return;
-
-      const rect = this.scoreCanvas.getBoundingClientRect();
-      const scaleX = cleanCanvas.width / rect.width;
-      const scaleY = cleanCanvas.height / rect.height;
-      const clickX = (e.clientX - rect.left) * scaleX;
-      const clickY = (e.clientY - rect.top) * scaleY;
-
-      if (this.activeEditor) {
-        const { x, y, tolerance } = this.activeEditor.getCoords(e);
-        if (this.activeEditor.hitTest(x, y, tolerance)) return;
-      }
-
-      // 1. Klepnutí do existujícího uloženého TAKTU
-      const measures = this.currentScore.measures || [];
-      const clickedMeasure = measures.find(m => {
-        if ((m.page || 1) !== this.currentPage) return false;
-        const b = m.box;
-        return (clickX >= b.left && clickX <= b.left + b.width &&
-                clickY >= b.top && clickY <= b.top + b.height);
-      });
-
-      if (clickedMeasure) {
-        this.activeType = 'measure';
-        this.editingId = clickedMeasure.id;
-
-        const scanResult = scanStaffAndBarlinesFromCanvas(cleanCanvas, clickX, clickY);
-
-        if (this.activeEditor) this.activeEditor.destroy();
-        this.activeEditor = new MeasureBoxEditor(
-          this.scoreCanvas,
-          () => this.renderScoreView(),
-          clickedMeasure.box,
-          () => {},
-          scanResult.isBarLine
-        );
-
-        this.updateActiveControlButtons();
-        document.getElementById('statusHint').innerText = `Označen takt #${clickedMeasure.id}. Můžete upravit, smazat nebo změnit na Klíč.`;
-        return;
-      }
-
-      // 2. Klepnutí do existujícího uloženého KLÍČE
-      const keySigs = this.currentScore.keySignatures || [];
-      const clickedKeySig = keySigs.find(k => {
-        if ((k.page || 1) !== this.currentPage) return false;
-        const b = k.box;
-        return (clickX >= b.left && clickX <= b.left + b.width &&
-                clickY >= b.top && clickY <= b.top + b.height);
-      });
-
-      if (clickedKeySig) {
-        this.activeType = 'keySig';
-        this.editingId = clickedKeySig.id;
-
-        const scanResult = scanStaffAndBarlinesFromCanvas(cleanCanvas, clickX, clickY);
-
-        if (this.activeEditor) this.activeEditor.destroy();
-        this.activeEditor = new MeasureBoxEditor(
-          this.scoreCanvas,
-          () => this.renderScoreView(),
-          clickedKeySig.box,
-          () => {},
-          scanResult.isBarLine
-        );
-
-        this.updateActiveControlButtons();
-        document.getElementById('statusHint').innerText = `Označen Klíč/Předznamenání. Můžete upravit, smazat nebo převést na Takt.`;
-        return;
-      }
-
-      // 3. Nový výběr
-      this.activeType = 'new';
-      this.editingId = null;
-
-      const scanResult = scanStaffAndBarlinesFromCanvas(cleanCanvas, clickX, clickY);
-
-      if (this.activeEditor) this.activeEditor.destroy();
-      this.activeEditor = new MeasureBoxEditor(
-        this.scoreCanvas,
-        () => this.renderScoreView(),
-        scanResult.box,
-        () => {},
-        scanResult.isBarLine
-      );
-
-      this.updateActiveControlButtons();
-      document.getElementById('statusHint').innerText = 'Místo ohraničeno. Uložte jako takt, nebo jako Klíč/Předznamenání.';
-    });
   }
 
   updateActiveControlButtons() {
@@ -1217,7 +1364,7 @@ class GuitarTrainer {
         this.resetActiveSelection();
         this.updateUI();
         this.renderScoreView();
-        document.getElementById('statusHint').innerText = 'Rámeček byl úspěšně změněn na Klíč/Předznamenání.';
+        document.getElementById('statusHint').innerText = 'Změněno na Klíč/Předznamenání.';
       }
     } else if (this.activeType === 'keySig') {
       const kIdx = (this.currentScore.keySignatures || []).findIndex(k => k.id === this.editingId);
@@ -1236,7 +1383,7 @@ class GuitarTrainer {
         this.resetActiveSelection();
         this.updateUI();
         this.renderScoreView();
-        document.getElementById('statusHint').innerText = `Rámeček byl úspěšně změněn na Takt #${newMeasure.id}.`;
+        document.getElementById('statusHint').innerText = `Změněno na Takt #${newMeasure.id}.`;
       }
     }
   }
@@ -1255,7 +1402,7 @@ class GuitarTrainer {
         k.box = { ...this.activeEditor.box };
         k.page = this.currentPage;
       }
-      document.getElementById('statusHint').innerText = 'Klíč a předznamenání bylo aktualizováno.';
+      document.getElementById('statusHint').innerText = 'Klíč aktualizován.';
     } else {
       const keySig = {
         id: 'key_' + Date.now(),
@@ -1290,7 +1437,7 @@ class GuitarTrainer {
         page: this.currentPage,
         box: { ...this.activeEditor.box }
       });
-      document.getElementById('statusHint').innerText = 'Takt uložen. Můžete klepnout na další takt.';
+      document.getElementById('statusHint').innerText = 'Takt uložen. Můžete označit další.';
     }
 
     await this.persistCurrentScore();
@@ -1328,6 +1475,7 @@ class GuitarTrainer {
     if (Number(loopFrom.value) < 1) loopFrom.value = 1;
   }
 
+  // VYKRESLENÍ VÝRAZNÝCH RÁMEČKŮ S KONTRASTNÍ VÝPLNÍ
   renderScoreView() {
     const pageCanvas = this.pageCache.get(this.currentPage);
     if (!pageCanvas) return;
@@ -1335,35 +1483,53 @@ class GuitarTrainer {
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
     this.scoreCtx.drawImage(pageCanvas, 0, 0);
 
-    // Vykreslení klíčů/předznamenání
+    // 1. Zlaté klíče a předznamenání
     if (this.currentScore && this.currentScore.keySignatures) {
       this.currentScore.keySignatures.forEach((k) => {
         if ((k.page || 1) !== this.currentPage) return;
         if (this.activeType === 'keySig' && this.editingId === k.id) return;
 
-        this.scoreCtx.strokeStyle = 'rgba(234, 179, 8, 0.9)';
-        this.scoreCtx.lineWidth = 2.5;
+        // Výplň
+        this.scoreCtx.fillStyle = 'rgba(234, 179, 8, 0.16)';
+        this.scoreCtx.fillRect(k.box.left, k.box.top, k.box.width, k.box.height);
+
+        // Obrys
+        this.scoreCtx.strokeStyle = '#ca8a04';
+        this.scoreCtx.lineWidth = 3.5;
         this.scoreCtx.strokeRect(k.box.left, k.box.top, k.box.width, k.box.height);
 
-        this.scoreCtx.fillStyle = '#eab308';
-        this.scoreCtx.font = 'bold 15px sans-serif';
-        this.scoreCtx.fillText('🎼 Klíč', k.box.left + 5, k.box.top + 18);
+        // Štítek
+        this.scoreCtx.fillStyle = '#ca8a04';
+        this.scoreCtx.fillRect(k.box.left, k.box.top, 54, 22);
+        this.scoreCtx.fillStyle = '#ffffff';
+        this.scoreCtx.font = 'bold 13px sans-serif';
+        this.scoreCtx.fillText('🎼 Klíč', k.box.left + 5, k.box.top + 16);
       });
     }
 
-    // Vykreslení taktů
+    // 2. Zelené takty
     if (this.currentScore && this.currentScore.measures) {
       this.currentScore.measures.forEach((m) => {
         if ((m.page || 1) !== this.currentPage) return;
         if (this.activeType === 'measure' && this.editingId === m.id) return;
 
-        this.scoreCtx.strokeStyle = 'rgba(34, 197, 94, 0.85)';
-        this.scoreCtx.lineWidth = 2.5;
+        // Výplň
+        this.scoreCtx.fillStyle = 'rgba(34, 197, 94, 0.16)';
+        this.scoreCtx.fillRect(m.box.left, m.box.top, m.box.width, m.box.height);
+
+        // Obrys
+        this.scoreCtx.strokeStyle = '#16a34a';
+        this.scoreCtx.lineWidth = 3.5;
         this.scoreCtx.strokeRect(m.box.left, m.box.top, m.box.width, m.box.height);
 
-        this.scoreCtx.fillStyle = '#22c55e';
-        this.scoreCtx.font = 'bold 18px sans-serif';
-        this.scoreCtx.fillText(`${m.id}`, m.box.left + 6, m.box.top + 22);
+        // Štítek s číslem taktu
+        const numText = `${m.id}`;
+        const badgeW = Math.max(28, numText.length * 11 + 12);
+        this.scoreCtx.fillStyle = '#16a34a';
+        this.scoreCtx.fillRect(m.box.left, m.box.top, badgeW, 22);
+        this.scoreCtx.fillStyle = '#ffffff';
+        this.scoreCtx.font = 'bold 14px sans-serif';
+        this.scoreCtx.fillText(numText, m.box.left + 6, m.box.top + 16);
       });
     }
   }
@@ -1424,7 +1590,7 @@ class GuitarTrainer {
     const currentM = measures[index];
     const targetPage = currentM.page || 1;
 
-    // 1. Klíč v záhlaví
+    // Klíč v záhlaví
     const keySig = this.getKeySignatureForMeasure(index, targetPage);
     const clefEmptyHint = document.getElementById('clefEmptyHint');
     const clefPreviewWrap = document.getElementById('clefPreviewWrap');
@@ -1449,7 +1615,7 @@ class GuitarTrainer {
       clefPreviewWrap.style.display = 'none';
     }
 
-    // 2. Takty k zobrazení pod sebou
+    // Takty pod sebou
     let measuresToStack = [];
     if (this.stackCount === 'loop') {
       const loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom').value) || 1)) - 1;
@@ -1465,7 +1631,6 @@ class GuitarTrainer {
       }
     }
 
-    // 3. Vykreslení taktů pod sebou
     let maxWidth = 0;
     const renderedImages = [];
     for (const m of measuresToStack) {
@@ -1526,7 +1691,7 @@ class GuitarTrainer {
 
 const app = new GuitarTrainer();
 
-// PŘEPÍNÁNÍ ZÁLOŽEK (Knihovna, Značkování, Cvičení)
+// PŘEPÍNÁNÍ ZÁLOŽEK
 function switchMode(mode) {
   const tabLib = document.getElementById('tabLibrary');
   const tabEdit = document.getElementById('tabEdit');
@@ -1553,6 +1718,7 @@ function switchMode(mode) {
     tabEdit.classList.add('active');
     editView.style.display = 'flex';
     app.renderScoreView();
+    app.fitCanvasToScreen();
   } else if (mode === 'practice') {
     if (!app.currentScore || !app.currentScore.measures || app.currentScore.measures.length === 0) {
       alert('Nejprve označte a uložte alespoň jeden takt.');
@@ -1569,9 +1735,7 @@ function switchMode(mode) {
   }
 }
 
-// 5. OBSLUHA FOCENÍ A NAHRÁVÁNÍ SOUBORŮ
-
-// A) Focení not fotoaparátem přímo ze stojanu
+// 5. NAHRÁVÁNÍ SOUBORŮ A FOCENÍ S AUTOMATICKÝM ZVÝŠENÍM KONTRASTU
 document.getElementById('cameraInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -1580,11 +1744,11 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   const userChosenName = prompt('Zadejte název skladby:', defaultName) || defaultName;
 
   try {
-    const compressedDataUrl = await compressImageFile(file);
+    const enhancedDataUrl = await processAndEnhancePhoto(file);
     await app.saveNewScoreToLibrary(userChosenName.trim(), {
       isPdf: false,
-      imageData: compressedDataUrl,
-      pages: [compressedDataUrl]
+      imageData: enhancedDataUrl,
+      pages: [enhancedDataUrl]
     });
   } catch (err) {
     console.error('Chyba fotoaparátu:', err);
@@ -1594,14 +1758,13 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   }
 });
 
-// B) Přidání další vyfocené strany
 document.getElementById('addPageInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   try {
-    const compressedDataUrl = await compressImageFile(file);
-    await app.appendPageToCurrentScore(compressedDataUrl);
+    const enhancedDataUrl = await processAndEnhancePhoto(file);
+    await app.appendPageToCurrentScore(enhancedDataUrl);
   } catch (err) {
     console.error('Chyba při focení další strany:', err);
     alert('Chyba při focení strany: ' + err.message);
@@ -1610,7 +1773,6 @@ document.getElementById('addPageInput').addEventListener('change', async (e) => 
   }
 });
 
-// C) Nahrání souboru z úložiště
 document.getElementById('fileInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -1627,11 +1789,11 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
         pdfData: arrayBuffer
       });
     } else {
-      const compressedDataUrl = await compressImageFile(file);
+      const enhancedDataUrl = await processAndEnhancePhoto(file);
       await app.saveNewScoreToLibrary(songName, {
         isPdf: false,
-        imageData: compressedDataUrl,
-        pages: [compressedDataUrl]
+        imageData: enhancedDataUrl,
+        pages: [enhancedDataUrl]
       });
     }
   } catch (err) {

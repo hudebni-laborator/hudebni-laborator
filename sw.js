@@ -1,8 +1,9 @@
-const CACHE_NAME = 'guitar-trainer-v13';
+const CACHE_NAME = 'guitar-trainer-v14';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
+  './icon.svg',
   './src/app.js',
   './src/db.js',
   './src/wakeLock.js',
