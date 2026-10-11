@@ -26,7 +26,7 @@
     </div>
   </header>
 
-  <!-- PŘEHLEDNÝ PROUŽEK S CELÝM NÁZVEM SKLADBY -->
+  <!-- PŘEHLEDNÝ PROUŽEK S NÁZVEM SKLADBY -->
   <div class="active-file-banner" id="activeFileBanner" style="display:none;">
     <span class="label">Skladba:</span>
     <span class="name" id="scoreTitleDisplay">Není vybrána žádná skladba</span>
@@ -79,7 +79,7 @@
         <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
       </div>
 
-      <!-- Spolehlivý zoom a tlačítko návratu na celou obrazovku -->
+      <!-- Zoom ovládání -->
       <div class="zoom-controls">
         <button class="page-btn" onclick="app.zoomScore(-0.25)" title="Oddálit">🔍 -</button>
         <span class="zoom-indicator" id="zoomLevelSpan" onclick="app.resetZoom()" title="Klepnutím vrátíte celou obrazovku">100%</span>
@@ -129,7 +129,7 @@
       </div>
     </div>
 
-    <!-- KONTEJNER PRO NEOMEZENÝ ZOOM A POSUV -->
+    <!-- KONTEJNER S PINCH ZOOM A PAN POSUVEM -->
     <div class="canvas-box" id="canvasBox">
       <div class="canvas-viewport" id="canvasViewport">
         <canvas id="scoreCanvas"></canvas>
@@ -144,12 +144,20 @@
     </div>
   </div>
 
-  <!-- 3. ZÁLOŽKA: CVIČENÍ -->
-  <div class="view-panel" id="practiceView" style="display:none;">
-    <div class="toolbar" style="width:100%; border-radius:8px; padding:4px 10px;">
+  <!-- 3. ZÁLOŽKA: CVIČENÍ (S ukotveným tréninkovým metronomem dole) -->
+  <div class="view-panel practice-panel" id="practiceView" style="display:none;">
+    
+    <!-- Horní ovládání počtu taktů a přepínání smyčky -->
+    <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
+      <div class="measure-stepper" style="gap:6px;">
+        <button class="btn compact-btn" onclick="app.prevMeasure()">◀</button>
+        <div class="measure-indicator compact-indicator" id="practiceMeasureTitle">Takt 1 / 1</div>
+        <button class="btn compact-btn" onclick="app.nextMeasure(true)">▶</button>
+      </div>
+
       <div class="ctrl-group" style="margin-left:auto;">
-        <label for="stackCountSelect" style="font-size:0.78rem;">Zobrazit pod sebou:</label>
-        <select id="stackCountSelect" onchange="app.updatePracticeStackCount()" style="padding:4px 8px; font-size:0.8rem;">
+        <label for="stackCountSelect" style="font-size:0.75rem;">Zobrazit:</label>
+        <select id="stackCountSelect" onchange="app.updatePracticeStackCount()" style="padding:3px 6px; font-size:0.78rem;">
           <option value="1">1 takt</option>
           <option value="2">2 takty pod sebou</option>
           <option value="3">3 takty pod sebou</option>
@@ -159,39 +167,75 @@
       </div>
     </div>
 
+    <!-- Karta s notami (Klíč + takty) -->
     <div class="practice-card">
       <div class="clef-banner" id="clefBanner">
-        <span class="clef-label">Klíč & Předznamenání:</span>
         <div class="clef-preview-wrap" id="clefPreviewWrap">
           <canvas id="clefCanvas"></canvas>
         </div>
-        <span class="clef-empty-hint" id="clefEmptyHint" style="display:none;">(Lze označit v záložce Značkování)</span>
       </div>
 
       <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
         <canvas id="practiceCanvas"></canvas>
-        <div class="tap-hint">◀ klepnutí vlevo / vpravo pro přepnutí taktu ▶</div>
+        <div class="tap-hint">◀ klepnutí vlevo / vpravo ▶</div>
       </div>
     </div>
 
-    <div class="trainer-controls compact-controls">
-      <div class="measure-stepper">
-        <button class="btn btn-nav compact-btn" onclick="app.prevMeasure()">◀ Předchozí</button>
-        <div class="measure-indicator compact-indicator" id="practiceMeasureTitle">Takt 1 / 1</div>
-        <button class="btn btn-nav btn-primary compact-btn" onclick="app.nextMeasure(true)">Další ▶</button>
-      </div>
+    <!-- DOLŮ PŘILEPENÝ TRÉNINKOVÝ METRONOM -->
+    <div class="docked-metronome" id="dockedMetronome">
+      <!-- 1. Řádek: Informace o stavu, fázi a indikace dob -->
+      <div class="metro-header-row">
+        <div class="metro-phase-badge badge-idle" id="metroPhaseBadge">⏸ Připraveno</div>
+        
+        <div class="metro-tempo-display">
+          <span class="tempo-current" id="metroCurrentBpmText">60</span>
+          <span class="tempo-unit">BPM</span>
+          <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
+        </div>
 
-      <div class="trainer-row compact-row">
-        <div class="ctrl-group" style="gap:5px;">
-          <label style="font-size:0.75rem;">Smyčka od:</label>
-          <input type="number" id="loopFrom" value="1" min="1" class="compact-input">
-          <label style="font-size:0.75rem;">do:</label>
-          <input type="number" id="loopTo" value="1" min="1" class="compact-input">
+        <div class="metro-beat-lights" id="metroBeatLights">
+          <div class="beat-light"></div>
+          <div class="beat-light"></div>
+          <div class="beat-light"></div>
+          <div class="beat-light"></div>
         </div>
       </div>
+
+      <!-- 2. Řádek: Nastavení tempa, zrychlování a spuštění -->
+      <div class="metro-controls-row">
+        <div class="metro-input-group">
+          <label>Start:</label>
+          <input type="number" id="metroStartBpm" value="60" min="30" max="260" class="metro-input">
+        </div>
+
+        <div class="metro-input-group">
+          <label>Cíl:</label>
+          <input type="number" id="metroTargetBpm" value="100" min="30" max="260" class="metro-input">
+        </div>
+
+        <div class="metro-input-group">
+          <label>+Krok:</label>
+          <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input" title="O kolik BPM zrychlit po odehrání">
+        </div>
+
+        <div class="metro-input-group">
+          <label>Doby:</label>
+          <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input" style="width:42px;">
+        </div>
+
+        <button class="btn btn-primary metro-play-btn" id="metroToggleBtn" onclick="app.toggleIncrementalMetronome()">
+          ▶ Start
+        </button>
+
+        <button class="btn metro-reset-btn" onclick="app.resetMetronomeTempo()" title="Vrátit tempo na Start BPM">
+          ↺
+        </button>
+      </div>
     </div>
+
   </div>
 
+  <!-- Plovoucí zvětšovací lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
