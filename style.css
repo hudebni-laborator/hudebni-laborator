@@ -32,33 +32,24 @@ body {
 header {
   background-color: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 10px 14px;
+  padding: 8px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .app-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 60%;
+  max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.badge {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--surface-2);
-  color: var(--text-muted);
-  text-transform: uppercase;
 }
 
 .nav-tabs {
@@ -73,12 +64,13 @@ header {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  padding: 6px 12px;
+  font-size: 0.82rem;
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .tab-btn.active {
@@ -89,11 +81,15 @@ header {
 .toolbar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 8px 14px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+}
+
+.compact-toolbar {
+  padding: 4px 10px;
 }
 
 .crop-toolbar {
@@ -106,12 +102,12 @@ header {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 7px 12px;
-  font-size: 0.85rem;
+  padding: 6px 10px;
+  font-size: 0.82rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-weight: 500;
 }
 
@@ -147,23 +143,27 @@ header {
 
 .file-input { display: none; }
 
-/* Přepínač stránek */
-.page-switcher {
+/* Přepínač stránek a ovládání lupy/zoomu */
+.page-switcher, .zoom-controls {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   background: var(--surface-2);
-  padding: 3px 8px;
+  padding: 2px 6px;
   border-radius: 6px;
   border: 1px solid var(--border);
 }
 
-.page-indicator {
-  font-size: 0.82rem;
+.page-indicator, .zoom-indicator {
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text);
-  min-width: 70px;
+  min-width: 55px;
   text-align: center;
+}
+
+.zoom-indicator {
+  cursor: pointer;
 }
 
 .page-btn {
@@ -171,8 +171,8 @@ header {
   border: none;
   color: var(--text);
   cursor: pointer;
-  font-size: 0.85rem;
-  padding: 2px 6px;
+  font-size: 0.82rem;
+  padding: 3px 6px;
   border-radius: 4px;
 }
 
@@ -190,10 +190,10 @@ header {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   background: #18181b;
   border-bottom: 1px solid var(--border);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   flex-wrap: wrap;
 }
 
@@ -205,17 +205,17 @@ header {
 
 .subbar-label {
   color: var(--text-muted);
+  font-size: 0.75rem;
   margin-right: 2px;
-  font-size: 0.78rem;
 }
 
 .size-btn {
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 4px 8px;
+  padding: 4px 7px;
   border-radius: 5px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -232,30 +232,93 @@ header {
   color: #93c5fd;
 }
 
-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px;
-  width: 100%;
-}
-
+/* Hlavní panely */
 .view-panel {
   width: 100%;
   max-width: 950px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 8px;
+  margin: 0 auto;
 }
 
+/* Přehled souborů v záložce Knihovna */
+.library-container {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+.library-header {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.library-list {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.library-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface-2);
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.library-item:hover, .library-item.active {
+  border-color: var(--primary);
+}
+
+.library-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.library-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.library-meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.library-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Kontejner plátna se scrollováním při přiblížení */
 .canvas-box {
   width: 100%;
+  max-height: 75vh;
   background: #1f1f1f;
   border-radius: 8px;
   border: 1px solid var(--border);
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   justify-content: center;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -272,17 +335,17 @@ canvas {
 }
 
 .status-msg {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   text-align: center;
-  padding: 4px;
+  padding: 2px;
 }
 
-/* Bezpečná zóna pro smazání všech taktů dole */
+/* Bezpečná zóna pro smazání všech taktů */
 .danger-zone {
-  margin-top: 14px;
-  margin-bottom: 20px;
-  padding-top: 12px;
+  margin-top: 10px;
+  margin-bottom: 16px;
+  padding-top: 10px;
   border-top: 1px dashed var(--border);
   width: 100%;
   display: flex;
@@ -293,17 +356,9 @@ canvas {
   background: transparent;
   border: 1px solid rgba(239, 68, 68, 0.35);
   color: #f87171;
-  font-size: 0.8rem;
-  padding: 6px 14px;
+  font-size: 0.78rem;
+  padding: 5px 12px;
   opacity: 0.8;
-  transition: all 0.2s;
-}
-
-.btn-subtle-danger:active {
-  opacity: 1;
-  background: rgba(239, 68, 68, 0.15);
-  border-color: var(--danger);
-  color: #fca5a5;
 }
 
 /* Lupa nad prstem */
@@ -328,13 +383,7 @@ canvas {
   display: block;
 }
 
-/* Režim cvičení */
-#practiceView {
-  display: none;
-  width: 100%;
-  max-width: 950px;
-}
-
+/* REŽIM CVIČENÍ - KOMPAKTNÍ ROZVRŽENÍ */
 .practice-card {
   width: 100%;
   background: var(--surface);
@@ -343,25 +392,23 @@ canvas {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
 .clef-banner {
   background: #27272a;
   border-bottom: 1px solid var(--border);
-  padding: 6px 12px;
+  padding: 4px 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 48px;
+  gap: 8px;
+  min-height: 40px;
 }
 
 .clef-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--accent-gold);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
   white-space: nowrap;
 }
 
@@ -372,7 +419,7 @@ canvas {
   display: flex;
   align-items: center;
   padding: 2px;
-  height: 44px;
+  height: 38px;
   max-width: 220px;
   border: 1px solid var(--border);
 }
@@ -384,7 +431,7 @@ canvas {
 }
 
 .clef-empty-hint {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   font-style: italic;
 }
@@ -397,7 +444,7 @@ canvas {
   justify-content: center;
   align-items: flex-start;
   min-height: 220px;
-  max-height: 56vh;
+  max-height: 60vh;
   cursor: pointer;
   position: relative;
   border-top: 1px solid var(--border);
@@ -411,148 +458,66 @@ canvas {
 
 .tap-hint {
   position: absolute;
-  bottom: 8px;
-  font-size: 0.72rem;
-  color: rgba(0, 0, 0, 0.5);
+  bottom: 6px;
+  font-size: 0.68rem;
+  color: rgba(0, 0, 0, 0.45);
   pointer-events: none;
   background: rgba(255, 255, 255, 0.85);
-  padding: 3px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
 
-.trainer-controls {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-  background: var(--surface);
-  padding: 14px;
+/* Kompaktní ovládání pod okénkem */
+.compact-controls {
+  padding: 8px 12px;
+  gap: 6px;
+  margin-top: 6px;
   border-radius: 8px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  width: 100%;
+}
+
+.compact-btn {
+  padding: 7px 14px;
+  font-size: 0.85rem;
+}
+
+.compact-indicator {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.compact-row {
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.compact-input {
+  width: 55px;
+  padding: 4px 6px;
+  font-size: 0.82rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
 }
 
 .measure-stepper {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-}
-
-.measure-indicator {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.5px;
-}
-
-.btn-nav {
-  padding: 10px 18px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  gap: 8px;
 }
 
 .trainer-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .ctrl-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.ctrl-group label {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.ctrl-group input[type="number"], .ctrl-group select {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-/* Modální okno knihovny skladeb */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
-  z-index: 1000;
-  justify-content: center;
-  align-items: center;
-  padding: 16px;
-}
-
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.modal-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-title {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.modal-body {
-  padding: 14px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.library-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--surface-2);
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-}
-
-.library-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.library-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.library-meta {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.library-actions {
-  display: flex;
   gap: 6px;
 }
