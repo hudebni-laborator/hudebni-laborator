@@ -13,7 +13,7 @@
 
   <header>
     <div class="app-title">
-      Kytarový Trenažér
+      <span id="scoreTitleDisplay">Kytarový Trenažér</span>
       <span class="badge" id="appModeBadge">Příprava</span>
     </div>
     <div class="nav-tabs">
@@ -22,11 +22,11 @@
     </div>
   </header>
 
-  <!-- Lišta nástrojů pro značkování (pouze běžné pracovní akce) -->
+  <!-- Běžná lišta nástrojů pro značkování -->
   <div class="toolbar" id="editToolbar">
     <button class="btn" onclick="app.openLibraryModal()">📚 Knihovna (<span class="lib-count-span">0</span>)</button>
 
-    <label class="btn btn-primary" title="Vyfotit noty fotoaparátem">
+    <label class="btn btn-primary" title="Vyfotit noty fotoaparátem ze stojanu">
       📷 Vyfotit noty
       <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
     </label>
@@ -41,24 +41,46 @@
       <input type="file" id="addPageInput" class="file-input" accept="image/*" capture="environment">
     </label>
 
+    <!-- Tlačítka správy načtené skladby -->
+    <button class="btn" id="cropPaperBtn" style="display:none;" onclick="app.startPaperCrop()" title="Odříznout pozadí a okraje pultu">
+      ✂ Oříznout papír
+    </button>
+    <button class="btn" id="renameScoreBtn" style="display:none;" onclick="app.renameCurrentScore()" title="Změnit název skladby">
+      ✏ Přejmenovat
+    </button>
+
+    <!-- Přepínač stránek -->
     <div class="page-switcher" id="pageSwitcher" style="display:none;">
       <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
       <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
       <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
     </div>
 
+    <!-- Akce s aktivním rámečkem -->
     <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
       ✔ Uložit takt <span id="nextMeasureNum">1</span>
     </button>
     <button id="setKeySigBtn" class="btn btn-gold" style="display:none;" onclick="app.saveCurrentAsKeySignature()">
       🎼 Uložit jako Klíč/Předznamenání
     </button>
-    <button id="deleteSelectedMeasureBtn" class="btn btn-danger" style="display:none;" onclick="app.deleteSelectedMeasure()">
-      🗑 Smazat tento takt
+    <button id="toggleCategoryBtn" class="btn" style="display:none;" onclick="app.toggleActiveCategory()">
+      🔄 Změnit kategorii
+    </button>
+    <button id="deleteActiveBoxBtn" class="btn btn-danger" style="display:none;" onclick="app.deleteActiveBox()">
+      🗑 Smazat rámeček
     </button>
   </div>
 
-  <!-- Lišta pro úpravu a rozšiřování rámečku -->
+  <!-- Speciální lišta při ořezávání papíru -->
+  <div class="toolbar crop-toolbar" id="cropToolbar" style="display:none;">
+    <span style="font-weight:600; font-size:0.85rem; color:#93c5fd;">✂ Ořez papíru: Posuňte rohy rámečku k okrajům not</span>
+    <div style="margin-left:auto; display:flex; gap:6px;">
+      <button class="btn btn-accent" onclick="app.applyPaperCrop()">✔ Použít ořez</button>
+      <button class="btn btn-danger" onclick="app.cancelPaperCrop()">✖ Zrušit</button>
+    </div>
+  </div>
+
+  <!-- Lišta pro jemnou úpravu rozměrů rámečku a skok o takt -->
   <div class="edit-subbar" id="editSubbar" style="display:none;">
     <div class="subbar-group">
       <span class="subbar-label">Více taktů:</span>
@@ -87,7 +109,7 @@
       </div>
       <div class="status-msg" id="statusHint">Vyfoťte noty z pultu nebo vyberte z knihovny a klepněte na takt.</div>
 
-      <!-- Bezpečná zóna dole pod notami pro smazání všech taktů -->
+      <!-- Bezpečná zóna dole pod notami pro hromadné smazání -->
       <div class="danger-zone">
         <button id="clearMeasuresBtn" class="btn btn-subtle-danger" style="display:none;" onclick="app.clearMeasures()">
           🗑 Smazat všechny označené takty (<span id="measureCountSpan">0</span>)

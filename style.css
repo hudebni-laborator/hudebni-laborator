@@ -45,7 +45,11 @@ header {
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
@@ -90,6 +94,11 @@ header {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.crop-toolbar {
+  background: #1e293b;
+  border-bottom: 2px solid #3b82f6;
 }
 
 .btn {
@@ -269,7 +278,7 @@ canvas {
   padding: 4px;
 }
 
-/* Bezpečná zóna pro smazání všech taktů (dole pod notami) */
+/* Bezpečná zóna pro smazání všech taktů dole */
 .danger-zone {
   margin-top: 14px;
   margin-bottom: 20px;
@@ -319,7 +328,7 @@ canvas {
   display: block;
 }
 
-/* Režim cvičení a zobrazení předznamenání / taktů */
+/* Režim cvičení */
 #practiceView {
   display: none;
   width: 100%;
