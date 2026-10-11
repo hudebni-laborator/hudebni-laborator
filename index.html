@@ -41,20 +41,40 @@
     </header>
 
     <div class="editor-toolbar">
-      <button class="btn btn-sm" id="btn-mode-key">1. Nastavit klíč / předznamenání</button>
-      <button class="btn btn-sm active" id="btn-mode-measure">2. Označovat takty</button>
-      <button class="btn btn-sm" id="btn-undo">Vrátit krok (Undo)</button>
+        <!-- Přidejte do .editor-toolbar v index.html -->
+        <div class="tool-group" id="zoom-controls">
+            <button class="btn btn-sm" id="btn-zoom-reset" title="Resetovat přiblížení">🔍 100%</button>
+        </div>
+      <!-- Přepínač Posouvat vs Označovat pro mobil -->
+      <div class="tool-group">
+        <button class="btn btn-sm active" id="btn-tool-draw" title="Kreslit a editovat rámečky">✏️ Kreslit</button>
+        <button class="btn btn-sm" id="btn-tool-pan" title="Volný posun stránky">✋ Posouvat</button>
+      </div>
+
+      <button class="btn btn-sm" id="btn-mode-key">Klíč</button>
+      <button class="btn btn-sm active" id="btn-mode-measure">Takty</button>
+      <button class="btn btn-sm" id="btn-undo">Zpět</button>
+      <button class="btn btn-sm btn-danger" id="btn-delete-selected" style="display: none;">Smazat</button>
+
+      <!-- Stránkování vícestránkových PDF -->
+      <div class="tool-group" id="page-controls" style="display: none; align-items: center;">
+        <button class="btn btn-sm" id="btn-prev-page">◀</button>
+        <span id="page-indicator" style="font-size: 12px; font-weight: 600; padding: 0 6px;">1 / 1</span>
+        <button class="btn btn-sm" id="btn-next-page">▶</button>
+      </div>
 
       <div class="slider-group" id="threshold-control" style="display: none;">
-        <label for="threshold-slider">Kontrast papíru:</label>
+        <label for="threshold-slider">Kontrast:</label>
         <input type="range" id="threshold-slider" min="60" max="210" value="145">
         <span id="threshold-val">145</span>
       </div>
     </div>
 
-    <div class="canvas-viewport">
-      <canvas id="pdf-canvas"></canvas>
-      <div id="selection-layer"></div>
+    <div class="canvas-viewport" id="canvas-viewport">
+      <div class="canvas-wrapper">
+        <canvas id="pdf-canvas"></canvas>
+        <div id="selection-layer" class="mode-draw"></div>
+      </div>
     </div>
   </section>
 
@@ -62,10 +82,25 @@
   <section id="view-practice" class="view practice-screen">
     <div class="practice-top-bar">
       <button class="btn btn-sm" id="btn-exit-practice">✕ Ukončit</button>
-      <span class="pedal-hint">Bluetooth pedál: PageUp / PageDown</span>
+      
+      <div class="measure-count-selector">
+        <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Taktů naráz:</span>
+        <button class="btn btn-sm active" data-count="1">1</button>
+        <button class="btn btn-sm" data-count="2">2</button>
+        <button class="btn btn-sm" data-count="3">3</button>
+      </div>
+
+      <span class="pedal-hint">Pedál: PageUp / PageDown</span>
     </div>
 
-    <div id="practice-strips" class="practice-strips"></div>
+    <!-- Horní samostatné záhlaví pro klíč -->
+    <div id="practice-key-header" class="practice-header-key" style="display: none;">
+      <span class="practice-header-key-label">Předznamenání:</span>
+      <canvas id="practice-key-canvas"></canvas>
+    </div>
+
+    <!-- Pásy cvičených taktů -->
+    <div id="practice-strips" class="practice-strips" data-count="1"></div>
 
     <div class="practice-controls">
       <button class="btn btn-sm" id="btn-prev-measure">◀ Předchozí</button>

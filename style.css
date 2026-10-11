@@ -26,7 +26,6 @@ body {
   flex-direction: column;
 }
 
-/* Pohledy */
 .view {
   display: none;
   width: 100%;
@@ -38,7 +37,6 @@ body {
   flex-direction: column;
 }
 
-/* Navigační lišty */
 header {
   background: var(--surface-color);
   border-bottom: 1px solid var(--surface-border);
@@ -63,7 +61,6 @@ header h1 {
   max-width: 50vw;
 }
 
-/* Tlačítka */
 .btn {
   background: var(--surface-color);
   color: var(--text-main);
@@ -77,6 +74,7 @@ header h1 {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  user-select: none;
 }
 
 .btn:active {
@@ -184,7 +182,7 @@ header h1 {
 
 /* View 2: Editor */
 .editor-toolbar {
-  padding: 10px 16px;
+  padding: 8px 12px;
   background: #16161a;
   border-bottom: 1px solid var(--surface-border);
   display: flex;
@@ -193,10 +191,19 @@ header h1 {
   align-items: center;
 }
 
+.tool-group {
+  display: flex;
+  gap: 4px;
+  background: #0d0d0f;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--surface-border);
+}
+
 .slider-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-muted);
   margin-left: auto;
@@ -210,16 +217,28 @@ header h1 {
 .canvas-viewport {
   position: relative;
   width: 100%;
-  overflow-y: auto;
+  overflow: hidden; /* Skryje posuvníky, posun řídíme gesty */
   flex: 1;
-  background: #000;
+  background: #09090b;
+  touch-action: none; /* Klíčové: zamezí výchozímu chování prohlížeče při dvou prstech */
+}
+
+.canvas-wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  transform-origin: 0 0;
+  will-change: transform;
 }
 
 #pdf-canvas {
   display: block;
-  margin: 0 auto;
+  width: 100%;
+  height: auto;
 }
 
+/* Dotyková vrstva výběru */
 #selection-layer {
   position: absolute;
   top: 0;
@@ -229,19 +248,75 @@ header h1 {
   cursor: crosshair;
 }
 
-.measure-rect {
-  position: absolute;
-  border: 2px solid var(--primary-color);
-  background: rgba(16, 185, 129, 0.15);
+/* V režimu posunu je vrstva průchozí pro přirozený scroll */
+#selection-layer.mode-pan {
+  cursor: grab;
   pointer-events: none;
 }
 
-.key-rect {
-  position: absolute;
-  border: 2px dashed #3b82f6;
-  background: rgba(59, 130, 246, 0.15);
-  pointer-events: none;
+/* V režimu kreslení zachytává dotyky bez scrollovaní */
+#selection-layer.mode-draw {
+  touch-action: none;
 }
+
+.measure-rect, .key-rect {
+  position: absolute;
+  cursor: move;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+}
+
+.measure-rect {
+  border: 2px solid var(--primary-color);
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.key-rect {
+  border: 2px dashed #3b82f6;
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.measure-rect.selected, .key-rect.selected {
+  outline: 2px solid #ffffff;
+  background: rgba(16, 185, 129, 0.32);
+  z-index: 10;
+}
+
+/* Živý náhled rámečku při tažení prstem/myší */
+.active-drag-rect {
+  position: absolute;
+  border: 2px dashed #10b981;
+  background: rgba(16, 185, 129, 0.25);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.active-drag-rect.key-drag {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.25);
+}
+
+.handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border: 2px solid var(--primary-color);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  z-index: 12;
+}
+
+.handle.tl { top: 0; left: 0; cursor: nwse-resize; }
+.handle.tr { top: 0; left: 100%; cursor: nesw-resize; }
+.handle.bl { top: 100%; left: 0; cursor: nesw-resize; }
+.handle.br { top: 100%; left: 100%; cursor: nwse-resize; }
+.handle.tm { top: 0; left: 50%; cursor: ns-resize; }
+.handle.bm { top: 100%; left: 50%; cursor: ns-resize; }
+.handle.ml { top: 50%; left: 0; cursor: ew-resize; }
+.handle.mr { top: 50%; left: 100%; cursor: ew-resize; }
 
 .badge {
   position: absolute;
@@ -266,7 +341,10 @@ header h1 {
   padding-left: max(16px, env(safe-area-inset-left));
   padding-right: max(16px, env(safe-area-inset-right));
   padding-bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  gap: 10px;
 }
 
 .practice-top-bar {
@@ -274,11 +352,48 @@ header h1 {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.measure-count-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .pedal-hint {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.practice-header-key {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #18181b;
+  border: 1px solid var(--surface-border);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.practice-header-key-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b82f6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.practice-header-key canvas {
+  height: 52px;
+  width: auto;
+  background: #fbfbfa;
+  border-radius: 4px;
+  display: block;
 }
 
 .practice-strips {
@@ -288,34 +403,40 @@ header h1 {
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin: 12px 0;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .practice-strip-row {
   position: relative;
   display: flex;
-  flex-direction: row;
   align-items: stretch;
   width: 100%;
   max-width: 1200px;
-  height: clamp(120px, 32vh, 220px);
   background: #fbfbfa;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+  flex: 1 1 0;
+  min-height: 80px;
 }
 
-.strip-key {
-  height: 100%;
-  width: auto;
-  border-right: 1px solid #d4d4d8;
-  object-fit: contain;
+.practice-strips[data-count="1"] .practice-strip-row {
+  max-height: clamp(140px, 35vh, 260px);
+}
+
+.practice-strips[data-count="2"] .practice-strip-row {
+  max-height: clamp(100px, 24vh, 180px);
+}
+
+.practice-strips[data-count="3"] .practice-strip-row {
+  max-height: clamp(80px, 17vh, 130px);
 }
 
 .strip-measure {
   height: 100%;
-  flex: 1;
   width: 100%;
+  display: block;
   object-fit: fill;
 }
 
@@ -325,7 +446,7 @@ header h1 {
   right: 8px;
   font-size: 11px;
   font-family: monospace;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.88);
   color: #18181b;
   padding: 2px 6px;
   border-radius: 4px;
@@ -345,7 +466,10 @@ header h1 {
   .practice-screen {
     padding-top: 6px;
   }
-  .practice-strip-row {
-    height: clamp(130px, 46vh, 240px);
+  .practice-header-key canvas {
+    height: 44px;
+  }
+  .practice-strips[data-count="1"] .practice-strip-row {
+    max-height: clamp(130px, 46vh, 240px);
   }
 }
