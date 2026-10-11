@@ -13,16 +13,17 @@
 </head>
 <body>
 
-  <!-- HORNÍ ŘÁDEK: 3 ZÁLOŽKY -->
+  <!-- HORNÍ ŘÁDEK S LOGEM A ROZPROSTŘENÝMI BAREVNÝMI TLAČÍTKY -->
   <header>
     <div class="brand">
       <img src="icon.svg" alt="Logo" class="brand-icon">
       <div class="app-title">Notový Trenažér</div>
     </div>
+    
     <div class="nav-tabs">
-      <button class="tab-btn active" id="tabLibrary" onclick="switchMode('library')">1. Knihovna</button>
-      <button class="tab-btn" id="tabEdit" onclick="switchMode('edit')">2. Značkování</button>
-      <button class="tab-btn" id="tabPractice" onclick="switchMode('practice')">3. Cvičení</button>
+      <button class="tab-btn tab-lib active" id="tabLibrary" onclick="switchMode('library')">Knihovna</button>
+      <button class="tab-btn tab-edit" id="tabEdit" onclick="switchMode('edit')">Značkování</button>
+      <button class="tab-btn tab-practice" id="tabPractice" onclick="switchMode('practice')">Cvičení</button>
     </div>
   </header>
 
@@ -146,8 +147,6 @@
 
   <!-- 3. ZÁLOŽKA: CVIČENÍ -->
   <div class="view-panel practice-panel" id="practiceView" style="display:none;">
-    
-    <!-- Horní ovládání počtu taktů a přepínání smyčky -->
     <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
       <div class="measure-stepper" style="gap:6px;">
         <button class="btn compact-btn" onclick="app.prevMeasure()">◀</button>
@@ -167,7 +166,6 @@
       </div>
     </div>
 
-    <!-- Karta s notami (Klíč + takty) -->
     <div class="practice-card">
       <div class="clef-banner" id="clefBanner">
         <div class="clef-preview-wrap" id="clefPreviewWrap">
@@ -181,9 +179,8 @@
       </div>
     </div>
 
-    <!-- DOLŮ PŘILEPENÝ METRONOM PŘIZPŮSOBENÝ PRO MOBIL -->
+    <!-- DOLŮ PŘILEPENÝ METRONOM -->
     <div class="docked-metronome" id="dockedMetronome">
-      <!-- 1. Řádek: Stav, fáze a indikace dob -->
       <div class="metro-header-row">
         <div class="metro-phase-badge badge-idle" id="metroPhaseBadge">⏸ Připraveno</div>
         
@@ -201,7 +198,6 @@
         </div>
       </div>
 
-      <!-- 2. Řádek: Všechna tlačítka a pole přehledně vedle sebe bez přetékání -->
       <div class="metro-controls-row">
         <div class="metro-input-group">
           <span class="metro-lbl">Start</span>
@@ -227,14 +223,12 @@
         <button class="btn btn-primary metro-play-btn" id="metroToggleBtn" onclick="app.toggleIncrementalMetronome()">▶ Start</button>
       </div>
 
-      <!-- Skrytá pole pro smyčku (udržovaná v synchronizaci) -->
       <input type="hidden" id="loopFrom" value="1">
       <input type="hidden" id="loopTo" value="1">
     </div>
 
   </div>
 
-  <!-- Plovoucí zvětšovací lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
