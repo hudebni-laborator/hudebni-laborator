@@ -29,7 +29,7 @@
       <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
     </label>
 
-    <!-- Přepínač stránek PDF (zobrazí se pouze pro vícestránková PDF) -->
+    <!-- Přepínač stránek PDF -->
     <div class="page-switcher" id="pageSwitcher" style="display:none;">
       <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
       <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
@@ -122,12 +122,12 @@
     </div>
   </main>
 
-  <!-- LUPA NAD PRSTEM PŘI EDITACI -->
+  <!-- Lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
 
-  <!-- MODÁLNÍ OKNO KNIHOVNY -->
+  <!-- Modální okno knihovny -->
   <div class="modal-overlay" id="libraryModal">
     <div class="modal">
       <div class="modal-header">
@@ -138,6 +138,7 @@
     </div>
   </div>
 
+  <!-- Skripty načítané ze složky src/ -->
   <script src="src/wakeLock.js"></script>
   <script src="src/db.js"></script>
   <script src="src/app.js"></script>

@@ -1,8 +1,7 @@
-// IndexedDB úložiště pro správu knihovny skladeb, PDF souborů a vícestránkových not
 class ScoreDB {
   constructor() {
     this.dbName = 'GuitarTrainerDB';
-    this.version = 2;
+    this.version = 3; // Zvýšeno pro zajištění spolehlivého upgrade
     this.db = null;
   }
 
@@ -14,17 +13,8 @@ class ScoreDB {
 
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
-        let store;
         if (!db.objectStoreNames.contains('scores')) {
-          store = db.createObjectStore('scores', { keyPath: 'id' });
-        } else {
-          store = e.target.transaction.objectStore('scores');
-        }
-        if (!store.indexNames.contains('name')) {
-          store.createIndex('name', 'name', { unique: false });
-        }
-        if (!store.indexNames.contains('updatedAt')) {
-          store.createIndex('updatedAt', 'updatedAt', { unique: false });
+          db.createObjectStore('scores', { keyPath: 'id' });
         }
       };
 
