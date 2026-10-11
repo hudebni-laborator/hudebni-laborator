@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#18181b">
-  <title>Kytarový Trenažér</title>
+  <title>Notový Trenažér</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -17,7 +17,7 @@
   <header>
     <div class="brand">
       <img src="icon.svg" alt="Logo" class="brand-icon">
-      <div class="app-title">Kytarový Trenažér</div>
+      <div class="app-title">Notový Trenažér</div>
     </div>
     <div class="nav-tabs">
       <button class="tab-btn active" id="tabLibrary" onclick="switchMode('library')">1. Knihovna</button>
@@ -56,8 +56,8 @@
       <button class="btn" id="renameScoreBtn" style="display:none;" onclick="app.renameCurrentScore()" title="Přejmenovat">
         ✏ Přejmenovat
       </button>
-      <button class="btn" onclick="app.exportBackupJSON()" title="Zálohovat skladby na Disk / do souboru">
-        💾 Export na Disk
+      <button class="btn" onclick="app.exportBackupJSON()" title="Zálohovat skladby do souboru">
+        💾 Export JSON
       </button>
     </div>
 
@@ -72,16 +72,19 @@
   <!-- 2. ZÁLOŽKA: ZNAČKOVÁNÍ -->
   <div class="view-panel" id="editView" style="display:none;">
     <div class="toolbar" id="editToolbar">
+      <!-- Přepínač stránek -->
       <div class="page-switcher" id="pageSwitcher" style="display:none;">
         <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
         <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
         <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
       </div>
 
+      <!-- Spolehlivý zoom a tlačítko návratu na celou obrazovku -->
       <div class="zoom-controls">
         <button class="page-btn" onclick="app.zoomScore(-0.25)" title="Oddálit">🔍 -</button>
-        <span class="zoom-indicator" id="zoomLevelSpan" onclick="app.resetZoom()" title="Kliknutím obnovíte">100%</span>
+        <span class="zoom-indicator" id="zoomLevelSpan" onclick="app.resetZoom()" title="Klepnutím vrátíte celou obrazovku">100%</span>
         <button class="page-btn" onclick="app.zoomScore(0.25)" title="Přiblížit">🔍 +</button>
+        <button class="btn btn-fit" onclick="app.resetZoom()" title="Zobrazit celou stránku na displeji">⛶ Celá stránka</button>
       </div>
 
       <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
@@ -126,13 +129,13 @@
       </div>
     </div>
 
-    <!-- KONTEJNER S NEOMEZENÝM PINCH ZOOM A PAN POSUVEM -->
+    <!-- KONTEJNER PRO NEOMEZENÝ ZOOM A POSUV -->
     <div class="canvas-box" id="canvasBox">
       <div class="canvas-viewport" id="canvasViewport">
         <canvas id="scoreCanvas"></canvas>
       </div>
     </div>
-    <div class="status-msg" id="statusHint">Dvěma prsty můžete noty libovolně zvětšit a posouvat. Klepnutím označíte takt.</div>
+    <div class="status-msg" id="statusHint">Dvěma prsty libovolně zvětšete/posuňte noty. Dvojklik vrátí celou obrazovku.</div>
 
     <div class="danger-zone">
       <button id="clearMeasuresBtn" class="btn btn-subtle-danger" style="display:none;" onclick="app.clearMeasures()">

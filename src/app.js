@@ -2,7 +2,7 @@ if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-// 1. ZPRACOVÁNÍ A ZLEPŠENÍ KONTRASTU VYFOCENÝCH NOT Z PULTU
+// 1. ZPRACOVÁNÍ A KONTRAST FOTKY
 async function processAndEnhancePhoto(file, maxDimension = 2400) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -26,11 +26,9 @@ async function processAndEnhancePhoto(file, maxDimension = 2400) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
 
-      // Algoritmus pro vybělení šedého papíru a ztmavení not
       const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
 
-      // Zjistíme průměrný jas horních 5 % nejjasnějších bodů (papír)
       let sampleSum = 0, sampleCount = 0;
       for (let i = 0; i < data.length; i += 64) {
         const lum = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
@@ -43,7 +41,6 @@ async function processAndEnhancePhoto(file, maxDimension = 2400) {
 
       for (let i = 0; i < data.length; i += 4) {
         let lum = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
-        // Plynulé roztažení kontrastu (černá černější, papír čistě bílý)
         let enhanced;
         if (lum >= whitePoint) {
           enhanced = 255;
@@ -245,7 +242,7 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   };
 }
 
-// 3. EDITOR RÁMEČKU S PŘIZPŮSOBENÍM AKTUÁLNÍMU ZOOMU A POSUVU
+// 3. EDITOR RÁMEČKU
 class MeasureBoxEditor {
   constructor(canvas, renderCallback, initialBox, onUpdate, isBarLineFn, isCropBox = false) {
     this.canvas = canvas;
@@ -515,7 +512,6 @@ class MeasureBoxEditor {
       c.strokeRect(b.left, b.top, b.width, b.height);
       c.setLineDash([]);
     } else {
-      // Výrazné zvýraznění aktivního rámečku
       c.fillStyle = 'rgba(37, 99, 235, 0.22)';
       c.fillRect(b.left, b.top, b.width, b.height);
 
@@ -550,7 +546,7 @@ class MeasureBoxEditor {
   }
 }
 
-// 4. HLAVNÍ APLIKACE S PODPOROU PINCH-TO-ZOOM A PAN
+// 4. HLAVNÍ APLIKACE S ROBUSTNÍM ZOOMEM A POSUVEM
 class GuitarTrainer {
   constructor() {
     this.scoreCanvas = document.getElementById('scoreCanvas');
@@ -573,7 +569,7 @@ class GuitarTrainer {
     this.currentIndex = 0;
     this.activeEditor = null;
 
-    // Viewport transformace (Pinch Zoom & Pan)
+    // Viewport transformace: měřítko a souřadnice
     this.zoomScale = 1.0;
     this.panX = 0;
     this.panY = 0;
@@ -591,7 +587,6 @@ class GuitarTrainer {
     this.initPracticeGestures();
   }
 
-  // --- MATEMATIKA ZOOMU A PŘEPOČTU SOUŘADNIC ---
   updateViewportTransform() {
     if (!this.canvasViewport) return;
     this.canvasViewport.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoomScale})`;
@@ -615,14 +610,22 @@ class GuitarTrainer {
   fitCanvasToScreen() {
     if (!this.scoreCanvas || this.scoreCanvas.width === 0) return;
     const boxRect = this.canvasBox.getBoundingClientRect();
-    this.zoomScale = Math.min(1.0, (boxRect.width - 16) / this.scoreCanvas.width);
+
+    // Přesný výpočet pro zobrazení celé stránky bez ořezu na výšku i šířku
+    const scaleX = (boxRect.width - 24) / this.scoreCanvas.width;
+    const scaleY = (boxRect.height - 24) / this.scoreCanvas.height;
+    this.zoomScale = Math.min(scaleX, scaleY, 1.0);
+
+    // Vycentrování na střed kontejneru
     this.panX = (boxRect.width - this.scoreCanvas.width * this.zoomScale) / 2;
-    this.panY = 10;
+    this.panY = Math.max(8, (boxRect.height - this.scoreCanvas.height * this.zoomScale) / 2);
+
     this.updateViewportTransform();
   }
 
   applyZoomAt(newScale, centerScreenX, centerScreenY) {
-    const clampedScale = Math.max(0.4, Math.min(4.0, newScale));
+    // Snížená minimální hranice na 0.15 pro stoprocentní jistotu oddálení
+    const clampedScale = Math.max(0.15, Math.min(4.0, newScale));
     const factor = clampedScale / this.zoomScale;
 
     this.panX = centerScreenX - (centerScreenX - this.panX) * factor;
@@ -642,7 +645,6 @@ class GuitarTrainer {
     };
   }
 
-  // --- INTELIGENTNÍ DOTYKOVÝ ENGINE: 1 PRST (ZNAČKOVÁNÍ/TÁHLA/PAN) + 2 PRSTY (PINCH ZOOM & PAN) ---
   initTouchEngine() {
     const box = this.canvasBox;
     const ongoingTouches = new Map();
@@ -651,6 +653,7 @@ class GuitarTrainer {
     let isDraggingHandle = false;
     let isPanningOneFinger = false;
     let startPoint = null;
+    let lastTapTime = 0;
 
     box.addEventListener('pointerdown', (e) => {
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -670,11 +673,9 @@ class GuitarTrainer {
             return;
           }
         }
-        // Pokud nesaháme na táhlo rámečku, umožníme posun not (pan)
         isPanningOneFinger = true;
         box.setPointerCapture(e.pointerId);
       } else if (ongoingTouches.size === 2) {
-        // Zahájení pinch-to-zoom
         isDraggingHandle = false;
         isPanningOneFinger = false;
         if (this.activeEditor) this.activeEditor.endDrag();
@@ -704,7 +705,6 @@ class GuitarTrainer {
           const targetScale = initialPinchScale * (currentDist / initialPinchDist);
           this.applyZoomAt(targetScale, centerScreenX, centerScreenY);
         }
-        // Zároveň posunujeme při dvou prstech
         this.panX += dx / 2;
         this.panY += dy / 2;
         this.updateViewportTransform();
@@ -738,11 +738,18 @@ class GuitarTrainer {
           if (this.cropEditor) this.cropEditor.endDrag();
         }
 
-        // Detekce čistého klepnutí (Tap)
         if (startPoint && !this.isCropMode) {
           const movedDist = Math.hypot(e.clientX - startPoint.x, e.clientY - startPoint.y);
           if (movedDist < 8 && !isDraggingHandle) {
-            this.handleCanvasTap(e.clientX, e.clientY);
+            const currentTime = Date.now();
+            // DOUBLE-TAP: Rychlé dvojkliknutí vrátí zobrazení celé obrazovky
+            if (currentTime - lastTapTime < 280) {
+              this.fitCanvasToScreen();
+              lastTapTime = 0;
+            } else {
+              lastTapTime = currentTime;
+              this.handleCanvasTap(e.clientX, e.clientY);
+            }
           }
         }
         isPanningOneFinger = false;
@@ -755,7 +762,6 @@ class GuitarTrainer {
     box.addEventListener('pointercancel', finishPointer);
   }
 
-  // Klepnutí prstem na plátno (výběr existujícího rámečku nebo detekce nového)
   handleCanvasTap(clientX, clientY) {
     if (!this.currentScore) return;
     const cleanCanvas = this.pageCache.get(this.currentPage);
@@ -844,7 +850,6 @@ class GuitarTrainer {
     document.getElementById('statusHint').innerText = 'Místo ohraničeno. Uložte jako takt, nebo jako Klíč/Předznamenání.';
   }
 
-  // --- KNIHOVNA & ZÁLOHA NA GOOGLE DRIVE ---
   async initLibrary() {
     try {
       const all = await window.scoreDB.getAllScores();
@@ -903,7 +908,7 @@ class GuitarTrainer {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(all));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `kytarovy_trenazer_zaloha_${new Date().toISOString().slice(0,10)}.json`);
+      downloadAnchor.setAttribute("download", `notovy_trenazer_zaloha_${new Date().toISOString().slice(0,10)}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
@@ -940,7 +945,7 @@ class GuitarTrainer {
     }
 
     const titleEl = document.getElementById('scoreTitleDisplay');
-    if (titleEl) titleEl.innerText = score.name || 'Kytarový Trenažér';
+    if (titleEl) titleEl.innerText = score.name || 'Notový Trenažér';
     document.getElementById('activeFileBanner').style.display = 'flex';
 
     document.getElementById('renameScoreBtn').style.display = 'inline-flex';
@@ -1188,6 +1193,7 @@ class GuitarTrainer {
     this.currentPage = target;
     this.updatePageSwitcherUI();
     await this.renderCurrentPage();
+    this.fitCanvasToScreen();
   }
 
   async saveNewScoreToLibrary(name, dataObj) {
@@ -1475,7 +1481,7 @@ class GuitarTrainer {
     if (Number(loopFrom.value) < 1) loopFrom.value = 1;
   }
 
-  // VYKRESLENÍ VÝRAZNÝCH RÁMEČKŮ S KONTRASTNÍ VÝPLNÍ
+  // VYKRESLENÍ VÝRAZNÝCH RÁMEČKŮ
   renderScoreView() {
     const pageCanvas = this.pageCache.get(this.currentPage);
     if (!pageCanvas) return;
@@ -1483,22 +1489,19 @@ class GuitarTrainer {
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
     this.scoreCtx.drawImage(pageCanvas, 0, 0);
 
-    // 1. Zlaté klíče a předznamenání
+    // 1. Klíče a předznamenání
     if (this.currentScore && this.currentScore.keySignatures) {
       this.currentScore.keySignatures.forEach((k) => {
         if ((k.page || 1) !== this.currentPage) return;
         if (this.activeType === 'keySig' && this.editingId === k.id) return;
 
-        // Výplň
         this.scoreCtx.fillStyle = 'rgba(234, 179, 8, 0.16)';
         this.scoreCtx.fillRect(k.box.left, k.box.top, k.box.width, k.box.height);
 
-        // Obrys
         this.scoreCtx.strokeStyle = '#ca8a04';
         this.scoreCtx.lineWidth = 3.5;
         this.scoreCtx.strokeRect(k.box.left, k.box.top, k.box.width, k.box.height);
 
-        // Štítek
         this.scoreCtx.fillStyle = '#ca8a04';
         this.scoreCtx.fillRect(k.box.left, k.box.top, 54, 22);
         this.scoreCtx.fillStyle = '#ffffff';
@@ -1507,22 +1510,19 @@ class GuitarTrainer {
       });
     }
 
-    // 2. Zelené takty
+    // 2. Takty
     if (this.currentScore && this.currentScore.measures) {
       this.currentScore.measures.forEach((m) => {
         if ((m.page || 1) !== this.currentPage) return;
         if (this.activeType === 'measure' && this.editingId === m.id) return;
 
-        // Výplň
         this.scoreCtx.fillStyle = 'rgba(34, 197, 94, 0.16)';
         this.scoreCtx.fillRect(m.box.left, m.box.top, m.box.width, m.box.height);
 
-        // Obrys
         this.scoreCtx.strokeStyle = '#16a34a';
         this.scoreCtx.lineWidth = 3.5;
         this.scoreCtx.strokeRect(m.box.left, m.box.top, m.box.width, m.box.height);
 
-        // Štítek s číslem taktu
         const numText = `${m.id}`;
         const badgeW = Math.max(28, numText.length * 11 + 12);
         this.scoreCtx.fillStyle = '#16a34a';
@@ -1735,7 +1735,7 @@ function switchMode(mode) {
   }
 }
 
-// 5. NAHRÁVÁNÍ SOUBORŮ A FOCENÍ S AUTOMATICKÝM ZVÝŠENÍM KONTRASTU
+// 5. NAHRÁVÁNÍ SOUBORŮ A FOCENÍ
 document.getElementById('cameraInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;

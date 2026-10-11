@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guitar-trainer-v14';
+const CACHE_NAME = 'guitar-trainer-v15';
 const ASSETS = [
   './',
   './index.html',
