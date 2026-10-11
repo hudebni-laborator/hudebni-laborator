@@ -1,3 +1,4 @@
+// IndexedDB úložiště pro správu knihovny skladeb, PDF souborů a vícestránkových not
 class ScoreDB {
   constructor() {
     this.dbName = 'GuitarTrainerDB';

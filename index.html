@@ -28,15 +28,27 @@
       + Nové noty (PDF/Obrázek)
       <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
     </label>
+
+    <!-- Přepínač stránek PDF (zobrazí se pouze pro vícestránková PDF) -->
+    <div class="page-switcher" id="pageSwitcher" style="display:none;">
+      <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
+      <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
+      <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
+    </div>
+
+    <!-- Tlačítka uložení / aktualizace rámečku -->
     <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
       ✔ Uložit takt <span id="nextMeasureNum">1</span>
     </button>
+    <button id="deleteSelectedMeasureBtn" class="btn btn-danger" style="display:none;" onclick="app.deleteSelectedMeasure()">
+      🗑 Smazat tento takt
+    </button>
     <button id="clearMeasuresBtn" class="btn btn-danger" style="display:none;" onclick="app.clearMeasures()">
-      Smazat takty (<span id="measureCountSpan">0</span>)
+      Smazat vše (<span id="measureCountSpan">0</span>)
     </button>
   </div>
 
-  <!-- Lišta pro úpravu rámečku a spojení více taktů dohromady -->
+  <!-- Lišta pro úpravu a rozšiřování rámečku -->
   <div class="edit-subbar" id="editSubbar" style="display:none;">
     <div class="subbar-group">
       <span class="subbar-label">Více taktů:</span>

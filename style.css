@@ -130,7 +130,45 @@ header {
 
 .file-input { display: none; }
 
-/* Lišta pro úpravu a rozšiřování rámečku přes více taktů */
+/* Přepínač stránek PDF */
+.page-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.page-indicator {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 70px;
+  text-align: center;
+}
+
+.page-btn {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.page-btn:hover {
+  background: var(--border);
+}
+
+.page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Lišta pro úpravu a rozšiřování rámečku */
 .edit-subbar {
   display: flex;
   align-items: center;
@@ -223,7 +261,7 @@ canvas {
   padding: 4px;
 }
 
-/* LUPA NAD PRSTEM (Precision Touch Loupe) */
+/* LUPA NAD PRSTEM */
 .touch-loupe {
   position: fixed;
   width: 130px;
@@ -236,7 +274,7 @@ canvas {
   overflow: hidden;
   background: #ffffff;
   transform: translate(-50%, -100%);
-  margin-top: -35px; /* Výrazný odstup nad bříško prstu */
+  margin-top: -35px;
 }
 
 .touch-loupe canvas {
