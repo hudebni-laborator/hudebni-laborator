@@ -13,7 +13,7 @@
 </head>
 <body>
 
-  <!-- HORNÍ ŘÁDEK S LOGEM A ROZPROSTŘENÝMI BAREVNÝMI TLAČÍTKY -->
+  <!-- HORNÍ ŘÁDEK -->
   <header>
     <div class="brand">
       <img src="icon.svg" alt="Logo" class="brand-icon">
@@ -147,6 +147,13 @@
 
   <!-- 3. ZÁLOŽKA: CVIČENÍ -->
   <div class="view-panel practice-panel" id="practiceView" style="display:none;">
+    
+    <!-- ZVÝRAZNĚNÝ NÁZEV SKLADBY VE CVIČENÍ -->
+    <div class="practice-song-highlight" id="practiceSongTitleDisplay">
+      🎵 Není vybrána žádná skladba
+    </div>
+
+    <!-- Horní lišta: přepínání taktů a volba zobrazení -->
     <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
       <div class="measure-stepper" style="gap:6px;">
         <button class="btn compact-btn" onclick="app.prevMeasure()">◀</button>
@@ -166,6 +173,7 @@
       </div>
     </div>
 
+    <!-- Karta s notami (Klíč + takty) -->
     <div class="practice-card">
       <div class="clef-banner" id="clefBanner">
         <div class="clef-preview-wrap" id="clefPreviewWrap">
@@ -179,10 +187,14 @@
       </div>
     </div>
 
-    <!-- DOLŮ PŘILEPENÝ METRONOM -->
+    <!-- DOLŮ PŘILEPENÝ METRONOM S KRUHOVÝM OVLADAČEM -->
     <div class="docked-metronome" id="dockedMetronome">
+      <!-- 1. Řádek: Kruhový indikátor/spouštěč, tempo a světýlka dob -->
       <div class="metro-header-row">
-        <div class="metro-phase-badge badge-idle" id="metroPhaseBadge">⏸ Připraveno</div>
+        <!-- Kruhové tlačítko: Červená (stop) -> Oranžová (příprava) -> Zelená (hra) -->
+        <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="app.toggleIncrementalMetronome()" title="Klepnutím spustíte / zastavíte metronom">
+          <span class="circle-icon" id="metroCircleIcon">▶</span>
+        </button>
         
         <div class="metro-tempo-display">
           <span class="tempo-current" id="metroCurrentBpmText">60</span>
@@ -198,6 +210,7 @@
         </div>
       </div>
 
+      <!-- 2. Řádek: Vstupy tempa, počet hraných taktů a Reset -->
       <div class="metro-controls-row">
         <div class="metro-input-group">
           <span class="metro-lbl">Start</span>
@@ -215,12 +228,19 @@
         </div>
 
         <div class="metro-input-group">
+          <span class="metro-lbl">Taktů</span>
+          <input type="number" id="metroBarsCount" value="1" min="1" max="64" class="metro-input" title="Kolik taktů odehrát v daném tempu před zrychlením">
+        </div>
+
+        <div class="metro-input-group">
           <span class="metro-lbl">Doby</span>
           <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input">
         </div>
 
-        <button class="btn metro-reset-btn" onclick="app.resetMetronomeTempo()" title="Vrátit tempo na Start">↺</button>
-        <button class="btn btn-primary metro-play-btn" id="metroToggleBtn" onclick="app.toggleIncrementalMetronome()">▶ Start</button>
+        <!-- Místo tlačítka Start je zde tlačítko Reset -->
+        <button class="btn btn-danger metro-reset-btn" onclick="app.resetMetronomeTempo()" title="Vrátit tempo na Start BPM">
+          ↺ Reset
+        </button>
       </div>
 
       <input type="hidden" id="loopFrom" value="1">

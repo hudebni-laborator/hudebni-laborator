@@ -559,7 +559,7 @@ class MeasureBoxEditor {
   }
 }
 
-// 4. HLAVNÍ APLIKACE S INTEGROVANÝM METRONOMEM
+// 4. HLAVNÍ APLIKACE S KRUHOVÝM OVLADAČEM METRONOMU
 class GuitarTrainer {
   constructor() {
     this.scoreCanvas = document.getElementById('scoreCanvas');
@@ -628,7 +628,7 @@ class GuitarTrainer {
 
       let freq = 800;
       if (isLeadIn) {
-        freq = isAccent ? 1600 : 1100; // Přípravný takt má odlišný tón
+        freq = isAccent ? 1600 : 1100;
       } else {
         freq = isAccent ? 1200 : 800;
       }
@@ -651,6 +651,7 @@ class GuitarTrainer {
     }
   }
 
+  // Spuštění a zastavení přes kruhové tlačítko
   async toggleIncrementalMetronome() {
     if (this.isMetroRunning) {
       this.stopMetronome();
@@ -669,17 +670,11 @@ class GuitarTrainer {
     const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.metroCurrentBpm = startBpm;
     this.isMetroRunning = true;
-    this.metroPhase = 'leadin'; // 1. fáze: Vždy 1 takt sám naprázdno
+    this.metroPhase = 'leadin'; // 1. fáze: 1 takt sám naprázdno (Oranžová)
     this.metroBeatIndex = 0;
     this.metroMeasureIndexInCycle = 0;
 
     this.updateMetronomeUI();
-
-    const toggleBtn = document.getElementById('metroToggleBtn');
-    if (toggleBtn) {
-      toggleBtn.innerText = '⏸ Stop';
-      toggleBtn.className = 'btn btn-danger metro-play-btn';
-    }
 
     this.metroNextBeatTime = this.audioCtx.currentTime + 0.05;
     this.metroTimerId = setInterval(() => this.schedulerLoop(), this.lookaheadMs);
@@ -693,12 +688,6 @@ class GuitarTrainer {
     }
     this.metroPhase = 'idle';
     this.metroBeatIndex = 0;
-
-    const toggleBtn = document.getElementById('metroToggleBtn');
-    if (toggleBtn) {
-      toggleBtn.innerText = '▶ Start';
-      toggleBtn.className = 'btn btn-primary metro-play-btn';
-    }
 
     this.clearBeatLights();
     this.updateMetronomeUI();
@@ -739,6 +728,8 @@ class GuitarTrainer {
     const beatsPerBar = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
     const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
     const stepBpm = Number(document.getElementById('metroStepBpm')?.value) || 2;
+    // Kolikrát odehrát zobrazený takt v daném tempu před zrychlením
+    const barsCountToPlay = Number(document.getElementById('metroBarsCount')?.value) || 1;
 
     const secondsPerBeat = 60.0 / this.metroCurrentBpm;
     this.metroNextBeatTime += secondsPerBeat;
@@ -749,33 +740,22 @@ class GuitarTrainer {
       this.metroBeatIndex = 0;
 
       if (this.metroPhase === 'leadin') {
+        // Po 1 taktu přípravy (Oranžová) přecházíme do hraní (Zelená)
         this.metroPhase = 'playing';
         this.metroMeasureIndexInCycle = 0;
         setTimeout(() => this.updateMetronomeUI(), 0);
       } else if (this.metroPhase === 'playing') {
         this.metroMeasureIndexInCycle++;
 
-        // Kolik taktů se hraje v jednom kole na stejném místě:
-        let totalPlayBars = 1;
-        if (this.currentScore && this.currentScore.measures && this.currentScore.measures.length > 0) {
-          if (this.stackCount === 'loop') {
-            const lFrom = Number(document.getElementById('loopFrom')?.value) || 1;
-            const lTo = Number(document.getElementById('loopTo')?.value) || this.currentScore.measures.length;
-            totalPlayBars = Math.max(1, lTo - lFrom + 1);
-          } else {
-            totalPlayBars = Math.min(Number(this.stackCount) || 1, this.currentScore.measures.length);
-          }
-        }
+        // Metronom takt nepřepíná! Zůstává na aktuálně zobrazeném taktu.
 
-        // Metronom takt nepřepíná sám! Zůstává na aktuálně zobrazeném taktu.
-
-        // Pokud byly odehrány všechny takty v daném kole -> zrychlíme na tom samém taktu
-        if (this.metroMeasureIndexInCycle >= totalPlayBars) {
+        // Pokud se odehrál zadaný počet taktů (barsCountToPlay) -> zrychlíme
+        if (this.metroMeasureIndexInCycle >= barsCountToPlay) {
           if (this.metroCurrentBpm < targetBpm) {
             this.metroCurrentBpm = Math.min(targetBpm, this.metroCurrentBpm + stepBpm);
-            this.metroPhase = 'leadin'; // Před novým kolem 1 takt přípravy
+            this.metroPhase = 'leadin'; // Před novou rychlostí 1 takt přípravy
           } else {
-            this.metroPhase = 'goal';
+            this.metroPhase = 'goal'; // Dosaženo cíle
           }
           this.metroMeasureIndexInCycle = 0;
           setTimeout(() => this.updateMetronomeUI(), 0);
@@ -784,8 +764,10 @@ class GuitarTrainer {
     }
   }
 
+  // Aktualizace kruhového tlačítka bez textu a údajů o tempu
   updateMetronomeUI() {
-    const badge = document.getElementById('metroPhaseBadge');
+    const circleBtn = document.getElementById('metroCircleBtn');
+    const circleIcon = document.getElementById('metroCircleIcon');
     const curText = document.getElementById('metroCurrentBpmText');
     const targetText = document.getElementById('metroTargetBpmText');
     const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
@@ -794,19 +776,20 @@ class GuitarTrainer {
     if (curText) curText.innerText = this.metroCurrentBpm;
     if (targetText) targetText.innerText = `➔ Cíl: ${targetBpm} (+${stepBpm})`;
 
-    if (badge) {
+    if (circleBtn && circleIcon) {
+      circleBtn.className = 'metro-circle-btn';
       if (this.metroPhase === 'idle') {
-        badge.innerText = '⏸ Připraveno';
-        badge.className = 'metro-phase-badge badge-idle';
+        circleBtn.classList.add('circle-idle'); // Červená
+        circleIcon.innerText = '▶';
       } else if (this.metroPhase === 'leadin') {
-        badge.innerText = '🔔 Příprava (sám)';
-        badge.className = 'metro-phase-badge badge-leadin';
+        circleBtn.classList.add('circle-leadin'); // Oranžová
+        circleIcon.innerText = '⏸';
       } else if (this.metroPhase === 'playing') {
-        badge.innerText = '🎸 Hrajeme!';
-        badge.className = 'metro-phase-badge badge-playing';
+        circleBtn.classList.add('circle-playing'); // Zelená
+        circleIcon.innerText = '⏸';
       } else if (this.metroPhase === 'goal') {
-        badge.innerText = `🏆 Cíl ${targetBpm} BPM!`;
-        badge.className = 'metro-phase-badge badge-goal';
+        circleBtn.classList.add('circle-playing');
+        circleIcon.innerText = '🏆';
       }
     }
   }
@@ -1231,15 +1214,16 @@ class GuitarTrainer {
 
     const titleEl = document.getElementById('scoreTitleDisplay');
     if (titleEl) titleEl.innerText = score.name || 'Notový Trenažér';
-    document.getElementById('activeFileBanner').style.display = 'flex';
+    const practiceTitleEl = document.getElementById('practiceSongTitleDisplay');
+    if (practiceTitleEl) practiceTitleEl.innerText = `🎵 ${score.name || 'Skladba'}`;
 
+    document.getElementById('activeFileBanner').style.display = 'flex';
     document.getElementById('renameScoreBtn').style.display = 'inline-flex';
     document.getElementById('cropPaperBtn').style.display = score.isPdf ? 'none' : 'inline-flex';
     document.getElementById('addPageBtn').style.display = score.isPdf ? 'none' : 'inline-flex';
 
     this.updatePageSwitcherUI();
 
-    // Přepneme záložku před vykreslením a výpočtem měřítka, aby okno mělo rozměry
     if (switchTabToEdit) {
       switchMode('edit');
     }
@@ -1274,6 +1258,8 @@ class GuitarTrainer {
     if (newName && newName.trim() && newName.trim() !== currentName) {
       this.currentScore.name = newName.trim();
       document.getElementById('scoreTitleDisplay').innerText = this.currentScore.name;
+      const practiceTitleEl = document.getElementById('practiceSongTitleDisplay');
+      if (practiceTitleEl) practiceTitleEl.innerText = `🎵 ${this.currentScore.name}`;
       await this.persistCurrentScore();
       const all = await window.scoreDB.getAllScores();
       this.renderLibraryList(all);
@@ -1549,6 +1535,8 @@ class GuitarTrainer {
           this.updatePageSwitcherUI();
           this.updateUI();
           document.getElementById('scoreTitleDisplay').innerText = 'Není vybrána žádná skladba';
+          const pTitle = document.getElementById('practiceSongTitleDisplay');
+          if (pTitle) pTitle.innerText = '🎵 Není vybrána žádná skladba';
           document.getElementById('activeFileBanner').style.display = 'none';
           document.getElementById('cropPaperBtn').style.display = 'none';
           document.getElementById('renameScoreBtn').style.display = 'none';
@@ -1695,15 +1683,16 @@ class GuitarTrainer {
         k.box = { ...this.activeEditor.box };
         k.page = this.currentPage;
       }
-      document.getElementById('statusHint').innerText = 'Klíč/Předznamenání aktualizováno.';
+      document.getElementById('statusHint').innerText = 'Klíč aktualizován.';
     } else {
       const keySig = {
         id: 'key_' + Date.now(),
         page: this.currentPage,
+        fromMeasureIndex: Math.max(0, fromMeasure),
         box: { ...this.activeEditor.box }
       };
       this.currentScore.keySignatures.push(keySig);
-      document.getElementById('statusHint').innerText = 'Klíč/Předznamenání uloženo na své místo v notách.';
+      document.getElementById('statusHint').innerText = `Uloženo jako Klíč/Předznamenání.`;
     }
 
     this.currentScore.keySignatures.sort((a, b) => compareMusicPosition(a, b));
@@ -1951,7 +1940,7 @@ class GuitarTrainer {
 
     let nextIdx = this.currentIndex + 1;
     if (isManual) {
-      if (nextIdx >= count) nextIdx = 0; // Manuální kliknutí cykluje přes všechny takty
+      if (nextIdx >= count) nextIdx = 0;
     } else {
       let loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom')?.value) || 1)) - 1;
       let loopTo = Math.max(1, Math.min(count, Number(document.getElementById('loopTo')?.value) || count)) - 1;

@@ -29,7 +29,6 @@ body {
   overflow-x: hidden;
 }
 
-/* ZÁHLAVÍ: Logo nahoře a pod ním plná šířka tlačítek */
 header {
   background-color: #18181b;
   border-bottom: 1px solid var(--border);
@@ -59,7 +58,7 @@ header {
   letter-spacing: 0.3px;
 }
 
-/* TLAČÍTKA PŘES CELOU ŠÍŘKU OBRAZOVKY (ROZDĚLENÁ NA TŘETINY) */
+/* ROZPROSTŘENÁ TLAČÍTKA PŘES CELOU ŠÍŘKU */
 .nav-tabs {
   display: flex;
   width: 100%;
@@ -71,7 +70,7 @@ header {
 }
 
 .tab-btn {
-  flex: 1 1 0; /* Rozprostře se přesně na 1/3 šířky */
+  flex: 1 1 0;
   text-align: center;
   border: 1px solid transparent;
   padding: 9px 4px;
@@ -83,9 +82,7 @@ header {
   white-space: nowrap;
 }
 
-/* BAREVNÉ STYLY JEDNOTLIVÝCH ZÁLOŽEK */
-
-/* 1. Knihovna: Modrý tón */
+/* 1. Knihovna: Modrá */
 .tab-lib {
   background: rgba(37, 99, 235, 0.12);
   color: #93c5fd;
@@ -98,7 +95,7 @@ header {
   box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
 }
 
-/* 2. Značkování: Jantarový/zlatý tón */
+/* 2. Značkování: Jantarová / Zlatá */
 .tab-edit {
   background: rgba(217, 119, 6, 0.12);
   color: #fde047;
@@ -111,7 +108,7 @@ header {
   box-shadow: 0 0 12px rgba(217, 119, 6, 0.5);
 }
 
-/* 3. Cvičení: Smaragdově zelený tón */
+/* 3. Cvičení: Smaragdová */
 .tab-practice {
   background: rgba(16, 185, 129, 0.12);
   color: #86efac;
@@ -145,6 +142,24 @@ header {
 .active-file-banner span.name {
   font-weight: 700;
   color: #ffffff;
+}
+
+/* VÝRAZNÝ ŠTÍTEK NÁZVU SKLADBY VE CVIČENÍ */
+.practice-song-highlight {
+  width: 100%;
+  background: linear-gradient(90deg, #1e1e24 0%, #27272f 50%, #1e1e24 100%);
+  border: 1.5px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #fef08a;
+  text-align: center;
+  letter-spacing: 0.4px;
+  box-shadow: 0 2px 10px rgba(234, 179, 8, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .toolbar {
@@ -321,7 +336,7 @@ header {
 }
 
 .practice-panel {
-  padding-bottom: 95px;
+  padding-bottom: 110px;
 }
 
 /* KNIHOVNA */
@@ -444,7 +459,6 @@ canvas#scoreCanvas {
   opacity: 0.8;
 }
 
-/* LUPA NAD PRSTEM */
 .touch-loupe {
   position: fixed;
   width: 130px;
@@ -557,7 +571,9 @@ canvas#scoreCanvas {
   gap: 6px;
 }
 
-/* DOLŮ PŘILEPENÝ METRONOM */
+/* ======================================================== */
+/* PŘILEPENÝ METRONOM S KRUHOVÝM OVLADAČEM                  */
+/* ======================================================== */
 .docked-metronome {
   position: fixed;
   bottom: 0;
@@ -569,8 +585,8 @@ canvas#scoreCanvas {
   background: #18181b;
   border-top: 2px solid var(--primary);
   box-shadow: 0 -6px 25px rgba(0, 0, 0, 0.7);
-  padding: 5px 10px;
-  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 10px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -581,47 +597,58 @@ canvas#scoreCanvas {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.metro-phase-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
+/* Kruhový indikátor/spouštěč bez textu */
+.metro-circle-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s ease-in-out;
+  padding: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
-.badge-idle {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+.metro-circle-btn:active {
+  transform: scale(0.92);
 }
 
-.badge-leadin {
-  background: rgba(234, 179, 8, 0.2);
-  color: #fde047;
-  border: 1px solid #ca8a04;
-  animation: pulseGold 0.6s infinite alternate;
+.circle-icon {
+  font-size: 1.15rem;
+  color: #ffffff;
+  line-height: 1;
 }
 
-.badge-playing {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-  border: 1px solid #16a34a;
+/* Červená = V klidu (Play) */
+.circle-idle {
+  background: #dc2626;
+  border-color: #f87171;
 }
 
-.badge-goal {
-  background: rgba(59, 130, 246, 0.25);
-  color: #93c5fd;
-  border: 1px solid #2563eb;
+/* Oranžová = Příprava (Lead-in) */
+.circle-leadin {
+  background: #d97706;
+  border-color: #fbbf24;
+  animation: pulseCircleOrange 0.5s infinite alternate;
 }
 
-@keyframes pulseGold {
-  from { opacity: 0.75; }
-  to { opacity: 1; }
+/* Zelená = Hrajeme! */
+.circle-playing {
+  background: #16a34a;
+  border-color: #4ade80;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
+}
+
+@keyframes pulseCircleOrange {
+  from { transform: scale(1); box-shadow: 0 0 4px #f59e0b; }
+  to { transform: scale(1.08); box-shadow: 0 0 16px #f59e0b; }
 }
 
 .metro-tempo-display {
@@ -631,7 +658,7 @@ canvas#scoreCanvas {
 }
 
 .tempo-current {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 900;
   color: #ffffff;
 }
@@ -678,6 +705,7 @@ canvas#scoreCanvas {
   box-shadow: 0 0 5px #22c55e;
 }
 
+/* 2. Řádek: Ovládání na 100% šířky bez přetékání */
 .metro-controls-row {
   display: flex;
   align-items: center;
@@ -694,13 +722,13 @@ canvas#scoreCanvas {
 }
 
 .metro-lbl {
-  font-size: 0.65rem;
+  font-size: 0.64rem;
   color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .metro-input {
-  width: 44px;
+  width: 40px;
   height: 28px;
   padding: 2px;
   text-align: center;
@@ -712,16 +740,10 @@ canvas#scoreCanvas {
   border-radius: 4px;
 }
 
-.metro-play-btn {
-  padding: 5px 12px;
-  font-weight: 700;
-  font-size: 0.84rem;
-  height: 32px;
-  white-space: nowrap;
-}
-
 .metro-reset-btn {
-  padding: 5px 8px;
-  font-size: 0.84rem;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
   height: 30px;
+  white-space: nowrap;
 }
