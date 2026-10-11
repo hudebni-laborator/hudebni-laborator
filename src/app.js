@@ -559,7 +559,7 @@ class MeasureBoxEditor {
   }
 }
 
-// 4. HLAVNÍ APLIKACE S INTEGROVANÝM METRONOMEM A PROSTOROVÝM ŘAZENÍM
+// 4. HLAVNÍ APLIKACE S INTEGROVANÝM METRONOMEM
 class GuitarTrainer {
   constructor() {
     this.scoreCanvas = document.getElementById('scoreCanvas');
@@ -594,7 +594,7 @@ class GuitarTrainer {
 
     this.stackCount = 1;
 
-    // --- METRONOM STAV A AUDIO ---
+    // Metronom stav a audio
     this.audioCtx = null;
     this.isMetroRunning = false;
     this.metroCurrentBpm = 60;
@@ -611,7 +611,6 @@ class GuitarTrainer {
     this.initPracticeGestures();
   }
 
-  // --- AUDIO KONTEXT METRONOMU S RESUME PROMISE ---
   async initAudio() {
     if (!this.audioCtx) {
       this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -629,7 +628,7 @@ class GuitarTrainer {
 
       let freq = 800;
       if (isLeadIn) {
-        freq = isAccent ? 1600 : 1100; // Přípravný takt zaťuká odlišně
+        freq = isAccent ? 1600 : 1100; // Přípravný takt má odlišný tón
       } else {
         freq = isAccent ? 1200 : 800;
       }
@@ -637,7 +636,6 @@ class GuitarTrainer {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, time);
 
-      // Bezpečný exponenciální náběh a dozvuk
       const startTime = Math.max(this.audioCtx.currentTime, time);
       gain.gain.setValueAtTime(0.0001, startTime);
       gain.gain.exponentialRampToValueAtTime(1.0, startTime + 0.002);
@@ -653,7 +651,6 @@ class GuitarTrainer {
     }
   }
 
-  // --- TRÉNINKOVÝ METRONOM (PŘÍPRAVA + HRANÍ + ZRYCHLOVÁNÍ) ---
   async toggleIncrementalMetronome() {
     if (this.isMetroRunning) {
       this.stopMetronome();
@@ -669,7 +666,7 @@ class GuitarTrainer {
       try { await window.wakeLockManager.request(); } catch (_) {}
     }
 
-    const startBpm = Number(document.getElementById('metroStartBpm').value) || 60;
+    const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.metroCurrentBpm = startBpm;
     this.isMetroRunning = true;
     this.metroPhase = 'leadin'; // 1. fáze: Vždy 1 takt sám naprázdno
@@ -708,7 +705,7 @@ class GuitarTrainer {
   }
 
   resetMetronomeTempo() {
-    const startBpm = Number(document.getElementById('metroStartBpm').value) || 60;
+    const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.metroCurrentBpm = startBpm;
     this.updateMetronomeUI();
   }
@@ -722,7 +719,7 @@ class GuitarTrainer {
   }
 
   scheduleCurrentBeat(time) {
-    const beatsPerBar = Number(document.getElementById('metroBeatsPerBar').value) || 4;
+    const beatsPerBar = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
     const isAccent = (this.metroBeatIndex === 0);
     const isLeadIn = (this.metroPhase === 'leadin');
 
@@ -739,9 +736,9 @@ class GuitarTrainer {
   }
 
   advanceBeat() {
-    const beatsPerBar = Number(document.getElementById('metroBeatsPerBar').value) || 4;
-    const targetBpm = Number(document.getElementById('metroTargetBpm').value) || 100;
-    const stepBpm = Number(document.getElementById('metroStepBpm').value) || 2;
+    const beatsPerBar = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
+    const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
+    const stepBpm = Number(document.getElementById('metroStepBpm')?.value) || 2;
 
     const secondsPerBeat = 60.0 / this.metroCurrentBpm;
     this.metroNextBeatTime += secondsPerBeat;
@@ -758,24 +755,25 @@ class GuitarTrainer {
       } else if (this.metroPhase === 'playing') {
         this.metroMeasureIndexInCycle++;
 
+        // Kolik taktů se hraje v jednom kole na stejném místě:
         let totalPlayBars = 1;
         if (this.currentScore && this.currentScore.measures && this.currentScore.measures.length > 0) {
           if (this.stackCount === 'loop') {
-            const lFrom = Number(document.getElementById('loopFrom').value) || 1;
-            const lTo = Number(document.getElementById('loopTo').value) || this.currentScore.measures.length;
+            const lFrom = Number(document.getElementById('loopFrom')?.value) || 1;
+            const lTo = Number(document.getElementById('loopTo')?.value) || this.currentScore.measures.length;
             totalPlayBars = Math.max(1, lTo - lFrom + 1);
           } else {
             totalPlayBars = Math.min(Number(this.stackCount) || 1, this.currentScore.measures.length);
           }
-          // Posunout takt
-          setTimeout(() => this.nextMeasure(false), 0);
         }
 
-        // Pokud skončil hrací cyklus -> zrychlíme
+        // Metronom takt nepřepíná sám! Zůstává na aktuálně zobrazeném taktu.
+
+        // Pokud byly odehrány všechny takty v daném kole -> zrychlíme na tom samém taktu
         if (this.metroMeasureIndexInCycle >= totalPlayBars) {
           if (this.metroCurrentBpm < targetBpm) {
             this.metroCurrentBpm = Math.min(targetBpm, this.metroCurrentBpm + stepBpm);
-            this.metroPhase = 'leadin'; // Před dalším kolem 1 takt přípravy
+            this.metroPhase = 'leadin'; // Před novým kolem 1 takt přípravy
           } else {
             this.metroPhase = 'goal';
           }
@@ -1203,7 +1201,6 @@ class GuitarTrainer {
     }
   }
 
-  // SPOLEHLIVÉ OTEVŘENÍ SKLADBY S OKAMŽITÝM PŘEPNUTÍM ZÁLOŽKY
   async loadScore(id, switchTabToEdit = true) {
     const score = await window.scoreDB.getScore(id);
     if (!score) return;
@@ -1242,7 +1239,7 @@ class GuitarTrainer {
 
     this.updatePageSwitcherUI();
 
-    // DŮLEŽITÉ: Přepneme záložku před vykreslením a výpočtem měřítka, aby okno mělo rozměry
+    // Přepneme záložku před vykreslením a výpočtem měřítka, aby okno mělo rozměry
     if (switchTabToEdit) {
       switchMode('edit');
     }
@@ -1679,7 +1676,7 @@ class GuitarTrainer {
         this.resetActiveSelection();
         this.updateUI();
         this.renderScoreView();
-        document.getElementById('statusHint').innerText = 'Změněno na Takt.';
+        document.getElementById('statusHint').innerText = `Změněno na Takt.`;
       }
     }
   }
@@ -1698,16 +1695,15 @@ class GuitarTrainer {
         k.box = { ...this.activeEditor.box };
         k.page = this.currentPage;
       }
-      document.getElementById('statusHint').innerText = 'Klíč aktualizován.';
+      document.getElementById('statusHint').innerText = 'Klíč/Předznamenání aktualizováno.';
     } else {
       const keySig = {
         id: 'key_' + Date.now(),
         page: this.currentPage,
-        fromMeasureIndex: Math.max(0, fromMeasure),
         box: { ...this.activeEditor.box }
       };
       this.currentScore.keySignatures.push(keySig);
-      document.getElementById('statusHint').innerText = `Uloženo jako Klíč/Předznamenání.`;
+      document.getElementById('statusHint').innerText = 'Klíč/Předznamenání uloženo na své místo v notách.';
     }
 
     this.currentScore.keySignatures.sort((a, b) => compareMusicPosition(a, b));
@@ -1761,18 +1757,20 @@ class GuitarTrainer {
 
   updateUI() {
     const count = (this.currentScore && this.currentScore.measures) ? this.currentScore.measures.length : 0;
-    document.getElementById('measureCountSpan').innerText = count;
-    document.getElementById('clearMeasuresBtn').style.display = count > 0 ? 'inline-flex' : 'none';
+    const countSpan = document.getElementById('measureCountSpan');
+    if (countSpan) countSpan.innerText = count;
+    const clearBtn = document.getElementById('clearMeasuresBtn');
+    if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
 
     const loopFrom = document.getElementById('loopFrom');
     const loopTo = document.getElementById('loopTo');
-    loopFrom.max = Math.max(1, count);
-    loopTo.max = Math.max(1, count);
+    if (loopFrom) loopFrom.max = Math.max(1, count);
+    if (loopTo) loopTo.max = Math.max(1, count);
 
-    if (count > 0 && (Number(loopTo.value) <= 1 || Number(loopTo.value) < count)) {
+    if (count > 0 && loopTo && (Number(loopTo.value) <= 1 || Number(loopTo.value) < count)) {
       loopTo.value = count;
     }
-    if (Number(loopFrom.value) < 1) loopFrom.value = 1;
+    if (loopFrom && Number(loopFrom.value) < 1) loopFrom.value = 1;
   }
 
   renderScoreView() {
@@ -1896,8 +1894,8 @@ class GuitarTrainer {
     // 2. Takty pod sebou
     let measuresToStack = [];
     if (this.stackCount === 'loop') {
-      const loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom').value) || 1)) - 1;
-      const loopTo = Math.max(1, Math.min(count, Number(document.getElementById('loopTo').value) || count)) - 1;
+      const loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom')?.value) || 1)) - 1;
+      const loopTo = Math.max(1, Math.min(count, Number(document.getElementById('loopTo')?.value) || count)) - 1;
       for (let i = loopFrom; i <= loopTo; i++) {
         measuresToStack.push(measures[i]);
       }
@@ -1943,19 +1941,23 @@ class GuitarTrainer {
     });
 
     const pageStr = this.totalPages > 1 ? ` (strana ${targetPage})` : '';
-    document.getElementById('practiceMeasureTitle').innerText = `Takt ${index + 1} / ${count}${pageStr}`;
+    const titleEl = document.getElementById('practiceMeasureTitle');
+    if (titleEl) titleEl.innerText = `Takt ${index + 1} / ${count}${pageStr}`;
   }
 
   nextMeasure(isManual = false) {
     if (!this.currentScore || !this.currentScore.measures || this.currentScore.measures.length === 0) return;
     const count = this.currentScore.measures.length;
 
-    let loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom').value) || 1)) - 1;
-    let loopTo = Math.max(1, Math.min(count, Number(document.getElementById('loopTo').value) || count)) - 1;
-    if (loopTo < loopFrom) loopTo = count - 1;
-
     let nextIdx = this.currentIndex + 1;
-    if (nextIdx > loopTo || nextIdx >= count) nextIdx = loopFrom;
+    if (isManual) {
+      if (nextIdx >= count) nextIdx = 0; // Manuální kliknutí cykluje přes všechny takty
+    } else {
+      let loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom')?.value) || 1)) - 1;
+      let loopTo = Math.max(1, Math.min(count, Number(document.getElementById('loopTo')?.value) || count)) - 1;
+      if (loopTo < loopFrom) loopTo = count - 1;
+      if (nextIdx > loopTo || nextIdx >= count) nextIdx = loopFrom;
+    }
     this.showMeasureInTrainer(nextIdx);
   }
 
@@ -1982,7 +1984,7 @@ function switchMode(mode) {
 
   [tabLib, tabEdit, tabPractice].forEach(t => t.classList.remove('active'));
   [libView, editView, practiceView].forEach(v => v.style.display = 'none');
-  editSubbar.style.display = 'none';
+  if (editSubbar) editSubbar.style.display = 'none';
 
   if (mode === 'library') {
     app.stopMetronome();
