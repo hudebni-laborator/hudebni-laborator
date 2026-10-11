@@ -13,9 +13,16 @@ class ScoreDB {
 
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
+        let store;
         if (!db.objectStoreNames.contains('scores')) {
-          const store = db.createObjectStore('scores', { keyPath: 'id' });
+          store = db.createObjectStore('scores', { keyPath: 'id' });
+        } else {
+          store = e.target.transaction.objectStore('scores');
+        }
+        if (!store.indexNames.contains('name')) {
           store.createIndex('name', 'name', { unique: false });
+        }
+        if (!store.indexNames.contains('updatedAt')) {
           store.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
       };
@@ -26,6 +33,7 @@ class ScoreDB {
       };
 
       request.onerror = (e) => {
+        console.error('IndexedDB error:', e.target.error);
         reject('Chyba při otevírání IndexedDB: ' + e.target.error);
       };
     });

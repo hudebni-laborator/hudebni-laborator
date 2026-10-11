@@ -1,9 +1,8 @@
-// Konfigurace PDF.js
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-// 1. Zvukový generátor metronomu (Web Audio API)
+// 1. Zvukový generátor metronomu
 class MetronomeAudio {
   constructor() {
     this.audioCtx = null;
@@ -35,63 +34,54 @@ class MetronomeAudio {
   }
 }
 
-// =========================================================================
-// 2. VYSOCE PŘESNÁ DETEKCE TAKTOVÝCH ČAR A OSNOV
-// =========================================================================
+// 2. Detekce taktových čar a osnov
 function scanStaffAndBarlines(canvas, clickX, clickY) {
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
-  const imgData = ctx.getImageData(0, 0, width, height);
+
+  // Skenujeme jen vertikální pruh kolem klepnutí kvůli rychlosti
+  const scanTop = Math.max(0, Math.floor(clickY - 250));
+  const scanH = Math.min(height - scanTop, 500);
+  const imgData = ctx.getImageData(0, scanTop, width, scanH);
   const data = imgData.data;
 
-  // Adaptivní prahová hodnota pro dané okolí
-  let totalB = 0, sampleCount = 0;
-  for (let dy = -60; dy <= 60; dy += 6) {
-    for (let dx = -80; dx <= 80; dx += 8) {
-      const px = Math.min(width - 1, Math.max(0, Math.floor(clickX + dx)));
-      const py = Math.min(height - 1, Math.max(0, Math.floor(clickY + dy)));
-      const idx = (py * width + px) * 4;
-      totalB += (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-      sampleCount++;
-    }
-  }
-  const localBg = totalB / sampleCount;
-  const darkThreshold = Math.min(145, Math.max(60, localBg * 0.70));
-
-  const isDark = (x, y) => {
-    if (x < 0 || x >= width || y < 0 || y >= height) return false;
-    const idx = (Math.floor(y) * width + Math.floor(x)) * 4;
-    return (data[idx] + data[idx + 1] + data[idx + 2]) / 3 < darkThreshold;
+  const isDarkRel = (x, localY) => {
+    if (x < 0 || x >= width || localY < 0 || localY >= scanH) return false;
+    const idx = (localY * width + Math.floor(x)) * 4;
+    return (data[idx] + data[idx + 1] + data[idx + 2]) / 3 < 135;
   };
 
-  const getHWidth = (x, y, maxDist = 35) => {
-    if (!isDark(x, y)) return 0;
-    let l = 0; while (l < maxDist && isDark(x - l - 1, y)) l++;
-    let r = 0; while (r < maxDist && isDark(x + r + 1, y)) r++;
+  const getHWidth = (x, localY, maxDist = 35) => {
+    if (!isDarkRel(x, localY)) return 0;
+    let l = 0; while (l < maxDist && isDarkRel(x - l - 1, localY)) l++;
+    let r = 0; while (r < maxDist && isDarkRel(x + r + 1, localY)) r++;
     return l + r + 1;
   };
 
-  // 1. Detekce linek osnov
-  const sampleLeft = Math.max(0, Math.floor(clickX - 200));
-  const sampleRight = Math.min(width, Math.floor(clickX + 200));
-  const sampleWidth = Math.max(1, sampleRight - sampleLeft);
-  const minLineFill = sampleWidth * 0.35;
+  // Nalezení horizontálních linek v okolí
+  const sampleLeft = Math.max(0, Math.floor(clickX - 160));
+  const sampleRight = Math.min(width, Math.floor(clickX + 160));
+  const minLineFill = (sampleRight - sampleLeft) * 0.35;
 
-  const lineRows = [];
-  for (let y = 0; y < height; y++) {
+  const lineRowsRel = [];
+  for (let y = 0; y < scanH; y++) {
     let darkCount = 0;
     for (let x = sampleLeft; x < sampleRight; x++) {
-      if (isDark(x, y)) darkCount++;
+      if (isDarkRel(x, y)) darkCount++;
     }
     if (darkCount >= minLineFill) {
-      if (lineRows.length === 0 || y - lineRows[lineRows.length - 1] > 2) {
-        lineRows.push(y);
+      if (lineRowsRel.length === 0 || y - lineRowsRel[lineRowsRel.length - 1] > 2) {
+        lineRowsRel.push(y);
       }
     }
   }
 
-  const staves = [];
+  // Přepočet na globální souřadnice
+  const lineRows = lineRowsRel.map(y => y + scanTop);
+
+  // Seskupení linek
+  let currentStaff = null;
   for (let i = 0; i <= lineRows.length - 5; i++) {
     const group = lineRows.slice(i, i + 5);
     const spacings = [
@@ -101,80 +91,59 @@ function scanStaffAndBarlines(canvas, clickX, clickY) {
       group[4] - group[3]
     ];
     const avgSpacing = spacings.reduce((a, b) => a + b) / 4;
-    const isUniform = spacings.every(s => Math.abs(s - avgSpacing) <= 4 && s >= 4 && s <= 35);
+    const isUniform = spacings.every(s => Math.abs(s - avgSpacing) <= 5 && s >= 4 && s <= 40);
 
     if (isUniform) {
-      staves.push({
-        top: group[0],
-        bottom: group[4],
-        height: group[4] - group[0],
-        lines: group,
-        spacing: avgSpacing
-      });
-      i += 4;
+      const top = group[0];
+      const bottom = group[4];
+      if (clickY >= top - 40 && clickY <= bottom + 40) {
+        currentStaff = { top, bottom, height: bottom - top, lines: group, spacing: avgSpacing };
+        break;
+      }
     }
   }
 
-  if (staves.length === 0) {
+  // Bezpečný záložní výřez, pokud se nepodaří najít osnovu přesně
+  if (!currentStaff) {
+    const estTop = Math.max(0, Math.floor(clickY - 50));
     return {
-      currentStaff: null,
-      staves: [],
       isBarLine: () => false,
-      box: { left: Math.max(0, clickX - 60), top: Math.max(0, clickY - 50), width: 120, height: 100 }
+      box: { left: Math.max(0, Math.floor(clickX - 80)), top: estTop, width: 160, height: 100 }
     };
   }
 
-  let currentIndex = staves.findIndex(s => clickY >= s.top - 20 && clickY <= s.bottom + 20);
-  if (currentIndex === -1) {
-    let minDiff = Infinity;
-    staves.forEach((s, idx) => {
-      const center = (s.top + s.bottom) / 2;
-      const diff = Math.abs(clickY - center);
-      if (diff < minDiff) {
-        minDiff = diff;
-        currentIndex = idx;
-      }
-    });
-  }
+  const staffTopRel = currentStaff.top - scanTop;
+  const staffBottomRel = currentStaff.bottom - scanTop;
+  const linesRel = currentStaff.lines.map(y => y - scanTop);
+  const spacing = currentStaff.spacing;
 
-  const current = staves[currentIndex];
-  const staffTop = current.top;
-  const staffBottom = current.bottom;
-  const lines = current.lines;
-  const spacing = current.spacing;
-
-  // Validátor taktové čáry
   const isBarLine = (col) => {
     let gapsPassed = 0;
     for (let i = 0; i < 4; i++) {
-      const yA = lines[i];
-      const yB = lines[i + 1];
+      const yA = linesRel[i];
+      const yB = linesRel[i + 1];
       let gapDark = 0;
       let gapH = yB - yA + 1;
 
       for (let y = yA; y <= yB; y++) {
-        if (isDark(col, y) || isDark(col - 1, y) || isDark(col + 1, y)) {
-          gapDark++;
-        }
+        if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) gapDark++;
       }
-      if (gapDark / gapH >= 0.65) {
-        gapsPassed++;
-      }
+      if (gapDark / gapH >= 0.65) gapsPassed++;
     }
     if (gapsPassed < 4) return false;
 
     // Kontrola přesahu mimo osnovu
     const maxOvershoot = Math.max(4, Math.floor(spacing * 0.70));
     let overshootUp = 0;
-    for (let y = staffTop - 1; y >= Math.max(0, staffTop - spacing * 2.5); y--) {
-      if (isDark(col, y) || isDark(col - 1, y) || isDark(col + 1, y)) overshootUp++;
+    for (let y = staffTopRel - 1; y >= Math.max(0, staffTopRel - spacing * 2.5); y--) {
+      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) overshootUp++;
       else break;
     }
     if (overshootUp > maxOvershoot) return false;
 
     let overshootDown = 0;
-    for (let y = staffBottom + 1; y <= Math.min(height - 1, staffBottom + spacing * 2.5); y++) {
-      if (isDark(col, y) || isDark(col - 1, y) || isDark(col + 1, y)) overshootDown++;
+    for (let y = staffBottomRel + 1; y <= Math.min(scanH - 1, staffBottomRel + spacing * 2.5); y++) {
+      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) overshootDown++;
       else break;
     }
     if (overshootDown > maxOvershoot) return false;
@@ -182,10 +151,10 @@ function scanStaffAndBarlines(canvas, clickX, clickY) {
     // Kontrola hlaviček not
     const noteheadMinWidth = Math.max(6, Math.floor(spacing * 0.62));
     const testPointsY = [
-      Math.round(staffTop + spacing * 0.45),
-      Math.round(lines[1] + spacing * 0.5),
-      Math.round(lines[2] + spacing * 0.5),
-      Math.round(staffBottom - spacing * 0.45)
+      Math.round(staffTopRel + spacing * 0.45),
+      Math.round(linesRel[1] + spacing * 0.5),
+      Math.round(linesRel[2] + spacing * 0.5),
+      Math.round(staffBottomRel - spacing * 0.45)
     ];
 
     for (const testY of testPointsY) {
@@ -195,10 +164,10 @@ function scanStaffAndBarlines(canvas, clickX, clickY) {
     return true;
   };
 
-  // Nalezení nejbližších taktových čar vlevo a vpravo
+  // Hledání levé a pravé taktové čáry
   let leftX = Math.floor(clickX) - 5;
   let foundLeft = false;
-  for (let x = leftX; x >= 0; x--) {
+  for (let x = leftX; x >= Math.max(0, clickX - spacing * 18); x--) {
     if (isBarLine(x)) {
       leftX = x;
       foundLeft = true;
@@ -212,7 +181,7 @@ function scanStaffAndBarlines(canvas, clickX, clickY) {
 
   let rightX = Math.floor(clickX) + 5;
   let foundRight = false;
-  for (let x = rightX; x < width; x++) {
+  for (let x = rightX; x <= Math.min(width, clickX + spacing * 18); x++) {
     if (isBarLine(x)) {
       rightX = x;
       foundRight = true;
@@ -224,44 +193,22 @@ function scanStaffAndBarlines(canvas, clickX, clickY) {
   }
   if (!foundRight) rightX = Math.min(width, Math.floor(clickX + spacing * 8));
 
-  // Polovina mezer mezi osnovami
-  const prev = currentIndex > 0 ? staves[currentIndex - 1] : null;
-  const next = currentIndex < staves.length - 1 ? staves[currentIndex + 1] : null;
-
-  let gapAbove = 0, gapBelow = 0;
-  if (prev && next) {
-    gapAbove = current.top - prev.bottom;
-    gapBelow = next.top - current.bottom;
-  } else if (!prev && next) {
-    gapBelow = next.top - current.bottom;
-    gapAbove = gapBelow;
-  } else if (prev && !next) {
-    gapAbove = current.top - prev.bottom;
-    gapBelow = gapAbove;
-  } else {
-    gapAbove = current.height * 1.5;
-    gapBelow = current.height * 1.5;
-  }
-
-  const topY = Math.max(0, current.top - Math.floor(gapAbove / 2));
-  const bottomY = Math.min(height, current.bottom + Math.floor(gapBelow / 2));
+  const gapMargin = Math.round(currentStaff.height * 0.65);
+  const topY = Math.max(0, currentStaff.top - gapMargin);
+  const bottomY = Math.min(height, currentStaff.bottom + gapMargin);
 
   return {
-    currentStaff: current,
-    staves,
     isBarLine,
     box: {
       left: leftX,
       top: topY,
-      width: Math.max(25, rightX - leftX),
-      height: Math.max(25, bottomY - topY)
+      width: Math.max(30, rightX - leftX),
+      height: Math.max(30, bottomY - topY)
     }
   };
 }
 
-// =========================================================================
-// 3. EDITOR RÁMEČKU S LOUPE (ZVĚTŠOVACÍ SKLO NAD PRSTEM)
-// =========================================================================
+// 3. Editor rámečku s lupou
 class MeasureBoxEditor {
   constructor(canvas, renderCallback, initialBox, onUpdate, isBarLineFn) {
     this.canvas = canvas;
@@ -276,7 +223,6 @@ class MeasureBoxEditor {
     this.dragStart = { x: 0, y: 0 };
     this.initialBoxState = null;
 
-    // Prvky lupy
     this.loupeEl = document.getElementById('touchLoupe');
     this.loupeCanvas = document.getElementById('loupeCanvas');
     this.loupeCtx = this.loupeCanvas ? this.loupeCanvas.getContext('2d') : null;
@@ -310,15 +256,10 @@ class MeasureBoxEditor {
     if (Math.abs(x - b.left) <= tol && Math.abs(y - bot) <= tol) return 'corner-bl';
     if (Math.abs(x - r) <= tol && Math.abs(y - bot) <= tol) return 'corner-br';
 
-    const nearLeft = Math.abs(x - b.left) <= tol && y >= b.top - tol && y <= bot + tol;
-    const nearRight = Math.abs(x - r) <= tol && y >= b.top - tol && y <= bot + tol;
-    const nearTop = Math.abs(y - b.top) <= tol && x >= b.left - tol && x <= r + tol;
-    const nearBottom = Math.abs(y - bot) <= tol && x >= b.left - tol && x <= r + tol;
-
-    if (nearLeft) return 'left';
-    if (nearRight) return 'right';
-    if (nearTop) return 'top';
-    if (nearBottom) return 'bottom';
+    if (Math.abs(x - b.left) <= tol && y >= b.top - tol && y <= bot + tol) return 'left';
+    if (Math.abs(x - r) <= tol && y >= b.top - tol && y <= bot + tol) return 'right';
+    if (Math.abs(y - b.top) <= tol && x >= b.left - tol && x <= r + tol) return 'top';
+    if (Math.abs(y - bot) <= tol && x >= b.left - tol && x <= r + tol) return 'bottom';
 
     if (x > b.left && x < r && y > b.top && y < bot) return 'drag';
     return null;
@@ -349,7 +290,6 @@ class MeasureBoxEditor {
       this.initialBoxState = { ...this.box };
       this.canvas.setPointerCapture(e.pointerId);
 
-      // Pokud taháme za hranu, zobrazíme zvětšovací lupu nad prstem
       if (action !== 'drag') {
         this.updateLoupe(e, x, y);
       }
@@ -410,9 +350,8 @@ class MeasureBoxEditor {
 
     this.render();
     if (this.activeAction !== 'drag') {
-      let targetX = (this.activeAction.includes('left')) ? this.box.left : (this.box.left + this.box.width);
-      let targetY = y;
-      this.updateLoupe(e, targetX, targetY);
+      const targetX = this.activeAction.includes('left') ? this.box.left : (this.box.left + this.box.width);
+      this.updateLoupe(e, targetX, y);
     }
     if (this.onUpdate) this.onUpdate(this.box);
   }
@@ -425,7 +364,6 @@ class MeasureBoxEditor {
     }
   }
 
-  // Vykreslení lupy nad prstem
   updateLoupe(e, targetCanvasX, targetCanvasY) {
     if (!this.loupeEl || !this.loupeCanvas || !this.loupeCtx) return;
 
@@ -443,10 +381,8 @@ class MeasureBoxEditor {
     const sy = Math.max(0, Math.min(this.canvas.height - cropH, targetCanvasY - cropH / 2));
 
     this.loupeCtx.clearRect(0, 0, lw, lh);
-    // Vykreslíme výřez z podkladového plátna not
     this.loupeCtx.drawImage(this.canvas, sx, sy, cropW, cropH, 0, 0, lw, lh);
 
-    // Červená zaměřovací ryska přesně na hranu
     this.loupeCtx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
     this.loupeCtx.lineWidth = 2;
     this.loupeCtx.beginPath();
@@ -455,15 +391,13 @@ class MeasureBoxEditor {
     this.loupeCtx.stroke();
   }
 
-  // Rozšíření rámečku o 1 takt doleva / doprava
   expandMeasure(direction) {
     if (!this.isBarLineFn) return;
     const step = 8;
     if (direction === 'right') {
-      let curR = Math.floor(this.box.left + this.box.width);
+      const curR = Math.floor(this.box.left + this.box.width);
       for (let x = curR + step; x < this.canvas.width; x++) {
         if (this.isBarLineFn(x)) {
-          // Našli jsme další taktovou čáru doprava
           let newR = x;
           for (let off = 2; off <= 6; off++) {
             if (x + off < this.canvas.width && this.isBarLineFn(x + off)) newR = x + off;
@@ -473,7 +407,7 @@ class MeasureBoxEditor {
         }
       }
     } else if (direction === 'left') {
-      let curL = Math.floor(this.box.left);
+      const curL = Math.floor(this.box.left);
       for (let x = curL - step; x >= 0; x--) {
         if (this.isBarLineFn(x)) {
           let newL = x;
@@ -490,12 +424,11 @@ class MeasureBoxEditor {
     if (this.onUpdate) this.onUpdate(this.box);
   }
 
-  // Zúžení rámečku o 1 takt zleva / zprava
   shrinkMeasure(direction) {
     if (!this.isBarLineFn) return;
     const step = 10;
     if (direction === 'right') {
-      let curR = Math.floor(this.box.left + this.box.width);
+      const curR = Math.floor(this.box.left + this.box.width);
       for (let x = curR - step; x > this.box.left + 30; x--) {
         if (this.isBarLineFn(x)) {
           this.box.width = x - this.box.left;
@@ -503,7 +436,7 @@ class MeasureBoxEditor {
         }
       }
     } else if (direction === 'left') {
-      let curL = Math.floor(this.box.left);
+      const curL = Math.floor(this.box.left);
       for (let x = curL + step; x < this.box.left + this.box.width - 30; x++) {
         if (this.isBarLineFn(x)) {
           this.box.width -= (x - this.box.left);
@@ -517,8 +450,7 @@ class MeasureBoxEditor {
   }
 
   modifyWidth(delta) {
-    const newWidth = Math.max(20, Math.min(this.canvas.width - this.box.left, this.box.width + delta));
-    this.box.width = newWidth;
+    this.box.width = Math.max(20, Math.min(this.canvas.width - this.box.left, this.box.width + delta));
     this.render();
     if (this.onUpdate) this.onUpdate(this.box);
   }
@@ -575,9 +507,7 @@ class MeasureBoxEditor {
   }
 }
 
-// =========================================================================
-// 4. HLAVNÍ APLIKACE S OPRAVENÝM PŘEPÍNÁNÍM A KNIHOVNOU
-// =========================================================================
+// 4. Hlavní aplikace
 class GuitarTrainer {
   constructor() {
     this.scoreCanvas = document.getElementById('scoreCanvas');
@@ -592,14 +522,13 @@ class GuitarTrainer {
     this.baseImage = null;
     this.currentIndex = 0;
     this.activeEditor = null;
-    this.lastBarLineFn = null;
 
     this.isPlaying = false;
     this.timerId = null;
     this.currentBeat = 0;
 
     this.initLibrary();
-    this.initCanvasClicks();
+    this.initTouchMarking();
     this.initPracticeGestures();
   }
 
@@ -613,7 +542,7 @@ class GuitarTrainer {
         await this.loadScore(all[0].id);
       }
     } catch (e) {
-      console.warn('Chyba při čtení z knihovny:', e);
+      console.warn('Chyba při čtení knihovny:', e);
     }
   }
 
@@ -628,17 +557,17 @@ class GuitarTrainer {
       this.activeEditor = null;
     }
     document.getElementById('editSubbar').style.display = 'none';
+    document.getElementById('addMeasureBtn').style.display = 'none';
 
     if (score.imageData) {
       const img = new Image();
-      img.onload = async () => {
+      img.onload = () => {
         this.scoreCanvas.width = img.naturalWidth;
         this.scoreCanvas.height = img.naturalHeight;
-        this.scoreCtx.drawImage(img, 0, 0);
-        this.baseImage = await createImageBitmap(img);
+        this.baseImage = img;
         this.updateUI();
         this.renderScoreView();
-        document.getElementById('statusHint').innerText = `Otevřena skladba: "${score.name}". Klepněte na takt pro ohraničení.`;
+        document.getElementById('statusHint').innerText = `Otevřeno: "${score.name}". Klepněte prstem na libovolný takt.`;
       };
       img.src = score.imageData;
     }
@@ -654,7 +583,8 @@ class GuitarTrainer {
       updatedAt: Date.now()
     };
     await window.scoreDB.saveScore(score);
-    await this.initLibrary();
+    const all = await window.scoreDB.getAllScores();
+    document.getElementById('libCountSpan').innerText = all.length;
     await this.loadScore(id);
   }
 
@@ -662,7 +592,8 @@ class GuitarTrainer {
     if (!this.currentScore) return;
     this.currentScore.updatedAt = Date.now();
     await window.scoreDB.saveScore(this.currentScore);
-    await this.initLibrary();
+    const all = await window.scoreDB.getAllScores();
+    document.getElementById('libCountSpan').innerText = all.length;
   }
 
   async deleteScoreFromLibrary(id, e) {
@@ -670,6 +601,8 @@ class GuitarTrainer {
     if (confirm('Opravdu chcete smazat tuto skladbu z knihovny?')) {
       await window.scoreDB.deleteScore(id);
       const all = await window.scoreDB.getAllScores();
+      document.getElementById('libCountSpan').innerText = all.length;
+
       if (this.currentScore && this.currentScore.id === id) {
         if (all.length > 0) {
           await this.loadScore(all[0].id);
@@ -691,7 +624,7 @@ class GuitarTrainer {
     document.getElementById('libCountSpan').innerText = all.length;
 
     if (all.length === 0) {
-      listEl.innerHTML = '<div style="color:var(--text-muted); padding:10px; text-align:center;">V knihovně zatím nemáte žádné noty. Nahrajte nové souborem nahoře.</div>';
+      listEl.innerHTML = '<div style="color:var(--text-muted); padding:10px; text-align:center;">Knihovna je prázdná. Nahrajte noty tlačítkem nahoře.</div>';
     } else {
       all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       all.forEach(s => {
@@ -723,27 +656,39 @@ class GuitarTrainer {
     document.getElementById('libraryModal').style.display = 'none';
   }
 
-  // Funkce tlačítek pro změnu a rozšiřování taktů
-  expandMeasure(direction) {
-    if (this.activeEditor) this.activeEditor.expandMeasure(direction);
+  expandMeasure(dir) {
+    if (this.activeEditor) this.activeEditor.expandMeasure(dir);
   }
-
-  shrinkMeasure(direction) {
-    if (this.activeEditor) this.activeEditor.shrinkMeasure(direction);
+  shrinkMeasure(dir) {
+    if (this.activeEditor) this.activeEditor.shrinkMeasure(dir);
   }
-
   adjustActiveWidth(delta) {
     if (this.activeEditor) this.activeEditor.modifyWidth(delta);
   }
-
   adjustActiveEdge(edge, delta) {
     if (this.activeEditor) this.activeEditor.modifyEdge(edge, delta);
   }
 
-  initCanvasClicks() {
-    this.scoreCanvas.addEventListener('click', (e) => {
-      if (!this.baseImage || !this.currentScore) return;
-      if (this.activeEditor && this.activeEditor.activeAction) return;
+  // SPOLEHLIVÉ ZNAČKOVÁNÍ NA MOBILU (Tap detekce)
+  initTouchMarking() {
+    let downPos = null;
+
+    this.scoreCanvas.addEventListener('pointerdown', (e) => {
+      downPos = { x: e.clientX, y: e.clientY };
+    });
+
+    this.scoreCanvas.addEventListener('pointerup', (e) => {
+      if (!downPos) return;
+      const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+      downPos = null;
+
+      // Pokud prst popojel více než 8 px, šlo o tažení rámečku, nikoliv nové klepnutí
+      if (dist > 8) return;
+
+      if (!this.baseImage || !this.currentScore) {
+        alert('Nejprve nahrajte skladbu nebo ji vyberte z Knihovny.');
+        return;
+      }
 
       const rect = this.scoreCanvas.getBoundingClientRect();
       const scaleX = this.scoreCanvas.width / rect.width;
@@ -751,13 +696,13 @@ class GuitarTrainer {
       const clickX = (e.clientX - rect.left) * scaleX;
       const clickY = (e.clientY - rect.top) * scaleY;
 
+      // Pokud uživatel klikl na stávající táhlo rámečku, necháme ho editovat
       if (this.activeEditor) {
         const { x, y, tolerance } = this.activeEditor.getCoords(e);
         if (this.activeEditor.hitTest(x, y, tolerance)) return;
       }
 
       const scanResult = scanStaffAndBarlines(this.scoreCanvas, clickX, clickY);
-      this.lastBarLineFn = scanResult.isBarLine;
 
       if (this.activeEditor) this.activeEditor.destroy();
       this.activeEditor = new MeasureBoxEditor(
@@ -771,11 +716,10 @@ class GuitarTrainer {
       document.getElementById('addMeasureBtn').style.display = 'inline-flex';
       document.getElementById('editSubbar').style.display = 'flex';
       document.getElementById('nextMeasureNum').innerText = (this.currentScore.measures || []).length + 1;
-      document.getElementById('statusHint').innerText = 'Pod prstem vidíte zvětšenou lupu. Tlačítky nahoře můžete přidat další takt do stejného cvičení.';
+      document.getElementById('statusHint').innerText = 'Upravte rámeček prstem (s lupou) nebo tlačítky a klepněte na "✔ Uložit takt".';
     });
   }
 
-  // Gesta v režimu cvičení: klepnutí vlevo / vpravo na trenažér
   initPracticeGestures() {
     const disp = document.getElementById('practiceDisplay');
     disp.addEventListener('click', (e) => {
@@ -807,6 +751,7 @@ class GuitarTrainer {
 
     this.updateUI();
     this.renderScoreView();
+    document.getElementById('statusHint').innerText = 'Takt uložen. Můžete klepnout na další takt.';
   }
 
   async clearMeasures() {
@@ -819,6 +764,7 @@ class GuitarTrainer {
         this.activeEditor.destroy();
         this.activeEditor = null;
         document.getElementById('editSubbar').style.display = 'none';
+        document.getElementById('addMeasureBtn').style.display = 'none';
       }
       this.updateUI();
       this.renderScoreView();
@@ -836,7 +782,6 @@ class GuitarTrainer {
     loopFrom.max = Math.max(1, count);
     loopTo.max = Math.max(1, count);
 
-    // DŮLEŽITÉ: loopTo musí vždy odpovídat celkovému počtu taktů, aby nezablokoval přepínání!
     if (count > 0 && (Number(loopTo.value) <= 1 || Number(loopTo.value) < count)) {
       loopTo.value = count;
     }
@@ -861,15 +806,11 @@ class GuitarTrainer {
     }
   }
 
-  // =========================================================================
-  // OPRAVENÉ PŘEPÍNÁNÍ TAKTŮ V REŽIMU CVIČENÍ
-  // =========================================================================
   showMeasureInTrainer(index) {
     if (!this.currentScore || !this.currentScore.measures || this.currentScore.measures.length === 0) return;
     const measures = this.currentScore.measures;
     const count = measures.length;
 
-    // Normalizace indexu
     if (index < 0) index = 0;
     if (index >= count) index = count - 1;
 
@@ -893,37 +834,28 @@ class GuitarTrainer {
     const count = this.currentScore.measures.length;
 
     if (isManual) {
-      // Při manuálním kliknutí na "Další ▶" přecházíme plynule na další takt
-      const nextIdx = (this.currentIndex + 1) % count;
-      this.showMeasureInTrainer(nextIdx);
+      this.showMeasureInTrainer((this.currentIndex + 1) % count);
       return;
     }
 
-    // Při automatickém posunu metronomem dodržujeme smyčku
     let loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom').value) || 1)) - 1;
     let loopTo = Math.max(1, Math.min(count, Number(document.getElementById('loopTo').value) || count)) - 1;
     if (loopTo < loopFrom) loopTo = count - 1;
 
     let nextIdx = this.currentIndex + 1;
-    if (nextIdx > loopTo || nextIdx >= count) {
-      nextIdx = loopFrom;
-    }
+    if (nextIdx > loopTo || nextIdx >= count) nextIdx = loopFrom;
     this.showMeasureInTrainer(nextIdx);
   }
 
   prevMeasure() {
     if (!this.currentScore || !this.currentScore.measures || this.currentScore.measures.length === 0) return;
     const count = this.currentScore.measures.length;
-    const prevIdx = (this.currentIndex - 1 + count) % count;
-    this.showMeasureInTrainer(prevIdx);
+    this.showMeasureInTrainer((this.currentIndex - 1 + count) % count);
   }
 
   async togglePlay() {
-    if (this.isPlaying) {
-      this.stop();
-    } else {
-      await this.start();
-    }
+    if (this.isPlaying) this.stop();
+    else await this.start();
   }
 
   async start() {
@@ -935,10 +867,7 @@ class GuitarTrainer {
     this.currentBeat = 0;
     document.getElementById('playBtn').innerText = '⏸ Zastavit';
 
-    if (window.wakeLockManager) {
-      await window.wakeLockManager.request();
-    }
-
+    if (window.wakeLockManager) await window.wakeLockManager.request();
     this.scheduleNextTick();
   }
 
@@ -948,9 +877,7 @@ class GuitarTrainer {
     document.getElementById('playBtn').innerText = '▶ Start Metronom';
     document.getElementById('beatDot').classList.remove('active');
 
-    if (window.wakeLockManager) {
-      await window.wakeLockManager.release();
-    }
+    if (window.wakeLockManager) await window.wakeLockManager.release();
   }
 
   scheduleNextTick() {
@@ -960,8 +887,7 @@ class GuitarTrainer {
     const beatsPerMeasure = Number(document.getElementById('beatsPerMeasure').value) || 4;
     const intervalMs = (60 / bpm) * 1000;
 
-    const isAccent = (this.currentBeat === 0);
-    this.metronome.playClick(isAccent);
+    this.metronome.playClick(this.currentBeat === 0);
 
     const dot = document.getElementById('beatDot');
     dot.classList.add('active');
@@ -1015,43 +941,48 @@ function switchMode(mode) {
   }
 }
 
-// Nahrání nového souboru
+// SPOLEHLIVÉ NAHRÁVÁNÍ SOUBORŮ (PDF i Obrázky včetně Android MIME typů)
 document.getElementById('fileInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   const hint = document.getElementById('statusHint');
   hint.innerText = 'Načítám noty a ukládám do knihovny...';
-  const songName = file.name.replace(/\.[^/.]+$/, "");
+  const songName = file.name ? file.name.replace(/\.[^/.]+$/, "") : 'Nová skladba';
 
-  if (file.type === 'application/pdf') {
-    const reader = new FileReader();
-    reader.onload = async function() {
-      const typedarray = new Uint8Array(this.result);
-      const pdf = await pdfjsLib.getDocument(typedarray).promise;
+  const isPdf = file.type === 'application/pdf' || 
+                (file.name && file.name.toLowerCase().endsWith('.pdf'));
+
+  try {
+    if (isPdf) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const page = await pdf.getPage(1);
 
       const viewport = page.getViewport({ scale: 2.0 });
       app.scoreCanvas.width = viewport.width;
       app.scoreCanvas.height = viewport.height;
 
-      const renderContext = { canvasContext: app.scoreCtx, viewport: viewport };
-      await page.render(renderContext).promise;
-
+      await page.render({ canvasContext: app.scoreCtx, viewport }).promise;
       const imageData = app.scoreCanvas.toDataURL('image/jpeg', 0.85);
       await app.saveNewScoreToLibrary(songName, imageData);
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    const img = new Image();
-    img.onload = async () => {
-      app.scoreCanvas.width = img.naturalWidth;
-      app.scoreCanvas.height = img.naturalHeight;
-      app.scoreCtx.drawImage(img, 0, 0);
+    } else {
+      const img = new Image();
+      img.onload = async () => {
+        app.scoreCanvas.width = img.naturalWidth;
+        app.scoreCanvas.height = img.naturalHeight;
+        app.scoreCtx.drawImage(img, 0, 0);
 
-      const imageData = app.scoreCanvas.toDataURL('image/jpeg', 0.85);
-      await app.saveNewScoreToLibrary(songName, imageData);
-    };
-    img.src = URL.createObjectURL(file);
+        const imageData = app.scoreCanvas.toDataURL('image/jpeg', 0.85);
+        await app.saveNewScoreToLibrary(songName, imageData);
+      };
+      img.onerror = () => {
+        hint.innerText = 'Chyba: Obrázek se nepodařilo načíst.';
+      };
+      img.src = URL.createObjectURL(file);
+    }
+  } catch (err) {
+    console.error('Chyba nahrávání:', err);
+    hint.innerText = 'Chyba při zpracování souboru: ' + err.message;
   }
 });
