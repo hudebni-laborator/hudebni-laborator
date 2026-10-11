@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Kytarový Trenažér Taktů</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+  <!-- POHLED 1: Knihovna skladeb -->
+  <section id="view-library" class="view active">
+    <header>
+      <h1>Kytarový Trenažér Taktů</h1>
+    </header>
+    <div class="library-content">
+      <div class="library-actions">
+        <input type="file" id="file-input" accept="application/pdf, image/*" style="display: none;">
+        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+        
+        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+          📁 Nahrát PDF / Obrázek
+        </button>
+        <button class="btn" onclick="document.getElementById('camera-input').click()">
+          📷 Vyfotit noty
+        </button>
+      </div>
+
+      <div id="scores-list" class="scores-list"></div>
+    </div>
+  </section>
+
+  <!-- POHLED 2: Editor & Mapování taktů -->
+  <section id="view-editor" class="view">
+    <header>
+      <button class="btn btn-sm" id="btn-back-lib">← Zpět</button>
+      <span class="header-title" id="editor-title"></span>
+      <button class="btn btn-sm btn-primary" id="btn-start-practice">Spustit cvičení ▶</button>
+    </header>
+
+    <div class="editor-toolbar">
+      <button class="btn btn-sm" id="btn-mode-key">1. Nastavit klíč / předznamenání</button>
+      <button class="btn btn-sm active" id="btn-mode-measure">2. Označovat takty</button>
+      <button class="btn btn-sm" id="btn-undo">Vrátit krok (Undo)</button>
+
+      <div class="slider-group" id="threshold-control" style="display: none;">
+        <label for="threshold-slider">Kontrast papíru:</label>
+        <input type="range" id="threshold-slider" min="60" max="210" value="145">
+        <span id="threshold-val">145</span>
+      </div>
+    </div>
+
+    <div class="canvas-viewport">
+      <canvas id="pdf-canvas"></canvas>
+      <div id="selection-layer"></div>
+    </div>
+  </section>
+
+  <!-- POHLED 3: Cvičební režim -->
+  <section id="view-practice" class="view practice-screen">
+    <div class="practice-top-bar">
+      <button class="btn btn-sm" id="btn-exit-practice">✕ Ukončit</button>
+      <span class="pedal-hint">Bluetooth pedál: PageUp / PageDown</span>
+    </div>
+
+    <div id="practice-strips" class="practice-strips"></div>
+
+    <div class="practice-controls">
+      <button class="btn btn-sm" id="btn-prev-measure">◀ Předchozí</button>
+      <span id="practice-nav-info" style="font-size: 13px; font-weight: 500;"></span>
+      <button class="btn btn-sm" id="btn-next-measure">Další ▶</button>
+    </div>
+  </section>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

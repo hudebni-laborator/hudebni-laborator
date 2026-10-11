@@ -1,0 +1,351 @@
+:root {
+  --bg-color: #121214;
+  --surface-color: #1a1a1e;
+  --surface-border: #2c2c34;
+  --primary-color: #10b981;
+  --primary-hover: #059669;
+  --danger-color: #ef4444;
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pohledy */
+.view {
+  display: none;
+  width: 100%;
+  flex: 1;
+}
+
+.view.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navigační lišty */
+header {
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--surface-border);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+header h1 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50vw;
+}
+
+/* Tlačítka */
+.btn {
+  background: var(--surface-color);
+  color: var(--text-main);
+  border: 1px solid var(--surface-border);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn:active {
+  opacity: 0.8;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: #000;
+  border-color: var(--primary-color);
+  font-weight: 600;
+}
+
+.btn-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: var(--danger-color);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.btn.active {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+/* View 1: Knihovna */
+.library-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.library-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.scores-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.score-card {
+  background: var(--surface-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.score-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.score-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--primary-color);
+}
+
+.score-info h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.score-info p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.score-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-muted);
+}
+
+.empty-state .subtitle {
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* View 2: Editor */
+.editor-toolbar {
+  padding: 10px 16px;
+  background: #16161a;
+  border-bottom: 1px solid var(--surface-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.slider-group input {
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+.canvas-viewport {
+  position: relative;
+  width: 100%;
+  overflow-y: auto;
+  flex: 1;
+  background: #000;
+}
+
+#pdf-canvas {
+  display: block;
+  margin: 0 auto;
+}
+
+#selection-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.measure-rect {
+  position: absolute;
+  border: 2px solid var(--primary-color);
+  background: rgba(16, 185, 129, 0.15);
+  pointer-events: none;
+}
+
+.key-rect {
+  position: absolute;
+  border: 2px dashed #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+  pointer-events: none;
+}
+
+.badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--primary-color);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 4px;
+}
+
+.key-rect .badge {
+  background: #3b82f6;
+  color: #fff;
+}
+
+/* View 3: Cvičební plocha */
+.practice-screen {
+  background: var(--bg-color);
+  padding: 12px 16px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  justify-content: space-between;
+}
+
+.practice-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.pedal-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.practice-strips {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.practice-strip-row {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  max-width: 1200px;
+  height: clamp(120px, 32vh, 220px);
+  background: #fbfbfa;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+.strip-key {
+  height: 100%;
+  width: auto;
+  border-right: 1px solid #d4d4d8;
+  object-fit: contain;
+}
+
+.strip-measure {
+  height: 100%;
+  flex: 1;
+  width: 100%;
+  object-fit: fill;
+}
+
+.measure-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.85);
+  color: #18181b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.practice-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+@media (orientation: landscape) {
+  .practice-screen {
+    padding-top: 6px;
+  }
+  .practice-strip-row {
+    height: clamp(130px, 46vh, 240px);
+  }
+}
