@@ -25,19 +25,33 @@
   <!-- Lišta nástrojů pro značkování -->
   <div class="toolbar" id="editToolbar">
     <button class="btn" onclick="app.openLibraryModal()">📚 Knihovna (<span class="lib-count-span">0</span>)</button>
-    <label class="btn">
-      + Nové noty (PDF/Obrázek)
+
+    <!-- Přímé focení fotoaparátem ze stojanu -->
+    <label class="btn btn-primary" title="Vyfotit noty fotoaparátem">
+      📷 Vyfotit noty
+      <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
+    </label>
+
+    <!-- Nahrání existujícího souboru (PDF nebo obrázek) -->
+    <label class="btn" title="Nahrát PDF nebo obrázek z úložiště">
+      📁 Soubor
       <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
     </label>
 
-    <!-- Přepínač stránek PDF -->
+    <!-- Tlačítko pro přidání další vyfocené strany k otevřené skladbě -->
+    <label class="btn" id="addPageBtn" style="display:none;" title="Vyfotit a přidat další list k této skladbě">
+      📷 + Další strana
+      <input type="file" id="addPageInput" class="file-input" accept="image/*" capture="environment">
+    </label>
+
+    <!-- Přepínač stránek -->
     <div class="page-switcher" id="pageSwitcher" style="display:none;">
       <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
       <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
       <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
     </div>
 
-    <!-- Tlačítka pro takt a pro klíč s předznamenáním -->
+    <!-- Tlačítka pro takt a klíč s předznamenáním -->
     <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
       ✔ Uložit takt <span id="nextMeasureNum">1</span>
     </button>
@@ -79,13 +93,13 @@
       <div class="canvas-box">
         <canvas id="scoreCanvas"></canvas>
       </div>
-      <div class="status-msg" id="statusHint">Nahrajte skladbu nebo vyberte z knihovny a klepněte na takt nebo klíč.</div>
+      <div class="status-msg" id="statusHint">Vyfoťte noty z pultu nebo vyberte z knihovny a klepněte na takt.</div>
     </div>
 
-    <!-- 2. PRACTICE VIEW: Trénink s klíčem a možností více taktů pod sebou -->
+    <!-- 2. PRACTICE VIEW: Čistý trenažér bez metronomu -->
     <div class="view-panel" id="practiceView">
       
-      <!-- Lišta s Knihovnou a volbou zobrazení pod sebou v režimu cvičení -->
+      <!-- Lišta s Knihovnou a volbou zobrazení taktů pod sebou -->
       <div class="toolbar" style="width:100%; border-radius:8px;">
         <button class="btn" onclick="app.openLibraryModal()">📚 Knihovna (<span class="lib-count-span">0</span>)</button>
         <div class="ctrl-group" style="margin-left:auto;">
@@ -107,47 +121,30 @@
           <div class="clef-preview-wrap" id="clefPreviewWrap">
             <canvas id="clefCanvas"></canvas>
           </div>
-          <span class="clef-empty-hint" id="clefEmptyHint" style="display:none;">(Není označeno – lze označit v záložce Značkování)</span>
+          <span class="clef-empty-hint" id="clefEmptyHint" style="display:none;">(Lze označit v záložce Značkování)</span>
         </div>
 
-        <!-- ZOBRAZENÍ CVIČENÝCH TAKTŮ (1 nebo více pod sebou) -->
+        <!-- ZOBRAZENÍ CVIČENÝCH TAKTŮ -->
         <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
           <canvas id="practiceCanvas"></canvas>
-          <div class="tap-hint">◀ klepnutí vlevo / vpravo pro posun ▶</div>
+          <div class="tap-hint">◀ klepnutí vlevo / vpravo pro přepnutí taktu ▶</div>
         </div>
       </div>
 
+      <!-- Navigace taktů a nastavení smyčky -->
       <div class="trainer-controls">
         <div class="measure-stepper">
-          <button class="btn btn-nav" onclick="app.prevMeasure()">◀ Předchozí</button>
+          <button class="btn btn-nav" onclick="app.prevMeasure()">◀ Předchozí takt</button>
           <div class="measure-indicator" id="practiceMeasureTitle">Takt 1 / 1</div>
-          <button class="btn btn-nav" onclick="app.nextMeasure(true)">Další ▶</button>
+          <button class="btn btn-nav btn-primary" onclick="app.nextMeasure(true)">Další takt ▶</button>
         </div>
 
-        <div class="trainer-row">
+        <div class="trainer-row" style="justify-content: center;">
           <div class="ctrl-group">
-            <label for="bpmInput">Tempo (BPM):</label>
-            <input type="number" id="bpmInput" value="80" min="40" max="240" step="1" style="width:75px;">
-          </div>
-          <div class="ctrl-group">
-            <label for="beatsPerMeasure">Doby v taktu:</label>
-            <input type="number" id="beatsPerMeasure" value="4" min="1" max="12" style="width:65px;">
-          </div>
-          <div class="ctrl-group">
-            <div class="beat-indicator" id="beatDot"></div>
-            <button class="btn btn-primary" id="playBtn" onclick="app.togglePlay()">▶ Start Metronom</button>
-          </div>
-        </div>
-
-        <div class="trainer-row">
-          <div class="ctrl-group">
-            <label>Smyčka od taktu:</label>
-            <input type="number" id="loopFrom" value="1" min="1" style="width:60px;">
+            <label>Omezení smyčky od taktu:</label>
+            <input type="number" id="loopFrom" value="1" min="1" style="width:65px;">
             <label>do:</label>
-            <input type="number" id="loopTo" value="1" min="1" style="width:60px;">
-          </div>
-          <div class="ctrl-group">
-            <label><input type="checkbox" id="autoAdvance" checked> Posunout po doběhnutí taktu</label>
+            <input type="number" id="loopTo" value="1" min="1" style="width:65px;">
           </div>
         </div>
       </div>
@@ -170,6 +167,7 @@
     </div>
   </div>
 
+  <!-- Skripty načítané ze složky src/ -->
   <script src="src/wakeLock.js"></script>
   <script src="src/db.js"></script>
   <script src="src/app.js"></script>

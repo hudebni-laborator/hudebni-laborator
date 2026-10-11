@@ -2,36 +2,35 @@ if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-// 1. Zvukový generátor metronomu
-class MetronomeAudio {
-  constructor() {
-    this.audioCtx = null;
-  }
-  init() {
-    if (!this.audioCtx) {
-      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
-    }
-  }
-  playClick(isAccent = false) {
-    this.init();
-    const osc = this.audioCtx.createOscillator();
-    const gain = this.audioCtx.createGain();
+// 1. Zmenšení vyfocené fotografie na rozumnou velikost pro plynulý chod mobilu
+async function compressImageFile(file, maxDimension = 2400) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, this.audioCtx.currentTime);
+      if (w > maxDimension || h > maxDimension) {
+        if (w > h) {
+          h = Math.round((h * maxDimension) / w);
+          w = maxDimension;
+        } else {
+          w = Math.round((w * maxDimension) / h);
+          h = maxDimension;
+        }
+      }
 
-    gain.gain.setValueAtTime(1, this.audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.05);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
 
-    osc.connect(gain);
-    gain.connect(this.audioCtx.destination);
-
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.05);
-  }
+      resolve(canvas.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // 2. Detekce taktových čar a osnov z čistého podkladu
@@ -178,32 +177,26 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   };
 
   let leftX = Math.floor(clickX) - 5;
-  let foundLeft = false;
   for (let x = leftX; x >= Math.max(0, clickX - spacing * 18); x--) {
     if (isBarLine(x)) {
       leftX = x;
-      foundLeft = true;
       for (let off = 2; off <= 7; off++) {
         if (x - off >= 0 && isBarLine(x - off)) leftX = x - off;
       }
       break;
     }
   }
-  if (!foundLeft) leftX = Math.max(0, Math.floor(clickX - spacing * 8));
 
   let rightX = Math.floor(clickX) + 5;
-  let foundRight = false;
   for (let x = rightX; x <= Math.min(width, clickX + spacing * 18); x++) {
     if (isBarLine(x)) {
       rightX = x;
-      foundRight = true;
       for (let off = 2; off <= 7; off++) {
         if (x + off < width && isBarLine(x + off)) rightX = x + off;
       }
       break;
     }
   }
-  if (!foundRight) rightX = Math.min(width, Math.floor(clickX + spacing * 8));
 
   const gapMargin = Math.round(currentStaff.height * 0.65);
   const topY = Math.max(0, currentStaff.top - gapMargin);
@@ -557,8 +550,6 @@ class GuitarTrainer {
     this.clefCanvas = document.getElementById('clefCanvas');
     this.clefCtx = this.clefCanvas ? this.clefCanvas.getContext('2d') : null;
 
-    this.metronome = new MetronomeAudio();
-
     this.currentScore = null;
     this.pdfDoc = null;
     this.pageCache = new Map();
@@ -569,11 +560,7 @@ class GuitarTrainer {
     this.activeEditor = null;
     this.editingMeasureId = null;
 
-    this.stackCount = 1; // 1, 2, 3, 4, or 'loop'
-
-    this.isPlaying = false;
-    this.timerId = null;
-    this.currentBeat = 0;
+    this.stackCount = 1;
 
     this.initLibrary();
     this.initTouchMarking();
@@ -620,12 +607,16 @@ class GuitarTrainer {
         this.pdfDoc = await pdfjsLib.getDocument({ data: copyBuffer }).promise;
         this.totalPages = this.pdfDoc.numPages;
       } catch (err) {
-        console.error('Chyba načítání PDF dokumentu:', err);
+        console.error('Chyba načítání PDF:', err);
         this.totalPages = 1;
       }
+    } else if (score.pages && score.pages.length > 0) {
+      this.totalPages = score.pages.length;
     } else {
       this.totalPages = 1;
     }
+
+    document.getElementById('addPageBtn').style.display = score.isPdf ? 'none' : 'inline-flex';
 
     this.updatePageSwitcherUI();
     await this.renderCurrentPage();
@@ -654,8 +645,12 @@ class GuitarTrainer {
       this.scoreCanvas.width = cleanCanvas.width;
       this.scoreCanvas.height = cleanCanvas.height;
       this.renderScoreView();
-    } else if (this.currentScore.imageData) {
-      if (!this.pageCache.has(1)) {
+    } else {
+      // Vícestránkové vyfocené noty nebo samostatný obrázek
+      const targetDataUrl = (this.currentScore.pages && this.currentScore.pages[this.currentPage - 1]) 
+        || this.currentScore.imageData;
+
+      if (!this.pageCache.has(this.currentPage)) {
         const img = new Image();
         await new Promise((resolve, reject) => {
           img.onload = () => {
@@ -663,14 +658,15 @@ class GuitarTrainer {
             offCanvas.width = img.naturalWidth || img.width;
             offCanvas.height = img.naturalHeight || img.height;
             offCanvas.getContext('2d').drawImage(img, 0, 0);
-            this.pageCache.set(1, offCanvas);
+            this.pageCache.set(this.currentPage, offCanvas);
             resolve();
           };
           img.onerror = reject;
-          img.src = this.currentScore.imageData;
+          img.src = targetDataUrl;
         });
       }
-      const cleanCanvas = this.pageCache.get(1);
+
+      const cleanCanvas = this.pageCache.get(this.currentPage);
       this.scoreCanvas.width = cleanCanvas.width;
       this.scoreCanvas.height = cleanCanvas.height;
       this.renderScoreView();
@@ -691,6 +687,24 @@ class GuitarTrainer {
       await page.render({ canvasContext: offCtx, viewport }).promise;
       this.pageCache.set(pageNum, offCanvas);
       return offCanvas;
+    } else if (this.currentScore) {
+      const targetDataUrl = (this.currentScore.pages && this.currentScore.pages[pageNum - 1]) 
+        || this.currentScore.imageData;
+      if (targetDataUrl) {
+        const img = new Image();
+        await new Promise((res) => {
+          img.onload = () => {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = img.naturalWidth || img.width;
+            offCanvas.height = img.naturalHeight || img.height;
+            offCanvas.getContext('2d').drawImage(img, 0, 0);
+            this.pageCache.set(pageNum, offCanvas);
+            res();
+          };
+          img.src = targetDataUrl;
+        });
+        return this.pageCache.get(pageNum);
+      }
     }
     return this.pageCache.get(1) || null;
   }
@@ -734,14 +748,36 @@ class GuitarTrainer {
       isPdf: dataObj.isPdf,
       pdfData: dataObj.pdfData || null,
       imageData: dataObj.imageData || null,
+      pages: dataObj.pages || (dataObj.imageData ? [dataObj.imageData] : []),
       measures: [],
-      keySignatures: [], // { id, page, fromMeasureIndex, box }
+      keySignatures: [],
       updatedAt: Date.now()
     };
     await window.scoreDB.saveScore(score);
     const all = await window.scoreDB.getAllScores();
     document.querySelectorAll('.lib-count-span').forEach(el => el.innerText = all.length);
     await this.loadScore(id);
+  }
+
+  // Přidání další vyfocené strany k právě otevřené skladbě
+  async appendPageToCurrentScore(imageData) {
+    if (!this.currentScore) return;
+    if (this.currentScore.isPdf) {
+      alert('K PDF dokumentu nelze přidávat vyfocené strany. Vytvořte novou skladbu focením.');
+      return;
+    }
+
+    if (!this.currentScore.pages || this.currentScore.pages.length === 0) {
+      this.currentScore.pages = [this.currentScore.imageData];
+    }
+    this.currentScore.pages.push(imageData);
+    this.totalPages = this.currentScore.pages.length;
+    this.currentPage = this.totalPages; // Přejdeme na novou vyfocenou stranu
+
+    await this.persistCurrentScore();
+    this.updatePageSwitcherUI();
+    await this.renderCurrentPage();
+    document.getElementById('statusHint').innerText = `Přidána vyfocená strana ${this.currentPage}. Můžete na ní označovat takty.`;
   }
 
   async persistCurrentScore() {
@@ -782,7 +818,7 @@ class GuitarTrainer {
     document.querySelectorAll('.lib-count-span').forEach(el => el.innerText = all.length);
 
     if (all.length === 0) {
-      listEl.innerHTML = '<div style="color:var(--text-muted); padding:10px; text-align:center;">Knihovna je prázdná. Nahrajte noty tlačítkem nahoře.</div>';
+      listEl.innerHTML = '<div style="color:var(--text-muted); padding:10px; text-align:center;">Knihovna je prázdná. Vyfoťte noty tlačítkem nahoře.</div>';
     } else {
       all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       all.forEach(s => {
@@ -794,11 +830,11 @@ class GuitarTrainer {
         };
 
         const isCurrent = this.currentScore && this.currentScore.id === s.id;
-        const pageLabel = s.isPdf ? 'PDF' : 'Obrázek';
+        const pageCount = s.isPdf ? 'PDF' : `${(s.pages || [1]).length} str.`;
         item.innerHTML = `
           <div class="library-info">
             <div class="library-name">${s.name} ${isCurrent ? '⭐' : ''}</div>
-            <div class="library-meta">${pageLabel} • ${(s.measures || []).length} taktů • ${new Date(s.updatedAt).toLocaleDateString('cs-CZ')}</div>
+            <div class="library-meta">${pageCount} • ${(s.measures || []).length} taktů • ${new Date(s.updatedAt).toLocaleDateString('cs-CZ')}</div>
           </div>
           <div class="library-actions">
             <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="app.deleteScoreFromLibrary('${s.id}', event)">Smazat</button>
@@ -828,7 +864,6 @@ class GuitarTrainer {
     if (this.activeEditor) this.activeEditor.modifyEdge(edge, delta);
   }
 
-  // Dotyková detekce: klik na existující takt pro editaci, nebo označení nového
   initTouchMarking() {
     let downPos = null;
 
@@ -844,7 +879,7 @@ class GuitarTrainer {
       if (dist > 8) return;
 
       if (!this.currentScore) {
-        alert('Nejprve nahrajte skladbu nebo ji vyberte z Knihovny.');
+        alert('Nejprve vyfoťte noty nebo vyberte skladbu z Knihovny.');
         return;
       }
 
@@ -862,7 +897,7 @@ class GuitarTrainer {
         if (this.activeEditor.hitTest(x, y, tolerance)) return;
       }
 
-      // 1. Zkouška: klepnutí do existujícího uloženého taktu na této stránce
+      // 1. Zkouška: klepnutí do existujícího uloženého taktu
       const measures = this.currentScore.measures || [];
       const clickedMeasure = measures.find(m => {
         const mPage = m.page || 1;
@@ -931,11 +966,19 @@ class GuitarTrainer {
         this.nextMeasure(true);
       }
     });
+
+    // Podpora šipek na klávesnici nebo bluetooth pedálu
+    window.addEventListener('keydown', (e) => {
+      if (document.getElementById('practiceView').style.display === 'flex') {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          this.nextMeasure(true);
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          this.prevMeasure();
+        }
+      }
+    });
   }
 
-  // =========================================================================
-  // ULOŽENÍ KLÍČE A PŘEDZNAMENÁNÍ
-  // =========================================================================
   async saveCurrentAsKeySignature() {
     if (!this.activeEditor || !this.currentScore) return;
 
@@ -943,7 +986,6 @@ class GuitarTrainer {
       this.currentScore.keySignatures = [];
     }
 
-    // Určíme, od kterého indexu taktu toto předznamenání platí
     const fromMeasure = this.editingMeasureId != null ? 
       (this.editingMeasureId - 1) : 
       ((this.currentScore.measures || []).length);
@@ -955,7 +997,6 @@ class GuitarTrainer {
       box: { ...this.activeEditor.box }
     };
 
-    // Odstraníme staré předznamenání platné od stejného indexu/strany
     this.currentScore.keySignatures = this.currentScore.keySignatures.filter(
       k => !(k.page === this.currentPage && k.fromMeasureIndex === fromMeasure)
     );
@@ -977,7 +1018,6 @@ class GuitarTrainer {
     document.getElementById('statusHint').innerText = `Klíč a předznamenání bylo uloženo (platí od taktu #${fromMeasure + 1}).`;
   }
 
-  // Získání aktivního klíče/předznamenání pro daný index taktu
   getKeySignatureForMeasure(measureIndex, pageNum) {
     if (!this.currentScore || !this.currentScore.keySignatures || this.currentScore.keySignatures.length === 0) {
       return null;
@@ -1101,7 +1141,7 @@ class GuitarTrainer {
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
     this.scoreCtx.drawImage(pageCanvas, 0, 0);
 
-    // Vykreslení uložených klíčů/předznamenání zlatou barvou
+    // Vykreslení klíčů/předznamenání
     if (this.currentScore && this.currentScore.keySignatures) {
       this.currentScore.keySignatures.forEach((k) => {
         if (k.page !== this.currentPage) return;
@@ -1115,7 +1155,7 @@ class GuitarTrainer {
       });
     }
 
-    // Vykreslení uložených taktů zelenou barvou
+    // Vykreslení taktů
     if (this.currentScore && this.currentScore.measures) {
       this.currentScore.measures.forEach((m) => {
         const mPage = m.page || 1;
@@ -1134,9 +1174,6 @@ class GuitarTrainer {
     }
   }
 
-  // =========================================================================
-  // REŽIM CVIČENÍ: VYKRESLENÍ KLÍČE + VÍCE TAKTŮ POD SEBOU
-  // =========================================================================
   updatePracticeStackCount() {
     const sel = document.getElementById('stackCountSelect').value;
     this.stackCount = sel === 'loop' ? 'loop' : Number(sel);
@@ -1155,7 +1192,7 @@ class GuitarTrainer {
     const currentM = measures[index];
     const targetPage = currentM.page || 1;
 
-    // 1. Zobrazení klíče a předznamenání v záhlaví
+    // 1. Zobrazení klíče a předznamenání
     const keySig = this.getKeySignatureForMeasure(index, targetPage);
     const clefEmptyHint = document.getElementById('clefEmptyHint');
     const clefPreviewWrap = document.getElementById('clefPreviewWrap');
@@ -1196,7 +1233,7 @@ class GuitarTrainer {
       }
     }
 
-    // 3. Vykreslení všech vybraných taktů svisle pod sebou
+    // 3. Vykreslení taktů čistě pod sebou bez modrých rámečků
     let maxWidth = 0;
     const renderedImages = [];
     for (const m of measuresToStack) {
@@ -1207,11 +1244,10 @@ class GuitarTrainer {
     if (maxWidth < 200) maxWidth = 200;
 
     const rowSpacing = 16;
-    const bannerH = 26; // Proužek s číslem taktu
     let totalCanvasHeight = 0;
 
     renderedImages.forEach(item => {
-      totalCanvasHeight += bannerH + item.m.box.height + rowSpacing;
+      totalCanvasHeight += item.m.box.height + rowSpacing;
     });
 
     this.practiceCanvas.width = maxWidth;
@@ -1221,21 +1257,6 @@ class GuitarTrainer {
 
     let currentY = 8;
     renderedImages.forEach(({ m, pImg }) => {
-      const isCurrentlyActive = (m.id === currentM.id);
-
-      // Proužek s číslem taktu a zvýrazněním
-      this.practiceCtx.fillStyle = isCurrentlyActive ? '#2563eb' : '#374151';
-      this.practiceCtx.fillRect(0, currentY, maxWidth, bannerH);
-
-      this.practiceCtx.fillStyle = '#ffffff';
-      this.practiceCtx.font = 'bold 15px sans-serif';
-      const pageInfo = this.totalPages > 1 ? ` (strana ${m.page || 1})` : '';
-      const activeMark = isCurrentlyActive ? ' ▶ HRAJE SE' : '';
-      this.practiceCtx.fillText(`Takt #${m.id}${pageInfo}${activeMark}`, 10, currentY + 18);
-
-      currentY += bannerH;
-
-      // Vykreslení výřezu taktu
       if (pImg) {
         this.practiceCtx.drawImage(
           pImg,
@@ -1243,14 +1264,6 @@ class GuitarTrainer {
           0, currentY, m.box.width, m.box.height
         );
       }
-
-      // Zvýrazňující rámeček kolem aktivního taktu
-      if (isCurrentlyActive) {
-        this.practiceCtx.strokeStyle = '#2563eb';
-        this.practiceCtx.lineWidth = 4;
-        this.practiceCtx.strokeRect(0, currentY - bannerH, maxWidth, bannerH + m.box.height);
-      }
-
       currentY += m.box.height + rowSpacing;
     });
 
@@ -1281,58 +1294,6 @@ class GuitarTrainer {
     const count = this.currentScore.measures.length;
     this.showMeasureInTrainer((this.currentIndex - 1 + count) % count);
   }
-
-  async togglePlay() {
-    if (this.isPlaying) this.stop();
-    else await this.start();
-  }
-
-  async start() {
-    if (!this.currentScore || !this.currentScore.measures || this.currentScore.measures.length === 0) {
-      alert('Nejprve označte alespoň jeden takt v záložce "Značkování".');
-      return;
-    }
-    this.isPlaying = true;
-    this.currentBeat = 0;
-    document.getElementById('playBtn').innerText = '⏸ Zastavit';
-
-    if (window.wakeLockManager) await window.wakeLockManager.request();
-    this.scheduleNextTick();
-  }
-
-  async stop() {
-    this.isPlaying = false;
-    clearTimeout(this.timerId);
-    document.getElementById('playBtn').innerText = '▶ Start Metronom';
-    document.getElementById('beatDot').classList.remove('active');
-
-    if (window.wakeLockManager) await window.wakeLockManager.release();
-  }
-
-  scheduleNextTick() {
-    if (!this.isPlaying) return;
-
-    const bpm = Number(document.getElementById('bpmInput').value) || 80;
-    const beatsPerMeasure = Number(document.getElementById('beatsPerMeasure').value) || 4;
-    const intervalMs = (60 / bpm) * 1000;
-
-    const isAccent = (this.currentBeat === 0);
-    this.metronome.playClick(isAccent);
-
-    const dot = document.getElementById('beatDot');
-    dot.classList.add('active');
-    setTimeout(() => dot.classList.remove('active'), 120);
-
-    this.currentBeat++;
-    if (this.currentBeat >= beatsPerMeasure) {
-      this.currentBeat = 0;
-      if (document.getElementById('autoAdvance').checked) {
-        this.nextMeasure(false);
-      }
-    }
-
-    this.timerId = setTimeout(() => this.scheduleNextTick(), intervalMs);
-  }
 }
 
 const app = new GuitarTrainer();
@@ -1353,7 +1314,6 @@ function switchMode(mode) {
     practiceView.style.display = 'none';
     editToolbar.style.display = 'flex';
     badge.innerText = 'Příprava';
-    app.stop();
     app.renderScoreView();
   } else {
     if (!app.currentScore || !app.currentScore.measures || app.currentScore.measures.length === 0) {
@@ -1367,11 +1327,62 @@ function switchMode(mode) {
     editToolbar.style.display = 'none';
     editSubbar.style.display = 'none';
     badge.innerText = 'Cvičení';
+
+    // Aktivace WakeLock při přechodu do cvičení
+    if (window.wakeLockManager) {
+      window.wakeLockManager.request();
+    }
+
     app.showMeasureInTrainer(app.currentIndex);
   }
 }
 
-// Nahrávání souborů
+// 5. OBSLUHA FOCENÍ A NAHRÁVÁNÍ SOUBORŮ
+
+// A) Vyfocení nové skladby fotoaparátem přímo z pultu
+document.getElementById('cameraInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const hint = document.getElementById('statusHint');
+  hint.innerText = 'Zpracovávám vyfocené noty...';
+  const songName = 'Noty ' + new Date().toLocaleDateString('cs-CZ') + ' ' + new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+
+  try {
+    const compressedDataUrl = await compressImageFile(file);
+    await app.saveNewScoreToLibrary(songName, {
+      isPdf: false,
+      imageData: compressedDataUrl,
+      pages: [compressedDataUrl]
+    });
+  } catch (err) {
+    console.error('Chyba fotoaparátu:', err);
+    hint.innerText = 'Chyba při zpracování fotky: ' + err.message;
+  } finally {
+    e.target.value = '';
+  }
+});
+
+// B) Přidání další vyfocené strany k otevřené skladbě
+document.getElementById('addPageInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const hint = document.getElementById('statusHint');
+  hint.innerText = 'Ukládám další vyfocenou stranu...';
+
+  try {
+    const compressedDataUrl = await compressImageFile(file);
+    await app.appendPageToCurrentScore(compressedDataUrl);
+  } catch (err) {
+    console.error('Chyba při focení další strany:', err);
+    hint.innerText = 'Chyba při focení strany: ' + err.message;
+  } finally {
+    e.target.value = '';
+  }
+});
+
+// C) Nahrání souboru (PDF nebo obrázek) z disku
 document.getElementById('fileInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -1391,23 +1402,12 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
         pdfData: arrayBuffer
       });
     } else {
-      const img = new Image();
-      img.onload = async () => {
-        const offCanvas = document.createElement('canvas');
-        offCanvas.width = img.naturalWidth || img.width;
-        offCanvas.height = img.naturalHeight || img.height;
-        offCanvas.getContext('2d').drawImage(img, 0, 0);
-
-        const imageData = offCanvas.toDataURL('image/jpeg', 0.85);
-        await app.saveNewScoreToLibrary(songName, {
-          isPdf: false,
-          imageData: imageData
-        });
-      };
-      img.onerror = () => {
-        hint.innerText = 'Chyba: Obrázek se nepodařilo načíst.';
-      };
-      img.src = URL.createObjectURL(file);
+      const compressedDataUrl = await compressImageFile(file);
+      await app.saveNewScoreToLibrary(songName, {
+        isPdf: false,
+        imageData: compressedDataUrl,
+        pages: [compressedDataUrl]
+      });
     }
   } catch (err) {
     console.error('Chyba nahrávání:', err);

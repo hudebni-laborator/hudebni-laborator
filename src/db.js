@@ -1,7 +1,7 @@
 class ScoreDB {
   constructor() {
     this.dbName = 'GuitarTrainerDB';
-    this.version = 3;
+    this.version = 4;
     this.db = null;
   }
 
