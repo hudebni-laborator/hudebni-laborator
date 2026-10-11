@@ -3,7 +3,6 @@ class WakeLockManager {
     this.wakeLock = null;
     this.isRequested = false;
 
-    // Obnovení zámku po návratu do popředí prohlížeče
     document.addEventListener('visibilitychange', async () => {
       if (this.isRequested && document.visibilityState === 'visible') {
         await this.request();

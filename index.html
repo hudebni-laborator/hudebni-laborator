@@ -23,16 +23,38 @@
   </header>
 
   <div class="toolbar" id="editToolbar">
+    <button class="btn" onclick="app.openLibraryModal()">📚 Knihovna (<span id="libCountSpan">0</span>)</button>
     <label class="btn">
-      Nahrát noty (PDF/Obrázek)
+      + Nové noty (PDF/Obrázek)
       <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
     </label>
     <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
-      + Přidat takt <span id="nextMeasureNum">1</span>
+      ✔ Uložit takt <span id="nextMeasureNum">1</span>
     </button>
     <button id="clearMeasuresBtn" class="btn btn-danger" style="display:none;" onclick="app.clearMeasures()">
       Smazat takty (<span id="measureCountSpan">0</span>)
     </button>
+  </div>
+
+  <!-- Lišta pro úpravu rámečku a spojení více taktů dohromady -->
+  <div class="edit-subbar" id="editSubbar" style="display:none;">
+    <div class="subbar-group">
+      <span class="subbar-label">Více taktů:</span>
+      <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('left')">◀ +1 Takt vlevo</button>
+      <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('right')">+1 Takt vpravo ▶</button>
+    </div>
+    <div class="subbar-group">
+      <span class="subbar-label">Zúžit:</span>
+      <button class="size-btn" onclick="app.shrinkMeasure('left')">Zleva -1</button>
+      <button class="size-btn" onclick="app.shrinkMeasure('right')">Zprava -1</button>
+    </div>
+    <div class="subbar-group">
+      <span class="subbar-label">Jemně (px):</span>
+      <button class="size-btn" onclick="app.adjustActiveWidth(-10)">-10</button>
+      <button class="size-btn" onclick="app.adjustActiveWidth(10)">+10</button>
+      <button class="size-btn" onclick="app.adjustActiveEdge('left', -4)">◀ Vlevo</button>
+      <button class="size-btn" onclick="app.adjustActiveEdge('right', 4)">Vpravo ▶</button>
+    </div>
   </div>
 
   <main>
@@ -41,30 +63,31 @@
       <div class="canvas-box">
         <canvas id="scoreCanvas"></canvas>
       </div>
-      <div class="status-msg" id="statusHint">Nahrajte skladbu a klepněte prstem na libovolný takt.</div>
+      <div class="status-msg" id="statusHint">Nahrajte skladbu nebo vyberte z knihovny a klepněte na takt.</div>
     </div>
 
     <!-- PRACTICE VIEW -->
     <div class="view-panel" id="practiceView">
-      <div class="practice-display">
+      <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
         <canvas id="practiceCanvas"></canvas>
+        <div class="tap-hint">◀ klepnutí vlevo / vpravo ▶</div>
       </div>
 
       <div class="trainer-controls">
         <div class="measure-stepper">
-          <button class="btn" onclick="app.prevMeasure()">◀ Předchozí</button>
+          <button class="btn btn-nav" onclick="app.prevMeasure()">◀ Předchozí</button>
           <div class="measure-indicator" id="practiceMeasureTitle">Takt 1 / 1</div>
-          <button class="btn" onclick="app.nextMeasure()">Další ▶</button>
+          <button class="btn btn-nav" onclick="app.nextMeasure(true)">Další ▶</button>
         </div>
 
         <div class="trainer-row">
           <div class="ctrl-group">
             <label for="bpmInput">Tempo (BPM):</label>
-            <input type="number" id="bpmInput" value="80" min="40" max="240" step="1">
+            <input type="number" id="bpmInput" value="80" min="40" max="240" step="1" style="width:75px;">
           </div>
           <div class="ctrl-group">
             <label for="beatsPerMeasure">Doby v taktu:</label>
-            <input type="number" id="beatsPerMeasure" value="4" min="1" max="12">
+            <input type="number" id="beatsPerMeasure" value="4" min="1" max="12" style="width:65px;">
           </div>
           <div class="ctrl-group">
             <div class="beat-indicator" id="beatDot"></div>
@@ -87,7 +110,22 @@
     </div>
   </main>
 
-  <!-- Skripty načítané z podsložky src/ -->
+  <!-- LUPA NAD PRSTEM PŘI EDITACI -->
+  <div id="touchLoupe" class="touch-loupe" style="display:none;">
+    <canvas id="loupeCanvas" width="130" height="130"></canvas>
+  </div>
+
+  <!-- MODÁLNÍ OKNO KNIHOVNY -->
+  <div class="modal-overlay" id="libraryModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Knihovna skladeb (IndexedDB)</div>
+        <button class="size-btn" onclick="app.closeLibraryModal()">✕</button>
+      </div>
+      <div class="modal-body" id="libraryList"></div>
+    </div>
+  </div>
+
   <script src="src/wakeLock.js"></script>
   <script src="src/db.js"></script>
   <script src="src/app.js"></script>

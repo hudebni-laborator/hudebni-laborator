@@ -1,7 +1,7 @@
 class ScoreDB {
   constructor() {
     this.dbName = 'GuitarTrainerDB';
-    this.version = 1;
+    this.version = 2;
     this.db = null;
   }
 
@@ -14,7 +14,9 @@ class ScoreDB {
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains('scores')) {
-          db.createObjectStore('scores', { keyPath: 'id' });
+          const store = db.createObjectStore('scores', { keyPath: 'id' });
+          store.createIndex('name', 'name', { unique: false });
+          store.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
       };
 
@@ -49,6 +51,18 @@ class ScoreDB {
       const req = store.get(id);
 
       req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getAllScores() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('scores', 'readonly');
+      const store = tx.objectStore('scores');
+      const req = store.getAll();
+
+      req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => reject(req.error);
     });
   }
