@@ -5,6 +5,7 @@
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --accent: #22c55e;
+  --accent-gold: #eab308;
   --danger: #ef4444;
   --text: #f3f4f6;
   --text-muted: #9ca3af;
@@ -119,6 +120,13 @@ header {
   background: var(--accent);
   border-color: var(--accent);
   color: #052e16;
+  font-weight: 700;
+}
+
+.btn-gold {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+  color: #422006;
   font-weight: 700;
 }
 
@@ -283,31 +291,85 @@ canvas {
   display: block;
 }
 
-/* Režim cvičení */
+/* Režim cvičení a zobrazení předznamenání / taktů */
 #practiceView {
   display: none;
   width: 100%;
   max-width: 950px;
 }
 
-.practice-display {
+.practice-card {
   width: 100%;
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* Horní lišta klíče a předznamenání */
+.clef-banner {
+  background: #27272a;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 12px;
+  display: flex;
   align-items: center;
-  min-height: 180px;
-  max-height: 48vh;
-  border: 2px solid var(--primary);
+  gap: 10px;
+  min-height: 48px;
+}
+
+.clef-label {
+  font-size: 0.75rem;
+  color: var(--accent-gold);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.clef-preview-wrap {
+  background: #ffffff;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  height: 44px;
+  max-width: 220px;
+  border: 1px solid var(--border);
+}
+
+.clef-preview-wrap canvas {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+}
+
+.clef-empty-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.practice-display {
+  width: 100%;
+  background: #ffffff;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 200px;
+  max-height: 52vh;
   cursor: pointer;
   position: relative;
+  border-top: 1px solid var(--border);
 }
 
 .practice-display canvas {
-  max-height: 48vh;
   width: 100%;
+  height: auto;
   object-fit: contain;
 }
 
@@ -317,6 +379,9 @@ canvas {
   font-size: 0.7rem;
   color: rgba(0, 0, 0, 0.45);
   pointer-events: none;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .trainer-controls {

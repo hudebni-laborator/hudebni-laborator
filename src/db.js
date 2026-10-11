@@ -1,7 +1,7 @@
 class ScoreDB {
   constructor() {
     this.dbName = 'GuitarTrainerDB';
-    this.version = 3; // Zvýšeno pro zajištění spolehlivého upgrade
+    this.version = 3;
     this.db = null;
   }
 
