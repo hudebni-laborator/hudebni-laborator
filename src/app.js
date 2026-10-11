@@ -26,7 +26,6 @@ let editorPanX = 0;
 let editorPanY = 0;
 let initialPinchDistance = 0;
 let initialPinchZoom = 1.0;
-let initialPinchCenter = { x: 0, y: 0 };
 let isPinching = false;
 
 // Stav interakce obdélníků
@@ -46,8 +45,12 @@ const views = {
 
 const pdfCanvas = document.getElementById('pdf-canvas');
 const selectionLayer = document.getElementById('selection-layer');
-const canvasWrapper = document.querySelector('.canvas-wrapper');
+const canvasWrapper = document.getElementById('canvas-wrapper');
 const canvasViewport = document.getElementById('canvas-viewport');
+const loupeContainer = document.getElementById('loupe-container');
+const loupeCanvas = document.getElementById('loupe-canvas');
+const loupeCtx = loupeCanvas.getContext('2d');
+
 const practiceContainer = document.getElementById('practice-strips');
 const practiceKeyHeader = document.getElementById('practice-key-header');
 const practiceKeyCanvas = document.getElementById('practice-key-canvas');
@@ -160,6 +163,7 @@ async function openScore(id) {
     renderEditorImage();
   }
 
+  fitCanvasToViewport();
   updateSelectionLayer();
   switchView('editor');
 }
@@ -180,6 +184,7 @@ async function renderEditorPdfPage(pageNum) {
   await page.render({ canvasContext: ctx, viewport }).promise;
 
   pageCanvasCache.set(pageNum, await createImageBitmap(pdfCanvas));
+  fitCanvasToViewport();
   updateSelectionLayer();
 }
 
@@ -193,7 +198,19 @@ function renderEditorImage() {
   ctx.drawImage(currentImageBitmap, 0, 0);
 
   applyThresholdFilter(ctx, pdfCanvas.width, pdfCanvas.height, currentImageThreshold);
+  fitCanvasToViewport();
   updateSelectionLayer();
+}
+
+function fitCanvasToViewport() {
+  if (!canvasViewport || pdfCanvas.width === 0) return;
+  const viewportWidth = canvasViewport.clientWidth || window.innerWidth;
+  const baseScale = viewportWidth / pdfCanvas.width;
+  
+  canvasWrapper.style.width = `${pdfCanvas.width}px`;
+  canvasWrapper.style.height = `${pdfCanvas.height}px`;
+  
+  resetZoom(baseScale);
 }
 
 function applyThresholdFilter(ctx, width, height, threshold) {
@@ -213,47 +230,52 @@ function applyThresholdFilter(ctx, width, height, threshold) {
 // Logika transformace (Pinch-to-zoom a Pan)
 function applyCanvasTransform() {
   if (!canvasWrapper) return;
-  editorZoom = Math.min(Math.max(editorZoom, 1.0), 4.0);
-
-  if (editorZoom === 1.0) {
-    editorPanX = 0;
-    editorPanY = 0;
-  } else if (canvasViewport) {
-    const viewW = canvasViewport.clientWidth;
-    const viewH = canvasViewport.clientHeight;
-    const maxPanX = 0;
-    const minPanX = viewW - (canvasWrapper.offsetWidth * editorZoom);
-    const maxPanY = 0;
-    const minPanY = viewH - (canvasWrapper.offsetHeight * editorZoom);
-
-    editorPanX = Math.min(maxPanX, Math.max(minPanX, editorPanX));
-    editorPanY = Math.min(maxPanY, Math.max(minPanY, editorPanY));
-  }
+  editorZoom = Math.min(Math.max(editorZoom, 0.2), 5.0);
 
   canvasWrapper.style.transform = `translate(${editorPanX}px, ${editorPanY}px) scale(${editorZoom})`;
 
   const resetBtn = document.getElementById('btn-zoom-reset');
   if (resetBtn) {
-    resetBtn.textContent = `🔍 ${Math.round(editorZoom * 100)}%`;
+    resetBtn.textContent = `${Math.round(editorZoom * 100)}%`;
   }
 }
 
-function resetZoom() {
-  editorZoom = 1.0;
+function resetZoom(initialScale) {
+  if (initialScale) {
+    editorZoom = initialScale;
+  } else if (canvasViewport && pdfCanvas.width > 0) {
+    editorZoom = (canvasViewport.clientWidth || window.innerWidth) / pdfCanvas.width;
+  } else {
+    editorZoom = 1.0;
+  }
   editorPanX = 0;
   editorPanY = 0;
   applyCanvasTransform();
 }
 
-function getTouchDistance(touch1, touch2) {
-  return Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+// Plovoucí lupa (Magnifier) promítající detail 70px nad prstem
+function updateLoupe(screenX, screenY, canvasCoords) {
+  if (!loupeContainer || !loupeCtx || !pdfCanvas) return;
+
+  loupeContainer.style.display = 'block';
+  // Umístění 70px nad prst, aby prst nezakrýval obraz
+  loupeContainer.style.left = `${screenX}px`;
+  loupeContainer.style.top = `${screenY - 70}px`;
+
+  // Výřez 60x60 pixelů z nativního plátna, zvětšený 2x do 120x120 lupy
+  const cropSize = 60;
+  const sx = Math.max(0, Math.min(pdfCanvas.width - cropSize, canvasCoords.x - cropSize / 2));
+  const sy = Math.max(0, Math.min(pdfCanvas.height - cropSize, canvasCoords.y - cropSize / 2));
+
+  loupeCtx.imageSmoothingEnabled = true;
+  loupeCtx.imageSmoothingQuality = 'high';
+  loupeCtx.drawImage(pdfCanvas, sx, sy, cropSize, cropSize, 0, 0, 120, 120);
 }
 
-function getTouchMidpoint(touch1, touch2) {
-  return {
-    x: (touch1.clientX + touch2.clientX) / 2,
-    y: (touch1.clientY + touch2.clientY) / 2
-  };
+function hideLoupe() {
+  if (loupeContainer) {
+    loupeContainer.style.display = 'none';
+  }
 }
 
 function updateSelectionLayer() {
@@ -281,10 +303,10 @@ function updateSelectionLayer() {
 function createBoxElement(box, label, className, isSelected, id) {
   const el = document.createElement('div');
   el.className = `${className} ${isSelected ? 'selected' : ''}`;
-  el.style.left = `${(box.x / pdfCanvas.width) * 100}%`;
-  el.style.top = `${(box.y / pdfCanvas.height) * 100}%`;
-  el.style.width = `${(box.w / pdfCanvas.width) * 100}%`;
-  el.style.height = `${(box.h / pdfCanvas.height) * 100}%`;
+  el.style.left = `${box.x}px`;
+  el.style.top = `${box.y}px`;
+  el.style.width = `${box.w}px`;
+  el.style.height = `${box.h}px`;
   el.dataset.id = id;
 
   el.innerHTML = `<span class="badge">${label}</span>`;
@@ -339,7 +361,7 @@ function bindEvents() {
     switchView('editor');
   });
 
-  // Režimy kreslení a posunu
+  // Režimy Kreslit vs Posouvat
   const btnToolDraw = document.getElementById('btn-tool-draw');
   const btnToolPan = document.getElementById('btn-tool-pan');
 
@@ -359,10 +381,20 @@ function bindEvents() {
     updateSelectionLayer();
   });
 
-  const btnZoomReset = document.getElementById('btn-zoom-reset');
-  if (btnZoomReset) {
-    btnZoomReset.addEventListener('click', resetZoom);
-  }
+  // Tlačítka Zoomu (+, -, Reset)
+  document.getElementById('btn-zoom-in').addEventListener('click', () => {
+    editorZoom *= 1.25;
+    applyCanvasTransform();
+  });
+
+  document.getElementById('btn-zoom-out').addEventListener('click', () => {
+    editorZoom /= 1.25;
+    applyCanvasTransform();
+  });
+
+  document.getElementById('btn-zoom-reset').addEventListener('click', () => {
+    fitCanvasToViewport();
+  });
 
   const btnKey = document.getElementById('btn-mode-key');
   const btnMeasure = document.getElementById('btn-mode-measure');
@@ -412,7 +444,6 @@ function bindEvents() {
     prevPageBtn.addEventListener('click', async () => {
       if (currentPageNum > 1) {
         selectedMeasureId = null;
-        resetZoom();
         await renderEditorPdfPage(currentPageNum - 1);
       }
     });
@@ -422,7 +453,6 @@ function bindEvents() {
     nextPageBtn.addEventListener('click', async () => {
       if (currentPageNum < totalPages) {
         selectedMeasureId = null;
-        resetZoom();
         await renderEditorPdfPage(currentPageNum + 1);
       }
     });
@@ -475,16 +505,12 @@ function bindEvents() {
   });
 }
 
-// Interakce kreslení, editace rámečků, pinch-zoom a panování
 function initSelectionInteraction() {
   function getCanvasCoords(clientX, clientY) {
-    const rect = selectionLayer.getBoundingClientRect();
-    const factorX = pdfCanvas.width / rect.width;
-    const factorY = pdfCanvas.height / rect.height;
-
+    const rect = canvasWrapper.getBoundingClientRect();
     return {
-      x: Math.round((clientX - rect.left) * factorX),
-      y: Math.round((clientY - rect.top) * factorY)
+      x: Math.round((clientX - rect.left) / editorZoom),
+      y: Math.round((clientY - rect.top) / editorZoom)
     };
   }
 
@@ -499,12 +525,14 @@ function initSelectionInteraction() {
       const parentId = handle.parentElement.dataset.id;
       dragTarget = parentId === 'KEY' ? activeKeyBox : currentMeasures.find((m) => m.id === parentId).box;
       originalBox = { ...dragTarget };
+      updateLoupe(clientX, clientY, coords);
     } else if (boxEl) {
       selectedMeasureId = boxEl.dataset.id;
       editAction = 'move';
       dragTarget = selectedMeasureId === 'KEY' ? activeKeyBox : currentMeasures.find((m) => m.id === selectedMeasureId).box;
       originalBox = { ...dragTarget };
       updateSelectionLayer();
+      updateLoupe(clientX, clientY, coords);
     } else {
       selectedMeasureId = null;
       editAction = 'create';
@@ -514,6 +542,7 @@ function initSelectionInteraction() {
       dragPreviewEl = document.createElement('div');
       dragPreviewEl.className = `active-drag-rect ${selectionMode === 'key' ? 'key-drag' : ''}`;
       selectionLayer.appendChild(dragPreviewEl);
+      updateLoupe(clientX, clientY, coords);
     }
   }
 
@@ -554,15 +583,20 @@ function initSelectionInteraction() {
       dragTarget.h = Math.abs(coords.y - initialPointerPos.y);
 
       if (dragPreviewEl) {
-        dragPreviewEl.style.left = `${(dragTarget.x / pdfCanvas.width) * 100}%`;
-        dragPreviewEl.style.top = `${(dragTarget.y / pdfCanvas.height) * 100}%`;
-        dragPreviewEl.style.width = `${(dragTarget.w / pdfCanvas.width) * 100}%`;
-        dragPreviewEl.style.height = `${(dragTarget.h / pdfCanvas.height) * 100}%`;
+        dragPreviewEl.style.left = `${dragTarget.x}px`;
+        dragPreviewEl.style.top = `${dragTarget.y}px`;
+        dragPreviewEl.style.width = `${dragTarget.w}px`;
+        dragPreviewEl.style.height = `${dragTarget.h}px`;
       }
     }
+
+    // Aktualizace lupy nad prstem při pohybu
+    updateLoupe(clientX, clientY, coords);
   }
 
   async function handleEnd() {
+    hideLoupe();
+
     if (dragPreviewEl) {
       dragPreviewEl.remove();
       dragPreviewEl = null;
@@ -602,7 +636,7 @@ function initSelectionInteraction() {
     updateSelectionLayer();
   }
 
-  // Myš (Desktop)
+  // Desktop myš
   selectionLayer.addEventListener('mousedown', (e) => {
     if (touchTool === 'pan') return;
     handleStart(e.clientX, e.clientY, e.target);
@@ -614,12 +648,12 @@ function initSelectionInteraction() {
 
   window.addEventListener('mouseup', handleEnd);
 
-  // Dotyk (Mobil / Tablet)
+  // Mobilní dotyk s nativním Pinch-Zoomem
   if (canvasViewport) {
     canvasViewport.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) {
-        // Pinch-to-zoom začátek
         isPinching = true;
+        hideLoupe();
         if (dragPreviewEl) {
           dragPreviewEl.remove();
           dragPreviewEl = null;
@@ -627,9 +661,10 @@ function initSelectionInteraction() {
         editAction = null;
         dragTarget = null;
 
-        initialPinchDistance = getTouchDistance(e.touches[0], e.touches[1]);
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        initialPinchDistance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
         initialPinchZoom = editorZoom;
-        initialPinchCenter = getTouchMidpoint(e.touches[0], e.touches[1]);
         return;
       }
 
@@ -651,19 +686,15 @@ function initSelectionInteraction() {
     canvasViewport.addEventListener('touchmove', (e) => {
       if (e.touches.length === 2 && isPinching) {
         e.preventDefault();
-        const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
-        const currentCenter = getTouchMidpoint(e.touches[0], e.touches[1]);
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
 
-        const scaleFactor = currentDist / initialPinchDistance;
-        editorZoom = initialPinchZoom * scaleFactor;
-
-        editorPanX += currentCenter.x - initialPinchCenter.x;
-        editorPanY += currentCenter.y - initialPinchCenter.y;
-
-        initialPinchDistance = currentDist;
-        initialPinchCenter = currentCenter;
-
-        applyCanvasTransform();
+        if (initialPinchDistance > 0) {
+          const factor = currentDist / initialPinchDistance;
+          editorZoom = initialPinchZoom * factor;
+          applyCanvasTransform();
+        }
         return;
       }
 
@@ -740,7 +771,7 @@ async function renderPractice() {
   document.getElementById('practice-nav-info').textContent = 
     `${rangeText} (str. ${firstM.page || 1}) • (${practiceIndex + 1} z ${currentMeasures.length})`;
 
-  // Klíč a předznamenání nahoře v pevném záhlaví
+  // Klíč a předznamenání nahoře v samostatném panelu bez deformace
   if (firstM.keyBox && firstM.keyBox.w > 0 && firstM.keyBox.h > 0) {
     practiceKeyHeader.style.display = 'flex';
     const keySource = await getPageSource(firstM.keyBox.page || firstM.page || 1);
@@ -749,7 +780,7 @@ async function renderPractice() {
     practiceKeyHeader.style.display = 'none';
   }
 
-  // Vykreslení taktů roztažených přes celou šířku
+  // Vykreslení taktů se 100% zachováním poměru stran osnovy (object-fit: contain)
   for (const measure of visibleMeasures) {
     const row = document.createElement('div');
     row.className = 'practice-strip-row';

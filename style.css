@@ -198,6 +198,7 @@ header h1 {
   padding: 2px;
   border-radius: 6px;
   border: 1px solid var(--surface-border);
+  align-items: center;
 }
 
 .slider-group {
@@ -217,28 +218,25 @@ header h1 {
 .canvas-viewport {
   position: relative;
   width: 100%;
-  overflow: hidden; /* Skryje posuvníky, posun řídíme gesty */
+  overflow: hidden;
   flex: 1;
   background: #09090b;
-  touch-action: none; /* Klíčové: zamezí výchozímu chování prohlížeče při dvou prstech */
+  touch-action: none;
+  user-select: none;
 }
 
 .canvas-wrapper {
-  position: relative;
-  display: block;
-  width: 100%;
-  margin: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
   transform-origin: 0 0;
   will-change: transform;
 }
 
 #pdf-canvas {
   display: block;
-  width: 100%;
-  height: auto;
 }
 
-/* Dotyková vrstva výběru */
 #selection-layer {
   position: absolute;
   top: 0;
@@ -248,15 +246,8 @@ header h1 {
   cursor: crosshair;
 }
 
-/* V režimu posunu je vrstva průchozí pro přirozený scroll */
 #selection-layer.mode-pan {
   cursor: grab;
-  pointer-events: none;
-}
-
-/* V režimu kreslení zachytává dotyky bez scrollovaní */
-#selection-layer.mode-draw {
-  touch-action: none;
 }
 
 .measure-rect, .key-rect {
@@ -283,7 +274,6 @@ header h1 {
   z-index: 10;
 }
 
-/* Živý náhled rámečku při tažení prstem/myší */
 .active-drag-rect {
   position: absolute;
   border: 2px dashed #10b981;
@@ -299,8 +289,8 @@ header h1 {
 
 .handle {
   position: absolute;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   background: #ffffff;
   border: 2px solid var(--primary-color);
   border-radius: 50%;
@@ -332,6 +322,42 @@ header h1 {
 .key-rect .badge {
   background: #3b82f6;
   color: #fff;
+}
+
+/* Lupa (Magnifier / Loupe) zobrazovaná nad prstem */
+#loupe-container {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid #10b981;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  background: #ffffff;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 9999;
+  display: none;
+  transform: translate(-50%, -100%);
+}
+
+#loupe-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Crosshair uvnitř lupy */
+#loupe-container::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.8);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 /* View 3: Cvičební plocha */
@@ -403,14 +429,16 @@ header h1 {
   justify-content: center;
   align-items: center;
   width: 100%;
-  gap: 12px;
+  gap: 14px;
   overflow: hidden;
 }
 
+/* Řádek taktu – NEDEFORMOVANÝ, se zachováním přirozeného poměru stran */
 .practice-strip-row {
   position: relative;
   display: flex;
-  align-items: stretch;
+  justify-content: center;
+  align-items: center;
   width: 100%;
   max-width: 1200px;
   background: #fbfbfa;
@@ -433,11 +461,12 @@ header h1 {
   max-height: clamp(80px, 17vh, 130px);
 }
 
+/* ŽÁDNÁ DEFORMACE: contain zachová 100% proporce notové osnovy */
 .strip-measure {
-  height: 100%;
   width: 100%;
+  height: 100%;
   display: block;
-  object-fit: fill;
+  object-fit: contain;
 }
 
 .measure-badge {
