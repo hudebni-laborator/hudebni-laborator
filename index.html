@@ -13,7 +13,7 @@
 </head>
 <body>
 
-  <!-- HORNÍ ŘÁDEK -->
+  <!-- HORNÍ ŘÁDEK: 3 ZÁLOŽKY -->
   <header>
     <div class="brand">
       <img src="icon.svg" alt="Logo" class="brand-icon">
@@ -26,7 +26,7 @@
     </div>
   </header>
 
-  <!-- PŘEHLEDNÝ PROUŽEK S NÁZVEM SKLADBY -->
+  <!-- PROUŽEK S NÁZVEM SKLADBY -->
   <div class="active-file-banner" id="activeFileBanner" style="display:none;">
     <span class="label">Skladba:</span>
     <span class="name" id="scoreTitleDisplay">Není vybrána žádná skladba</span>
@@ -144,10 +144,10 @@
     </div>
   </div>
 
-  <!-- 3. ZÁLOŽKA: CVIČENÍ (S ukotveným tréninkovým metronomem dole) -->
+  <!-- 3. ZÁLOŽKA: CVIČENÍ -->
   <div class="view-panel practice-panel" id="practiceView" style="display:none;">
     
-    <!-- Horní ovládání počtu taktů -->
+    <!-- Horní ovládání počtu taktů a přepínání smyčky -->
     <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
       <div class="measure-stepper" style="gap:6px;">
         <button class="btn compact-btn" onclick="app.prevMeasure()">◀</button>
@@ -175,14 +175,15 @@
         </div>
       </div>
 
-      <div class="practice-display" id="practiceDisplay" title="Klepnutím vlevo/vpravo přepnete takt">
+      <div class="practice-display" id="practiceDisplay" title="Klepnutím vpravo/vlevo přepnete takt">
         <canvas id="practiceCanvas"></canvas>
         <div class="tap-hint">◀ klepnutí vlevo / vpravo pro přepnutí taktu ▶</div>
       </div>
     </div>
 
-    <!-- DOLŮ PŘILEPENÝ TRÉNINKOVÝ METRONOM -->
+    <!-- DOLŮ PŘILEPENÝ METRONOM PŘIZPŮSOBENÝ PRO MOBIL -->
     <div class="docked-metronome" id="dockedMetronome">
+      <!-- 1. Řádek: Stav, fáze a indikace dob -->
       <div class="metro-header-row">
         <div class="metro-phase-badge badge-idle" id="metroPhaseBadge">⏸ Připraveno</div>
         
@@ -200,39 +201,40 @@
         </div>
       </div>
 
+      <!-- 2. Řádek: Všechna tlačítka a pole přehledně vedle sebe bez přetékání -->
       <div class="metro-controls-row">
         <div class="metro-input-group">
-          <label>Start:</label>
+          <span class="metro-lbl">Start</span>
           <input type="number" id="metroStartBpm" value="60" min="30" max="260" class="metro-input">
         </div>
 
         <div class="metro-input-group">
-          <label>Cíl:</label>
+          <span class="metro-lbl">Cíl</span>
           <input type="number" id="metroTargetBpm" value="100" min="30" max="260" class="metro-input">
         </div>
 
         <div class="metro-input-group">
-          <label>+Krok:</label>
-          <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input" title="O kolik BPM zrychlit po odehrání">
+          <span class="metro-lbl">+Krok</span>
+          <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input" title="Zrychlení po odehrání">
         </div>
 
         <div class="metro-input-group">
-          <label>Doby:</label>
-          <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input" style="width:42px;">
+          <span class="metro-lbl">Doby</span>
+          <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input">
         </div>
 
-        <button class="btn btn-primary metro-play-btn" id="metroToggleBtn" onclick="app.toggleIncrementalMetronome()">
-          ▶ Start
-        </button>
-
-        <button class="btn metro-reset-btn" onclick="app.resetMetronomeTempo()" title="Vrátit tempo na Start BPM">
-          ↺
-        </button>
+        <button class="btn metro-reset-btn" onclick="app.resetMetronomeTempo()" title="Vrátit tempo na Start">↺</button>
+        <button class="btn btn-primary metro-play-btn" id="metroToggleBtn" onclick="app.toggleIncrementalMetronome()">▶ Start</button>
       </div>
+
+      <!-- Skrytá pole pro smyčku (udržovaná v synchronizaci) -->
+      <input type="hidden" id="loopFrom" value="1">
+      <input type="hidden" id="loopTo" value="1">
     </div>
 
   </div>
 
+  <!-- Plovoucí zvětšovací lupa nad prstem při editaci -->
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
