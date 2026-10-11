@@ -1,18 +1,23 @@
 {
-  "name": "Kytarový Trenažér Taktů",
-  "short_name": "Trenažér",
   "id": "/guitar-trainer/",
+  "name": "Kytarový Trenažér",
+  "short_name": "KytaraPWA",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#121214",
-  "theme_color": "#121214",
+  "background_color": "#121212",
+  "theme_color": "#1f1f1f",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='128' fill='%23121214'/><path d='M160 380 L352 132 M200 132 L392 380' stroke='%2310b981' stroke-width='42' stroke-linecap='round'/><circle cx='160' cy='380' r='30' fill='%2310b981'/><circle cx='352' cy='132' r='30' fill='%2310b981'/></svg>",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml"
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }

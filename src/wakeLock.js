@@ -1,44 +1,44 @@
-// Správa zhasínání displeje při cvičení
 class WakeLockManager {
   constructor() {
     this.wakeLock = null;
-    this.isActive = false;
+    this.isRequested = false;
 
+    // Obnovení zámku po návratu do popředí prohlížeče
     document.addEventListener('visibilitychange', async () => {
-      if (this.isActive && document.visibilityState === 'visible') {
-        await this.requestLock();
+      if (this.isRequested && document.visibilityState === 'visible') {
+        await this.request();
       }
     });
   }
 
-  isSupported() {
-    return 'wakeLock' in navigator;
-  }
-
-  async enable() {
-    this.isActive = true;
-    return await this.requestLock();
-  }
-
-  async disable() {
-    this.isActive = false;
-    if (this.wakeLock !== null) {
-      await this.wakeLock.release();
-      this.wakeLock = null;
+  async request() {
+    this.isRequested = true;
+    if ('wakeLock' in navigator) {
+      try {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => {
+          this.wakeLock = null;
+        });
+        return true;
+      } catch (err) {
+        console.warn(`Chyba WakeLock (${err.name}): ${err.message}`);
+        return false;
+      }
     }
+    return false;
   }
 
-  async requestLock() {
-    if (!this.isSupported()) return false;
-    try {
-      this.wakeLock = await navigator.wakeLock.request('screen');
-      this.wakeLock.addEventListener('release', () => {});
-      return true;
-    } catch (err) {
-      console.warn(`Wake Lock selhal: ${err.name}, ${err.message}`);
-      return false;
+  async release() {
+    this.isRequested = false;
+    if (this.wakeLock !== null) {
+      try {
+        await this.wakeLock.release();
+        this.wakeLock = null;
+      } catch (err) {
+        console.warn('Chyba při uvolnění WakeLock:', err);
+      }
     }
   }
 }
 
-export const screenLock = new WakeLockManager();
+window.wakeLockManager = new WakeLockManager();

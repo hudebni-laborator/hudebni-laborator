@@ -1,817 +1,662 @@
-import { saveScore, getAllScores, getScoreById, deleteScore, saveMeasures, getMeasuresByScore } from './db.js';
-import { screenLock } from './wakeLock.js';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-// Globální stav aplikace
-let currentScore = null;
-let currentPdf = null;
-let currentImageBitmap = null;
-let currentImageThreshold = 145;
-let currentMeasures = [];
-let activeKeyBox = null;
-let selectionMode = 'measure'; // 'key' | 'measure'
-let touchTool = 'draw';        // 'draw' | 'pan'
-let practiceIndex = 0;
-let measuresPerView = 1;
-
-// Vícestránkový stav
-let totalPages = 1;
-let currentPageNum = 1;
-const pageCanvasCache = new Map();
-
-// Stav přiblížení a posunu (Zoom & Pan)
-let editorZoom = 1.0;
-let editorPanX = 0;
-let editorPanY = 0;
-let initialPinchDistance = 0;
-let initialPinchZoom = 1.0;
-let isPinching = false;
-
-// Stav interakce obdélníků
-let selectedMeasureId = null;
-let editAction = null; // 'create' | 'move' | 'viewport-pan' | 'resize-tl' apod.
-let dragTarget = null;
-let initialPointerPos = { x: 0, y: 0 };
-let originalBox = null;
-let dragPreviewEl = null;
-
-// DOM Elementy
-const views = {
-  library: document.getElementById('view-library'),
-  editor: document.getElementById('view-editor'),
-  practice: document.getElementById('view-practice')
-};
-
-const pdfCanvas = document.getElementById('pdf-canvas');
-const selectionLayer = document.getElementById('selection-layer');
-const canvasWrapper = document.getElementById('canvas-wrapper');
-const canvasViewport = document.getElementById('canvas-viewport');
-const loupeContainer = document.getElementById('loupe-container');
-const loupeCanvas = document.getElementById('loupe-canvas');
-const loupeCtx = loupeCanvas.getContext('2d');
-
-const practiceContainer = document.getElementById('practice-strips');
-const practiceKeyHeader = document.getElementById('practice-key-header');
-const practiceKeyCanvas = document.getElementById('practice-key-canvas');
-const pageControls = document.getElementById('page-controls');
-const pageIndicator = document.getElementById('page-indicator');
-const thresholdControl = document.getElementById('threshold-control');
-const thresholdSlider = document.getElementById('threshold-slider');
-const thresholdVal = document.getElementById('threshold-val');
-
-window.addEventListener('DOMContentLoaded', async () => {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(console.error);
-  }
-  if (navigator.storage && navigator.storage.persist) {
-    await navigator.storage.persist();
-  }
-  await loadLibrary();
-  bindEvents();
-});
-
-function switchView(viewName) {
-  Object.keys(views).forEach((k) => views[k].classList.remove('active'));
-  views[viewName].classList.add('active');
-
-  if (viewName === 'practice') {
-    screenLock.enable();
-  } else {
-    screenLock.disable();
-  }
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-async function loadLibrary() {
-  const scores = await getAllScores();
-  const listContainer = document.getElementById('scores-list');
-  listContainer.innerHTML = '';
-
-  if (scores.length === 0) {
-    listContainer.innerHTML = `
-      <div class="empty-state">
-        <p>Žádné noty v paměti.</p>
-        <p class="subtitle">Nahrajte PDF nebo vyfoťte papírové noty mobilem.</p>
-      </div>`;
-    return;
+// 1. Zvukový generátor metronomu
+class MetronomeAudio {
+  constructor() {
+    this.audioCtx = null;
   }
-
-  for (const s of scores) {
-    const measures = await getMeasuresByScore(s.id);
-    const card = document.createElement('div');
-    card.className = 'score-card';
-
-    const dateStr = new Date(s.updatedAt).toLocaleDateString('cs-CZ');
-    const badgeType = s.type === 'pdf' ? 'PDF' : 'FOTO';
-
-    card.innerHTML = `
-      <div class="score-info">
-        <span class="score-badge">${badgeType}</span>
-        <div>
-          <h3>${s.title}</h3>
-          <p>${measures.length} připravených taktů • ${dateStr}</p>
-        </div>
-      </div>
-      <div class="score-actions">
-        <button class="btn btn-sm btn-open">Otevřít</button>
-        <button class="btn btn-sm btn-danger btn-del">Smazat</button>
-      </div>
-    `;
-
-    card.querySelector('.btn-open').addEventListener('click', () => openScore(s.id));
-    card.querySelector('.btn-del').addEventListener('click', async () => {
-      if (confirm(`Opravdu chcete smazat "${s.title}"?`)) {
-        await deleteScore(s.id);
-        await loadLibrary();
-      }
-    });
-
-    listContainer.appendChild(card);
-  }
-}
-
-async function openScore(id) {
-  currentScore = await getScoreById(id);
-  currentMeasures = await getMeasuresByScore(id);
-  activeKeyBox = null;
-  selectedMeasureId = null;
-  practiceIndex = 0;
-  currentPageNum = 1;
-  pageCanvasCache.clear();
-  resetZoom();
-
-  document.getElementById('editor-title').textContent = currentScore.title;
-
-  if (currentScore.type === 'pdf') {
-    thresholdControl.style.display = 'none';
-    currentPdf = await pdfjsLib.getDocument({ data: currentScore.buffer }).promise;
-    totalPages = currentPdf.numPages;
-    if (pageControls) {
-      pageControls.style.display = totalPages > 1 ? 'inline-flex' : 'none';
+  init() {
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    currentImageBitmap = null;
-    await renderEditorPdfPage(currentPageNum);
-  } else {
-    thresholdControl.style.display = 'flex';
-    if (pageControls) {
-      pageControls.style.display = 'none';
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
     }
-    currentPdf = null;
-    totalPages = 1;
-    const blob = new Blob([currentScore.buffer]);
-    currentImageBitmap = await createImageBitmap(blob);
-    renderEditorImage();
   }
+  playClick(isAccent = false) {
+    this.init();
+    const osc = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
 
-  fitCanvasToViewport();
-  updateSelectionLayer();
-  switchView('editor');
-}
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, this.audioCtx.currentTime);
 
-async function renderEditorPdfPage(pageNum) {
-  currentPageNum = pageNum;
-  if (pageIndicator) {
-    pageIndicator.textContent = `${currentPageNum} / ${totalPages}`;
+    gain.gain.setValueAtTime(1, this.audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.audioCtx.destination);
+
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.05);
   }
-
-  const page = await currentPdf.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 2.0 });
-
-  pdfCanvas.width = viewport.width;
-  pdfCanvas.height = viewport.height;
-
-  const ctx = pdfCanvas.getContext('2d');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
-  pageCanvasCache.set(pageNum, await createImageBitmap(pdfCanvas));
-  fitCanvasToViewport();
-  updateSelectionLayer();
 }
 
-function renderEditorImage() {
-  if (!currentImageBitmap) return;
-
-  pdfCanvas.width = currentImageBitmap.width;
-  pdfCanvas.height = currentImageBitmap.height;
-
-  const ctx = pdfCanvas.getContext('2d');
-  ctx.drawImage(currentImageBitmap, 0, 0);
-
-  applyThresholdFilter(ctx, pdfCanvas.width, pdfCanvas.height, currentImageThreshold);
-  fitCanvasToViewport();
-  updateSelectionLayer();
-}
-
-function fitCanvasToViewport() {
-  if (!canvasViewport || pdfCanvas.width === 0) return;
-  const viewportWidth = canvasViewport.clientWidth || window.innerWidth;
-  const baseScale = viewportWidth / pdfCanvas.width;
-  
-  canvasWrapper.style.width = `${pdfCanvas.width}px`;
-  canvasWrapper.style.height = `${pdfCanvas.height}px`;
-  
-  resetZoom(baseScale);
-}
-
-function applyThresholdFilter(ctx, width, height, threshold) {
+// 2. Detekce taktových čar a osnov s vertikálními mezerami
+function detectMeasureWithStaffGaps(canvas, clickX, clickY) {
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
 
-  for (let i = 0; i < data.length; i += 4) {
-    const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    const val = luminance > threshold ? 255 : 0;
-    data[i] = val;
-    data[i + 1] = val;
-    data[i + 2] = val;
-  }
-  ctx.putImageData(imgData, 0, 0);
-}
+  const isDark = (x, y) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return false;
+    const idx = (y * width + x) * 4;
+    return (data[idx] + data[idx + 1] + data[idx + 2]) / 3 < 127;
+  };
 
-// Logika transformace (Pinch-to-zoom a Pan)
-function applyCanvasTransform() {
-  if (!canvasWrapper) return;
-  editorZoom = Math.min(Math.max(editorZoom, 0.2), 5.0);
+  const roughStaffHeight = 45;
+  const localStartY = Math.max(0, Math.floor(clickY - roughStaffHeight));
+  const localEndY = Math.min(height, Math.floor(clickY + roughStaffHeight));
+  const requiredDarkH = (localEndY - localStartY) * 0.70;
 
-  canvasWrapper.style.transform = `translate(${editorPanX}px, ${editorPanY}px) scale(${editorZoom})`;
-
-  const resetBtn = document.getElementById('btn-zoom-reset');
-  if (resetBtn) {
-    resetBtn.textContent = `${Math.round(editorZoom * 100)}%`;
-  }
-}
-
-function resetZoom(initialScale) {
-  if (initialScale) {
-    editorZoom = initialScale;
-  } else if (canvasViewport && pdfCanvas.width > 0) {
-    editorZoom = (canvasViewport.clientWidth || window.innerWidth) / pdfCanvas.width;
-  } else {
-    editorZoom = 1.0;
-  }
-  editorPanX = 0;
-  editorPanY = 0;
-  applyCanvasTransform();
-}
-
-// Plovoucí lupa (Magnifier) promítající detail 70px nad prstem
-function updateLoupe(screenX, screenY, canvasCoords) {
-  if (!loupeContainer || !loupeCtx || !pdfCanvas) return;
-
-  loupeContainer.style.display = 'block';
-  // Umístění 70px nad prst, aby prst nezakrýval obraz
-  loupeContainer.style.left = `${screenX}px`;
-  loupeContainer.style.top = `${screenY - 70}px`;
-
-  // Výřez 60x60 pixelů z nativního plátna, zvětšený 2x do 120x120 lupy
-  const cropSize = 60;
-  const sx = Math.max(0, Math.min(pdfCanvas.width - cropSize, canvasCoords.x - cropSize / 2));
-  const sy = Math.max(0, Math.min(pdfCanvas.height - cropSize, canvasCoords.y - cropSize / 2));
-
-  loupeCtx.imageSmoothingEnabled = true;
-  loupeCtx.imageSmoothingQuality = 'high';
-  loupeCtx.drawImage(pdfCanvas, sx, sy, cropSize, cropSize, 0, 0, 120, 120);
-}
-
-function hideLoupe() {
-  if (loupeContainer) {
-    loupeContainer.style.display = 'none';
-  }
-}
-
-function updateSelectionLayer() {
-  selectionLayer.innerHTML = '';
-  const deleteBtn = document.getElementById('btn-delete-selected');
-  if (deleteBtn) {
-    deleteBtn.style.display = selectedMeasureId ? 'inline-flex' : 'none';
-  }
-
-  const pageMeasures = currentMeasures.filter((m) => (m.page || 1) === currentPageNum);
-
-  pageMeasures.forEach((m) => {
-    const isSelected = selectedMeasureId === m.id;
-    const boxEl = createBoxElement(m.box, `T.${m.number}`, 'measure-rect', isSelected, m.id);
-    selectionLayer.appendChild(boxEl);
-  });
-
-  if (activeKeyBox && (activeKeyBox.page || 1) === currentPageNum) {
-    const isSelected = selectedMeasureId === 'KEY';
-    const keyEl = createBoxElement(activeKeyBox, 'Klíč', 'key-rect', isSelected, 'KEY');
-    selectionLayer.appendChild(keyEl);
-  }
-}
-
-function createBoxElement(box, label, className, isSelected, id) {
-  const el = document.createElement('div');
-  el.className = `${className} ${isSelected ? 'selected' : ''}`;
-  el.style.left = `${box.x}px`;
-  el.style.top = `${box.y}px`;
-  el.style.width = `${box.w}px`;
-  el.style.height = `${box.h}px`;
-  el.dataset.id = id;
-
-  el.innerHTML = `<span class="badge">${label}</span>`;
-
-  if (isSelected) {
-    const handles = ['tl', 'tr', 'bl', 'br', 'tm', 'bm', 'ml', 'mr'];
-    handles.forEach((h) => {
-      const handleEl = document.createElement('div');
-      handleEl.className = `handle ${h}`;
-      handleEl.dataset.handle = h;
-      el.appendChild(handleEl);
-    });
-  }
-
-  return el;
-}
-
-function bindEvents() {
-  const fileInput = document.getElementById('file-input');
-  const cameraInput = document.getElementById('camera-input');
-
-  fileInput.addEventListener('change', handleFileSelected);
-  cameraInput.addEventListener('change', handleFileSelected);
-
-  async function handleFileSelected(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const isPdf = file.type === 'application/pdf';
-    const id = crypto.randomUUID();
-    const title = file.name.replace(/\.[^/.]+$/, '') || `Noty ${new Date().toLocaleTimeString('cs')}`;
-    const buffer = await file.arrayBuffer();
-
-    await saveScore({
-      id,
-      title,
-      type: isPdf ? 'pdf' : 'image',
-      buffer
-    });
-
-    await loadLibrary();
-    openScore(id);
-    e.target.value = '';
-  }
-
-  document.getElementById('btn-back-lib').addEventListener('click', () => {
-    loadLibrary();
-    switchView('library');
-  });
-
-  document.getElementById('btn-exit-practice').addEventListener('click', () => {
-    switchView('editor');
-  });
-
-  // Režimy Kreslit vs Posouvat
-  const btnToolDraw = document.getElementById('btn-tool-draw');
-  const btnToolPan = document.getElementById('btn-tool-pan');
-
-  btnToolDraw.addEventListener('click', () => {
-    touchTool = 'draw';
-    btnToolDraw.classList.add('active');
-    btnToolPan.classList.remove('active');
-    selectionLayer.className = 'mode-draw';
-  });
-
-  btnToolPan.addEventListener('click', () => {
-    touchTool = 'pan';
-    btnToolPan.classList.add('active');
-    btnToolDraw.classList.remove('active');
-    selectionLayer.className = 'mode-pan';
-    selectedMeasureId = null;
-    updateSelectionLayer();
-  });
-
-  // Tlačítka Zoomu (+, -, Reset)
-  document.getElementById('btn-zoom-in').addEventListener('click', () => {
-    editorZoom *= 1.25;
-    applyCanvasTransform();
-  });
-
-  document.getElementById('btn-zoom-out').addEventListener('click', () => {
-    editorZoom /= 1.25;
-    applyCanvasTransform();
-  });
-
-  document.getElementById('btn-zoom-reset').addEventListener('click', () => {
-    fitCanvasToViewport();
-  });
-
-  const btnKey = document.getElementById('btn-mode-key');
-  const btnMeasure = document.getElementById('btn-mode-measure');
-
-  btnKey.addEventListener('click', () => {
-    selectionMode = 'key';
-    btnKey.classList.add('active');
-    btnMeasure.classList.remove('active');
-  });
-
-  btnMeasure.addEventListener('click', () => {
-    selectionMode = 'measure';
-    btnMeasure.classList.add('active');
-    btnKey.classList.remove('active');
-  });
-
-  document.getElementById('btn-undo').addEventListener('click', async () => {
-    if (currentMeasures.length > 0) {
-      currentMeasures.pop();
-      selectedMeasureId = null;
-      await saveMeasures(currentScore.id, currentMeasures);
-      updateSelectionLayer();
+  // Hledání levé taktové čáry
+  let leftX = Math.floor(clickX);
+  for (let x = leftX; x >= 0; x--) {
+    let count = 0;
+    for (let y = localStartY; y < localEndY; y++) {
+      if (isDark(x, y)) count++;
     }
-  });
+    if (count >= requiredDarkH) { leftX = x; break; }
+  }
 
-  const deleteBtn = document.getElementById('btn-delete-selected');
-  if (deleteBtn) {
-    deleteBtn.addEventListener('click', async () => {
-      if (!selectedMeasureId) return;
+  // Hledání pravé taktové čáry
+  let rightX = Math.floor(clickX);
+  for (let x = rightX; x < width; x++) {
+    let count = 0;
+    for (let y = localStartY; y < localEndY; y++) {
+      if (isDark(x, y)) count++;
+    }
+    if (count >= requiredDarkH) { rightX = x; break; }
+  }
 
-      if (selectedMeasureId === 'KEY') {
-        activeKeyBox = null;
-      } else {
-        currentMeasures = currentMeasures.filter((m) => m.id !== selectedMeasureId);
-        currentMeasures.forEach((m, idx) => (m.number = idx + 1));
-        await saveMeasures(currentScore.id, currentMeasures);
+  // Detekce linek osnov
+  const sampleLeft = Math.min(leftX + 8, rightX);
+  const sampleRight = Math.max(leftX, rightX - 8);
+  const sampleWidth = Math.max(1, sampleRight - sampleLeft);
+  const minLineFill = sampleWidth * 0.45;
+
+  const lineRows = [];
+  for (let y = 0; y < height; y++) {
+    let darkCount = 0;
+    for (let x = sampleLeft; x < sampleRight; x++) {
+      if (isDark(x, y)) darkCount++;
+    }
+    if (darkCount >= minLineFill) {
+      if (lineRows.length === 0 || y - lineRows[lineRows.length - 1] > 2) {
+        lineRows.push(y);
       }
-      selectedMeasureId = null;
-      updateSelectionLayer();
-    });
+    }
   }
 
-  const prevPageBtn = document.getElementById('btn-prev-page');
-  const nextPageBtn = document.getElementById('btn-next-page');
+  const staves = [];
+  for (let i = 0; i <= lineRows.length - 5; i++) {
+    const group = lineRows.slice(i, i + 5);
+    const spacings = [
+      group[1] - group[0],
+      group[2] - group[1],
+      group[3] - group[2],
+      group[4] - group[3]
+    ];
+    const avgSpacing = spacings.reduce((a, b) => a + b) / 4;
+    const isUniform = spacings.every(s => Math.abs(s - avgSpacing) <= 3 && s >= 4 && s <= 22);
 
-  if (prevPageBtn) {
-    prevPageBtn.addEventListener('click', async () => {
-      if (currentPageNum > 1) {
-        selectedMeasureId = null;
-        await renderEditorPdfPage(currentPageNum - 1);
-      }
-    });
+    if (isUniform) {
+      staves.push({
+        top: group[0],
+        bottom: group[4],
+        height: group[4] - group[0]
+      });
+      i += 4;
+    }
   }
 
-  if (nextPageBtn) {
-    nextPageBtn.addEventListener('click', async () => {
-      if (currentPageNum < totalPages) {
-        selectedMeasureId = null;
-        await renderEditorPdfPage(currentPageNum + 1);
-      }
-    });
-  }
-
-  thresholdSlider.addEventListener('input', (e) => {
-    currentImageThreshold = parseInt(e.target.value, 10);
-    thresholdVal.textContent = currentImageThreshold;
-    renderEditorImage();
-  });
-
-  const countButtons = document.querySelectorAll('.measure-count-selector button');
-  countButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      countButtons.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      measuresPerView = parseInt(btn.dataset.count, 10);
-      renderPractice();
-    });
-  });
-
-  initSelectionInteraction();
-
-  document.getElementById('btn-start-practice').addEventListener('click', () => {
-    if (currentMeasures.length === 0) {
-      alert('Nejprve označte alespoň jeden takt.');
-      return;
-    }
-    practiceIndex = 0;
-    renderPractice();
-    switchView('practice');
-  });
-
-  document.getElementById('btn-prev-measure').addEventListener('click', () => shiftMeasure(-1));
-  document.getElementById('btn-next-measure').addEventListener('click', () => shiftMeasure(1));
-
-  window.addEventListener('keydown', (e) => {
-    if (!views.practice.classList.contains('active')) return;
-    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-      shiftMeasure(1);
-    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-      shiftMeasure(-1);
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    if (views.practice.classList.contains('active')) {
-      renderPractice();
-    }
-  });
-}
-
-function initSelectionInteraction() {
-  function getCanvasCoords(clientX, clientY) {
-    const rect = canvasWrapper.getBoundingClientRect();
+  if (staves.length === 0) {
     return {
-      x: Math.round((clientX - rect.left) / editorZoom),
-      y: Math.round((clientY - rect.top) / editorZoom)
+      left: leftX,
+      top: Math.max(0, Math.floor(clickY - 50)),
+      width: Math.max(30, rightX - leftX),
+      height: 100
     };
   }
 
-  function handleStart(clientX, clientY, targetEl) {
-    const handle = targetEl ? targetEl.closest('.handle') : null;
-    const boxEl = targetEl ? targetEl.closest('.measure-rect, .key-rect') : null;
-    const coords = getCanvasCoords(clientX, clientY);
-    initialPointerPos = coords;
-
-    if (handle) {
-      editAction = `resize-${handle.dataset.handle}`;
-      const parentId = handle.parentElement.dataset.id;
-      dragTarget = parentId === 'KEY' ? activeKeyBox : currentMeasures.find((m) => m.id === parentId).box;
-      originalBox = { ...dragTarget };
-      updateLoupe(clientX, clientY, coords);
-    } else if (boxEl) {
-      selectedMeasureId = boxEl.dataset.id;
-      editAction = 'move';
-      dragTarget = selectedMeasureId === 'KEY' ? activeKeyBox : currentMeasures.find((m) => m.id === selectedMeasureId).box;
-      originalBox = { ...dragTarget };
-      updateSelectionLayer();
-      updateLoupe(clientX, clientY, coords);
-    } else {
-      selectedMeasureId = null;
-      editAction = 'create';
-      dragTarget = { x: coords.x, y: coords.y, w: 0, h: 0 };
-      updateSelectionLayer();
-
-      dragPreviewEl = document.createElement('div');
-      dragPreviewEl.className = `active-drag-rect ${selectionMode === 'key' ? 'key-drag' : ''}`;
-      selectionLayer.appendChild(dragPreviewEl);
-      updateLoupe(clientX, clientY, coords);
-    }
-  }
-
-  function handleMove(clientX, clientY) {
-    if (!editAction || !dragTarget) return;
-
-    const coords = getCanvasCoords(clientX, clientY);
-    const dx = coords.x - initialPointerPos.x;
-    const dy = coords.y - initialPointerPos.y;
-
-    if (editAction === 'move') {
-      dragTarget.x = Math.max(0, Math.min(pdfCanvas.width - dragTarget.w, originalBox.x + dx));
-      dragTarget.y = Math.max(0, Math.min(pdfCanvas.height - dragTarget.h, originalBox.y + dy));
-      updateSelectionLayer();
-    } else if (editAction.startsWith('resize-')) {
-      const type = editAction.replace('resize-', '');
-      if (type.includes('r')) dragTarget.w = Math.max(20, originalBox.w + dx);
-      if (type.includes('b')) dragTarget.h = Math.max(20, originalBox.h + dy);
-      if (type.includes('l')) {
-        const newW = originalBox.w - dx;
-        if (newW > 20) {
-          dragTarget.x = originalBox.x + dx;
-          dragTarget.w = newW;
-        }
-      }
-      if (type.includes('t')) {
-        const newH = originalBox.h - dy;
-        if (newH > 20) {
-          dragTarget.y = originalBox.y + dy;
-          dragTarget.h = newH;
-        }
-      }
-      updateSelectionLayer();
-    } else if (editAction === 'create') {
-      dragTarget.x = Math.min(initialPointerPos.x, coords.x);
-      dragTarget.y = Math.min(initialPointerPos.y, coords.y);
-      dragTarget.w = Math.abs(coords.x - initialPointerPos.x);
-      dragTarget.h = Math.abs(coords.y - initialPointerPos.y);
-
-      if (dragPreviewEl) {
-        dragPreviewEl.style.left = `${dragTarget.x}px`;
-        dragPreviewEl.style.top = `${dragTarget.y}px`;
-        dragPreviewEl.style.width = `${dragTarget.w}px`;
-        dragPreviewEl.style.height = `${dragTarget.h}px`;
-      }
-    }
-
-    // Aktualizace lupy nad prstem při pohybu
-    updateLoupe(clientX, clientY, coords);
-  }
-
-  async function handleEnd() {
-    hideLoupe();
-
-    if (dragPreviewEl) {
-      dragPreviewEl.remove();
-      dragPreviewEl = null;
-    }
-
-    if (!editAction) return;
-
-    if (editAction === 'create') {
-      if (dragTarget && dragTarget.w > 25 && dragTarget.h > 25) {
-        if (selectionMode === 'key') {
-          activeKeyBox = { ...dragTarget, page: currentPageNum };
-          selectionMode = 'measure';
-          document.getElementById('btn-mode-measure').classList.add('active');
-          document.getElementById('btn-mode-key').classList.remove('active');
-        } else {
-          const nextNumber = currentMeasures.length + 1;
-          const newM = {
-            id: `${currentScore.id}-m-${nextNumber}`,
-            number: nextNumber,
-            page: currentPageNum,
-            box: { ...dragTarget },
-            keyBox: activeKeyBox ? { ...activeKeyBox } : null
-          };
-          currentMeasures.push(newM);
-          selectedMeasureId = newM.id;
-        }
-      }
-    }
-
-    if (currentScore) {
-      await saveMeasures(currentScore.id, currentMeasures);
-    }
-
-    editAction = null;
-    dragTarget = null;
-    originalBox = null;
-    updateSelectionLayer();
-  }
-
-  // Desktop myš
-  selectionLayer.addEventListener('mousedown', (e) => {
-    if (touchTool === 'pan') return;
-    handleStart(e.clientX, e.clientY, e.target);
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    handleMove(e.clientX, e.clientY);
-  });
-
-  window.addEventListener('mouseup', handleEnd);
-
-  // Mobilní dotyk s nativním Pinch-Zoomem
-  if (canvasViewport) {
-    canvasViewport.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 2) {
-        isPinching = true;
-        hideLoupe();
-        if (dragPreviewEl) {
-          dragPreviewEl.remove();
-          dragPreviewEl = null;
-        }
-        editAction = null;
-        dragTarget = null;
-
-        const t1 = e.touches[0];
-        const t2 = e.touches[1];
-        initialPinchDistance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-        initialPinchZoom = editorZoom;
-        return;
-      }
-
-      if (touchTool === 'pan' && e.touches.length === 1) {
-        isPinching = false;
-        editAction = 'viewport-pan';
-        initialPointerPos = { x: e.touches[0].clientX - editorPanX, y: e.touches[0].clientY - editorPanY };
-        return;
-      }
-
-      if (touchTool === 'draw' && e.touches.length === 1) {
-        isPinching = false;
-        const touch = e.touches[0];
-        const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
-        handleStart(touch.clientX, touch.clientY, targetEl);
-      }
-    }, { passive: false });
-
-    canvasViewport.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 2 && isPinching) {
-        e.preventDefault();
-        const t1 = e.touches[0];
-        const t2 = e.touches[1];
-        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-
-        if (initialPinchDistance > 0) {
-          const factor = currentDist / initialPinchDistance;
-          editorZoom = initialPinchZoom * factor;
-          applyCanvasTransform();
-        }
-        return;
-      }
-
-      if (editAction === 'viewport-pan' && e.touches.length === 1) {
-        e.preventDefault();
-        editorPanX = e.touches[0].clientX - initialPointerPos.x;
-        editorPanY = e.touches[0].clientY - initialPointerPos.y;
-        applyCanvasTransform();
-        return;
-      }
-
-      if (touchTool === 'draw' && e.touches.length === 1 && !isPinching) {
-        handleMove(e.touches[0].clientX, e.touches[0].clientY);
-      }
-    }, { passive: false });
-
-    canvasViewport.addEventListener('touchend', (e) => {
-      if (isPinching && e.touches.length < 2) {
-        isPinching = false;
-      }
-      if (editAction === 'viewport-pan') {
-        editAction = null;
-        return;
-      }
-      if (touchTool === 'draw') {
-        handleEnd();
+  let currentIndex = staves.findIndex(s => clickY >= s.top - 20 && clickY <= s.bottom + 20);
+  if (currentIndex === -1) {
+    let minDiff = Infinity;
+    staves.forEach((s, idx) => {
+      const center = (s.top + s.bottom) / 2;
+      const diff = Math.abs(clickY - center);
+      if (diff < minDiff) {
+        minDiff = diff;
+        currentIndex = idx;
       }
     });
   }
-}
 
-function shiftMeasure(dir) {
-  const next = practiceIndex + dir;
-  if (next >= 0 && next < currentMeasures.length) {
-    practiceIndex = next;
-    renderPractice();
-  }
-}
+  const current = staves[currentIndex];
+  const prev = currentIndex > 0 ? staves[currentIndex - 1] : null;
+  const next = currentIndex < staves.length - 1 ? staves[currentIndex + 1] : null;
 
-async function getPageSource(pageNum) {
-  if (currentScore.type !== 'pdf') {
-    return pdfCanvas;
-  }
+  let gapAbove = 0;
+  let gapBelow = 0;
 
-  if (pageCanvasCache.has(pageNum)) {
-    return pageCanvasCache.get(pageNum);
-  }
-
-  const page = await currentPdf.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 2.0 });
-
-  const offscreen = document.createElement('canvas');
-  offscreen.width = viewport.width;
-  offscreen.height = viewport.height;
-  const ctx = offscreen.getContext('2d');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
-  const bitmap = await createImageBitmap(offscreen);
-  pageCanvasCache.set(pageNum, bitmap);
-  return bitmap;
-}
-
-async function renderPractice() {
-  practiceContainer.innerHTML = '';
-  practiceContainer.dataset.count = measuresPerView;
-
-  const visibleMeasures = currentMeasures.slice(practiceIndex, practiceIndex + measuresPerView);
-  if (visibleMeasures.length === 0) return;
-
-  const firstM = visibleMeasures[0];
-  const lastM = visibleMeasures[visibleMeasures.length - 1];
-  const rangeText = firstM.number === lastM.number ? `Takt ${firstM.number}` : `Takty ${firstM.number}–${lastM.number}`;
-
-  document.getElementById('practice-nav-info').textContent = 
-    `${rangeText} (str. ${firstM.page || 1}) • (${practiceIndex + 1} z ${currentMeasures.length})`;
-
-  // Klíč a předznamenání nahoře v samostatném panelu bez deformace
-  if (firstM.keyBox && firstM.keyBox.w > 0 && firstM.keyBox.h > 0) {
-    practiceKeyHeader.style.display = 'flex';
-    const keySource = await getPageSource(firstM.keyBox.page || firstM.page || 1);
-    sliceCanvas(keySource, firstM.keyBox, practiceKeyCanvas);
+  if (prev && next) {
+    gapAbove = current.top - prev.bottom;
+    gapBelow = next.top - current.bottom;
+  } else if (!prev && next) {
+    gapBelow = next.top - current.bottom;
+    gapAbove = gapBelow;
+  } else if (prev && !next) {
+    gapAbove = current.top - prev.bottom;
+    gapBelow = gapAbove;
   } else {
-    practiceKeyHeader.style.display = 'none';
+    gapAbove = current.height * 1.5;
+    gapBelow = current.height * 1.5;
   }
 
-  // Vykreslení taktů se 100% zachováním poměru stran osnovy (object-fit: contain)
-  for (const measure of visibleMeasures) {
-    const row = document.createElement('div');
-    row.className = 'practice-strip-row';
+  const topY = Math.max(0, current.top - Math.floor(gapAbove / 2));
+  const bottomY = Math.min(height, current.bottom + Math.floor(gapBelow / 2));
 
-    const measureCanvas = document.createElement('canvas');
-    measureCanvas.className = 'strip-measure';
+  return {
+    left: leftX,
+    top: topY,
+    width: Math.max(20, rightX - leftX),
+    height: Math.max(20, bottomY - topY)
+  };
+}
 
-    const measureSource = await getPageSource(measure.page || 1);
-    sliceCanvas(measureSource, measure.box, measureCanvas);
-    row.appendChild(measureCanvas);
+// 3. Editor rámečku s Pointer Events a hitboxem pro dotyk
+class MeasureBoxEditor {
+  constructor(canvas, renderCallback, initialBox, onUpdate) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.renderCallback = renderCallback;
+    this.box = { ...initialBox };
+    this.onUpdate = onUpdate;
+    this.touchTolerance = 28;
 
-    const badge = document.createElement('div');
-    badge.className = 'measure-badge';
-    badge.textContent = `T.${measure.number} (str. ${measure.page || 1})`;
-    row.appendChild(badge);
+    this.activeAction = null;
+    this.dragStart = { x: 0, y: 0 };
+    this.initialBoxState = null;
 
-    practiceContainer.appendChild(row);
+    this.onPointerDown = this.handlePointerDown.bind(this);
+    this.onPointerMove = this.handlePointerMove.bind(this);
+    this.onPointerUp = this.handlePointerUp.bind(this);
+
+    this.bindEvents();
+    this.render();
+  }
+
+  getCoords(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+      tolerance: this.touchTolerance * scaleX
+    };
+  }
+
+  hitTest(x, y, tol) {
+    const b = this.box;
+    const r = b.left + b.width;
+    const bot = b.top + b.height;
+
+    const nearLeft = Math.abs(x - b.left) <= tol && y >= b.top - tol && y <= bot + tol;
+    const nearRight = Math.abs(x - r) <= tol && y >= b.top - tol && y <= bot + tol;
+    const nearTop = Math.abs(y - b.top) <= tol && x >= b.left - tol && x <= r + tol;
+    const nearBottom = Math.abs(y - bot) <= tol && x >= b.left - tol && x <= r + tol;
+
+    if (nearTop) return 'top';
+    if (nearBottom) return 'bottom';
+    if (nearLeft) return 'left';
+    if (nearRight) return 'right';
+
+    if (x > b.left && x < r && y > b.top && y < bot) return 'drag';
+    return null;
+  }
+
+  bindEvents() {
+    this.canvas.addEventListener('pointerdown', this.onPointerDown);
+    this.canvas.addEventListener('pointermove', this.onPointerMove);
+    this.canvas.addEventListener('pointerup', this.onPointerUp);
+    this.canvas.addEventListener('pointercancel', this.onPointerUp);
+  }
+
+  destroy() {
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    this.canvas.removeEventListener('pointermove', this.onPointerMove);
+    this.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.canvas.removeEventListener('pointercancel', this.onPointerUp);
+  }
+
+  handlePointerDown(e) {
+    const { x, y, tolerance } = this.getCoords(e);
+    const action = this.hitTest(x, y, tolerance);
+
+    if (action) {
+      this.activeAction = action;
+      this.dragStart = { x, y };
+      this.initialBoxState = { ...this.box };
+      this.canvas.setPointerCapture(e.pointerId);
+    }
+  }
+
+  handlePointerMove(e) {
+    if (!this.activeAction) return;
+
+    const { x, y } = this.getCoords(e);
+    const dx = x - this.dragStart.x;
+    const dy = y - this.dragStart.y;
+    const init = this.initialBoxState;
+
+    switch (this.activeAction) {
+      case 'drag':
+        this.box.left = Math.max(0, Math.min(this.canvas.width - this.box.width, init.left + dx));
+        this.box.top = Math.max(0, Math.min(this.canvas.height - this.box.height, init.top + dy));
+        break;
+      case 'top': {
+        const newTop = Math.min(init.top + dy, init.top + init.height - 20);
+        this.box.top = Math.max(0, newTop);
+        this.box.height = init.height - (this.box.top - init.top);
+        break;
+      }
+      case 'bottom':
+        this.box.height = Math.max(20, Math.min(this.canvas.height - this.box.top, init.height + dy));
+        break;
+      case 'left': {
+        const newLeft = Math.min(init.left + dx, init.left + init.width - 20);
+        this.box.left = Math.max(0, newLeft);
+        this.box.width = init.width - (this.box.left - init.left);
+        break;
+      }
+      case 'right':
+        this.box.width = Math.max(20, Math.min(this.canvas.width - this.box.left, init.width + dx));
+        break;
+    }
+
+    this.render();
+    if (this.onUpdate) this.onUpdate(this.box);
+  }
+
+  handlePointerUp(e) {
+    if (this.activeAction) {
+      this.canvas.releasePointerCapture(e.pointerId);
+      this.activeAction = null;
+    }
+  }
+
+  render() {
+    this.renderCallback();
+
+    const b = this.box;
+    const c = this.ctx;
+
+    c.save();
+    c.fillStyle = 'rgba(37, 99, 235, 0.18)';
+    c.fillRect(b.left, b.top, b.width, b.height);
+
+    c.strokeStyle = '#2563eb';
+    c.lineWidth = 3;
+    c.strokeRect(b.left, b.top, b.width, b.height);
+
+    c.fillStyle = '#ffffff';
+    c.strokeStyle = '#2563eb';
+    c.lineWidth = 3;
+
+    const handles = [
+      { x: b.left + b.width / 2, y: b.top },
+      { x: b.left + b.width / 2, y: b.top + b.height },
+      { x: b.left, y: b.top + b.height / 2 },
+      { x: b.left + b.width, y: b.top + b.height / 2 }
+    ];
+
+    handles.forEach(h => {
+      c.beginPath();
+      c.arc(h.x, h.y, 9, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+    });
+
+    c.restore();
   }
 }
 
-function sliceCanvas(source, crop, target) {
-  const sx = Math.max(0, Math.round(crop.x));
-  const sy = Math.max(0, Math.round(crop.y));
-  const sw = Math.min(source.width - sx, Math.round(crop.w));
-  const sh = Math.min(source.height - sy, Math.round(crop.h));
+// 4. Správa trenažéru
+class GuitarTrainer {
+  constructor() {
+    this.scoreCanvas = document.getElementById('scoreCanvas');
+    this.scoreCtx = this.scoreCanvas.getContext('2d');
 
-  target.width = sw;
-  target.height = sh;
+    this.practiceCanvas = document.getElementById('practiceCanvas');
+    this.practiceCtx = this.practiceCanvas.getContext('2d');
 
-  const ctx = target.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+    this.metronome = new MetronomeAudio();
+
+    this.currentScoreId = 'active_song';
+    this.baseImage = null;
+    this.measures = [];
+    this.currentIndex = 0;
+    this.activeEditor = null;
+
+    this.isPlaying = false;
+    this.timerId = null;
+    this.currentBeat = 0;
+
+    this.initAsyncData();
+    this.initCanvasClicks();
+  }
+
+  async initAsyncData() {
+    try {
+      if (window.scoreDB) {
+        const savedScore = await window.scoreDB.getScore(this.currentScoreId);
+        if (savedScore) {
+          this.measures = savedScore.measures || [];
+          if (savedScore.imageData) {
+            const img = new Image();
+            img.onload = async () => {
+              this.scoreCanvas.width = img.naturalWidth;
+              this.scoreCanvas.height = img.naturalHeight;
+              this.scoreCtx.drawImage(img, 0, 0);
+              this.baseImage = await createImageBitmap(img);
+              this.renderScoreView();
+            };
+            img.src = savedScore.imageData;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Chyba při načítání z IndexedDB:', e);
+    }
+    this.updateUI();
+  }
+
+  async persistCurrentScore() {
+    if (!window.scoreDB) return;
+    try {
+      const dataToSave = {
+        id: this.currentScoreId,
+        measures: this.measures,
+        updatedAt: Date.now()
+      };
+      if (this.baseImage) {
+        dataToSave.imageData = this.scoreCanvas.toDataURL('image/jpeg', 0.85);
+      }
+      await window.scoreDB.saveScore(dataToSave);
+    } catch (e) {
+      console.warn('Chyba při ukládání do IndexedDB:', e);
+    }
+  }
+
+  initCanvasClicks() {
+    this.scoreCanvas.addEventListener('click', (e) => {
+      if (!this.baseImage) return;
+      if (this.activeEditor && this.activeEditor.activeAction) return;
+
+      const rect = this.scoreCanvas.getBoundingClientRect();
+      const scaleX = this.scoreCanvas.width / rect.width;
+      const scaleY = this.scoreCanvas.height / rect.height;
+      const clickX = (e.clientX - rect.left) * scaleX;
+      const clickY = (e.clientY - rect.top) * scaleY;
+
+      if (this.activeEditor) {
+        const { x, y, tolerance } = this.activeEditor.getCoords(e);
+        if (this.activeEditor.hitTest(x, y, tolerance)) return;
+      }
+
+      const detected = detectMeasureWithStaffGaps(this.scoreCanvas, clickX, clickY);
+
+      if (this.activeEditor) this.activeEditor.destroy();
+      this.activeEditor = new MeasureBoxEditor(
+        this.scoreCanvas,
+        () => this.renderScoreView(),
+        detected,
+        () => {}
+      );
+
+      document.getElementById('addMeasureBtn').style.display = 'inline-flex';
+      document.getElementById('nextMeasureNum').innerText = this.measures.length + 1;
+      document.getElementById('statusHint').innerText = 'Rámeček můžete upravit táhly. Klepněte na "+ Přidat takt".';
+    });
+  }
+
+  async saveCurrentMeasure() {
+    if (!this.activeEditor) return;
+
+    this.measures.push({
+      id: this.measures.length + 1,
+      box: { ...this.activeEditor.box }
+    });
+
+    await this.persistCurrentScore();
+
+    this.activeEditor.destroy();
+    this.activeEditor = null;
+    document.getElementById('addMeasureBtn').style.display = 'none';
+
+    this.updateUI();
+    this.renderScoreView();
+  }
+
+  async clearMeasures() {
+    if (confirm('Opravdu chcete smazat všechny označené takty?')) {
+      this.measures = [];
+      await this.persistCurrentScore();
+      if (this.activeEditor) {
+        this.activeEditor.destroy();
+        this.activeEditor = null;
+      }
+      this.updateUI();
+      this.renderScoreView();
+    }
+  }
+
+  updateUI() {
+    const count = this.measures.length;
+    document.getElementById('measureCountSpan').innerText = count;
+    document.getElementById('clearMeasuresBtn').style.display = count > 0 ? 'inline-flex' : 'none';
+    document.getElementById('nextMeasureNum').innerText = count + 1;
+
+    const loopFrom = document.getElementById('loopFrom');
+    const loopTo = document.getElementById('loopTo');
+    loopFrom.max = Math.max(1, count);
+    loopTo.max = Math.max(1, count);
+    if (count > 0 && Number(loopTo.value) <= 1) {
+      loopTo.value = count;
+    }
+  }
+
+  renderScoreView() {
+    if (!this.baseImage) return;
+    this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
+    this.scoreCtx.drawImage(this.baseImage, 0, 0);
+
+    this.measures.forEach((m, idx) => {
+      this.scoreCtx.strokeStyle = 'rgba(34, 197, 94, 0.85)';
+      this.scoreCtx.lineWidth = 2.5;
+      this.scoreCtx.strokeRect(m.box.left, m.box.top, m.box.width, m.box.height);
+
+      this.scoreCtx.fillStyle = '#22c55e';
+      this.scoreCtx.font = 'bold 18px sans-serif';
+      this.scoreCtx.fillText(`${idx + 1}`, m.box.left + 6, m.box.top + 22);
+    });
+  }
+
+  showMeasureInTrainer(index) {
+    if (this.measures.length === 0) return;
+    if (index < 0) index = 0;
+    if (index >= this.measures.length) index = this.measures.length - 1;
+
+    this.currentIndex = index;
+    const m = this.measures[index];
+
+    this.practiceCanvas.width = m.box.width;
+    this.practiceCanvas.height = m.box.height;
+
+    this.practiceCtx.drawImage(
+      this.baseImage,
+      m.box.left, m.box.top, m.box.width, m.box.height,
+      0, 0, m.box.width, m.box.height
+    );
+
+    document.getElementById('practiceMeasureTitle').innerText = `Takt ${index + 1} / ${this.measures.length}`;
+  }
+
+  nextMeasure() {
+    const loopTo = Number(document.getElementById('loopTo').value) - 1;
+    const loopFrom = Number(document.getElementById('loopFrom').value) - 1;
+
+    let nextIdx = this.currentIndex + 1;
+    if (nextIdx > loopTo || nextIdx >= this.measures.length) {
+      nextIdx = Math.max(0, loopFrom);
+    }
+    this.showMeasureInTrainer(nextIdx);
+  }
+
+  prevMeasure() {
+    if (this.currentIndex > 0) {
+      this.showMeasureInTrainer(this.currentIndex - 1);
+    }
+  }
+
+  async togglePlay() {
+    if (this.isPlaying) {
+      this.stop();
+    } else {
+      await this.start();
+    }
+  }
+
+  async start() {
+    if (this.measures.length === 0) {
+      alert('Nejprve označte alespoň jeden takt v záložce "Značkování".');
+      return;
+    }
+    this.isPlaying = true;
+    this.currentBeat = 0;
+    document.getElementById('playBtn').innerText = '⏸ Zastavit';
+
+    if (window.wakeLockManager) {
+      await window.wakeLockManager.request();
+    }
+
+    this.scheduleNextTick();
+  }
+
+  async stop() {
+    this.isPlaying = false;
+    clearTimeout(this.timerId);
+    document.getElementById('playBtn').innerText = '▶ Start Metronom';
+    document.getElementById('beatDot').classList.remove('active');
+
+    if (window.wakeLockManager) {
+      await window.wakeLockManager.release();
+    }
+  }
+
+  scheduleNextTick() {
+    if (!this.isPlaying) return;
+
+    const bpm = Number(document.getElementById('bpmInput').value) || 80;
+    const beatsPerMeasure = Number(document.getElementById('beatsPerMeasure').value) || 4;
+    const intervalMs = (60 / bpm) * 1000;
+
+    const isAccent = (this.currentBeat === 0);
+    this.metronome.playClick(isAccent);
+
+    const dot = document.getElementById('beatDot');
+    dot.classList.add('active');
+    setTimeout(() => dot.classList.remove('active'), 120);
+
+    this.currentBeat++;
+    if (this.currentBeat >= beatsPerMeasure) {
+      this.currentBeat = 0;
+      if (document.getElementById('autoAdvance').checked) {
+        this.nextMeasure();
+      }
+    }
+
+    this.timerId = setTimeout(() => this.scheduleNextTick(), intervalMs);
+  }
 }
+
+const app = new GuitarTrainer();
+
+function switchMode(mode) {
+  const tabEdit = document.getElementById('tabEdit');
+  const tabPractice = document.getElementById('tabPractice');
+  const editView = document.getElementById('editView');
+  const practiceView = document.getElementById('practiceView');
+  const editToolbar = document.getElementById('editToolbar');
+  const badge = document.getElementById('appModeBadge');
+
+  if (mode === 'edit') {
+    tabEdit.classList.add('active');
+    tabPractice.classList.remove('active');
+    editView.style.display = 'flex';
+    practiceView.style.display = 'none';
+    editToolbar.style.display = 'flex';
+    badge.innerText = 'Příprava';
+    app.stop();
+    app.renderScoreView();
+  } else {
+    if (app.measures.length === 0) {
+      alert('Nejprve označte a přidejte alespoň jeden takt.');
+      return;
+    }
+    tabEdit.classList.remove('active');
+    tabPractice.classList.add('active');
+    editView.style.display = 'none';
+    practiceView.style.display = 'flex';
+    editToolbar.style.display = 'none';
+    badge.innerText = 'Cvičení';
+    app.showMeasureInTrainer(app.currentIndex);
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const hint = document.getElementById('statusHint');
+  hint.innerText = 'Načítám noty...';
+
+  if (file.type === 'application/pdf') {
+    const reader = new FileReader();
+    reader.onload = async function() {
+      const typedarray = new Uint8Array(this.result);
+      const pdf = await pdfjsLib.getDocument(typedarray).promise;
+      const page = await pdf.getPage(1);
+
+      const viewport = page.getViewport({ scale: 2.0 });
+      app.scoreCanvas.width = viewport.width;
+      app.scoreCanvas.height = viewport.height;
+
+      const renderContext = { canvasContext: app.scoreCtx, viewport: viewport };
+      await page.render(renderContext).promise;
+
+      app.baseImage = await createImageBitmap(app.scoreCanvas);
+      hint.innerText = 'Klepněte na takt pro ohraničení.';
+      await app.persistCurrentScore();
+      app.renderScoreView();
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const img = new Image();
+    img.onload = async () => {
+      app.scoreCanvas.width = img.naturalWidth;
+      app.scoreCanvas.height = img.naturalHeight;
+      app.scoreCtx.drawImage(img, 0, 0);
+      app.baseImage = await createImageBitmap(img);
+      hint.innerText = 'Klepněte na takt pro ohraničení.';
+      await app.persistCurrentScore();
+      app.renderScoreView();
+    };
+    img.src = URL.createObjectURL(file);
+  }
+});

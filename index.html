@@ -2,121 +2,99 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Kytarový Trenažér Taktů</title>
-  <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1f1f1f">
+  <title>Kytarový Trenažér</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
-  <!-- POHLED 1: Knihovna skladeb -->
-  <section id="view-library" class="view active">
-    <header>
-      <h1>Kytarový Trenažér Taktů</h1>
-    </header>
-    <div class="library-content">
-      <div class="library-actions">
-        <input type="file" id="file-input" accept="application/pdf, image/*" style="display: none;">
-        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
-        
-        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
-          📁 Nahrát PDF / Obrázek
-        </button>
-        <button class="btn" onclick="document.getElementById('camera-input').click()">
-          📷 Vyfotit noty
-        </button>
-      </div>
-
-      <div id="scores-list" class="scores-list"></div>
+  <header>
+    <div class="app-title">
+      Kytarový Trenažér
+      <span class="badge" id="appModeBadge">Příprava</span>
     </div>
-  </section>
+    <div class="nav-tabs">
+      <button class="tab-btn active" id="tabEdit" onclick="switchMode('edit')">1. Značkování</button>
+      <button class="tab-btn" id="tabPractice" onclick="switchMode('practice')">2. Cvičení</button>
+    </div>
+  </header>
 
-  <!-- POHLED 2: Editor & Mapování taktů -->
-  <section id="view-editor" class="view">
-    <header>
-      <button class="btn btn-sm" id="btn-back-lib">← Zpět</button>
-      <span class="header-title" id="editor-title"></span>
-      <button class="btn btn-sm btn-primary" id="btn-start-practice">Spustit cvičení ▶</button>
-    </header>
+  <div class="toolbar" id="editToolbar">
+    <label class="btn">
+      Nahrát noty (PDF/Obrázek)
+      <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
+    </label>
+    <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
+      + Přidat takt <span id="nextMeasureNum">1</span>
+    </button>
+    <button id="clearMeasuresBtn" class="btn btn-danger" style="display:none;" onclick="app.clearMeasures()">
+      Smazat takty (<span id="measureCountSpan">0</span>)
+    </button>
+  </div>
 
-    <div class="editor-toolbar">
-      <!-- Přepínač Posouvat vs Označovat -->
-      <div class="tool-group">
-        <button class="btn btn-sm active" id="btn-tool-draw" title="Kreslit a editovat rámečky">✏️ Kreslit</button>
-        <button class="btn btn-sm" id="btn-tool-pan" title="Volný posun stránky">✋ Posouvat</button>
+  <main>
+    <!-- EDIT VIEW -->
+    <div class="view-panel" id="editView">
+      <div class="canvas-box">
+        <canvas id="scoreCanvas"></canvas>
       </div>
-
-      <!-- Tlačítka pro Zoom -->
-      <div class="tool-group" id="zoom-controls">
-        <button class="btn btn-sm" id="btn-zoom-out" title="Oddálit">➖</button>
-        <button class="btn btn-sm" id="btn-zoom-reset" title="Resetovat zoom">100%</button>
-        <button class="btn btn-sm" id="btn-zoom-in" title="Přiblížit">➕</button>
-      </div>
-
-      <button class="btn btn-sm" id="btn-mode-key">Klíč</button>
-      <button class="btn btn-sm active" id="btn-mode-measure">Takty</button>
-      <button class="btn btn-sm" id="btn-undo">Zpět</button>
-      <button class="btn btn-sm btn-danger" id="btn-delete-selected" style="display: none;">Smazat</button>
-
-      <!-- Stránkování -->
-      <div class="tool-group" id="page-controls" style="display: none; align-items: center;">
-        <button class="btn btn-sm" id="btn-prev-page">◀</button>
-        <span id="page-indicator" style="font-size: 12px; font-weight: 600; padding: 0 6px;">1 / 1</span>
-        <button class="btn btn-sm" id="btn-next-page">▶</button>
-      </div>
-
-      <div class="slider-group" id="threshold-control" style="display: none;">
-        <label for="threshold-slider">Kontrast:</label>
-        <input type="range" id="threshold-slider" min="60" max="210" value="145">
-        <span id="threshold-val">145</span>
-      </div>
+      <div class="status-msg" id="statusHint">Nahrajte skladbu a klepněte prstem na libovolný takt.</div>
     </div>
 
-    <div class="canvas-viewport" id="canvas-viewport">
-      <div class="canvas-wrapper" id="canvas-wrapper">
-        <canvas id="pdf-canvas"></canvas>
-        <div id="selection-layer" class="mode-draw"></div>
-      </div>
-    </div>
-
-    <!-- Plovoucí lupa (Magnifier) nad prstem -->
-    <div id="loupe-container">
-      <canvas id="loupe-canvas" width="120" height="120"></canvas>
-    </div>
-  </section>
-
-  <!-- POHLED 3: Cvičební režim -->
-  <section id="view-practice" class="view practice-screen">
-    <div class="practice-top-bar">
-      <button class="btn btn-sm" id="btn-exit-practice">✕ Ukončit</button>
-      
-      <div class="measure-count-selector">
-        <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Taktů naráz:</span>
-        <button class="btn btn-sm active" data-count="1">1</button>
-        <button class="btn btn-sm" data-count="2">2</button>
-        <button class="btn btn-sm" data-count="3">3</button>
+    <!-- PRACTICE VIEW -->
+    <div class="view-panel" id="practiceView">
+      <div class="practice-display">
+        <canvas id="practiceCanvas"></canvas>
       </div>
 
-      <span class="pedal-hint">Pedál: PageUp / PageDown</span>
+      <div class="trainer-controls">
+        <div class="measure-stepper">
+          <button class="btn" onclick="app.prevMeasure()">◀ Předchozí</button>
+          <div class="measure-indicator" id="practiceMeasureTitle">Takt 1 / 1</div>
+          <button class="btn" onclick="app.nextMeasure()">Další ▶</button>
+        </div>
+
+        <div class="trainer-row">
+          <div class="ctrl-group">
+            <label for="bpmInput">Tempo (BPM):</label>
+            <input type="number" id="bpmInput" value="80" min="40" max="240" step="1">
+          </div>
+          <div class="ctrl-group">
+            <label for="beatsPerMeasure">Doby v taktu:</label>
+            <input type="number" id="beatsPerMeasure" value="4" min="1" max="12">
+          </div>
+          <div class="ctrl-group">
+            <div class="beat-indicator" id="beatDot"></div>
+            <button class="btn btn-primary" id="playBtn" onclick="app.togglePlay()">▶ Start Metronom</button>
+          </div>
+        </div>
+
+        <div class="trainer-row">
+          <div class="ctrl-group">
+            <label>Smyčka od taktu:</label>
+            <input type="number" id="loopFrom" value="1" min="1" style="width:60px;">
+            <label>do:</label>
+            <input type="number" id="loopTo" value="1" min="1" style="width:60px;">
+          </div>
+          <div class="ctrl-group">
+            <label><input type="checkbox" id="autoAdvance" checked> Posunout po doběhnutí taktu</label>
+          </div>
+        </div>
+      </div>
     </div>
+  </main>
 
-    <!-- Horní samostatné záhlaví pro klíč -->
-    <div id="practice-key-header" class="practice-header-key" style="display: none;">
-      <span class="practice-header-key-label">Předznamenání:</span>
-      <canvas id="practice-key-canvas"></canvas>
-    </div>
-
-    <!-- Pásy cvičených taktů -->
-    <div id="practice-strips" class="practice-strips" data-count="1"></div>
-
-    <div class="practice-controls">
-      <button class="btn btn-sm" id="btn-prev-measure">◀ Předchozí</button>
-      <span id="practice-nav-info" style="font-size: 13px; font-weight: 500;"></span>
-      <button class="btn btn-sm" id="btn-next-measure">Další ▶</button>
-    </div>
-  </section>
-
-  <script type="module" src="./src/app.js"></script>
+  <!-- Skripty načítané z podsložky src/ -->
+  <script src="src/wakeLock.js"></script>
+  <script src="src/db.js"></script>
+  <script src="src/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(console.error);
+    }
+  </script>
 </body>
 </html>
