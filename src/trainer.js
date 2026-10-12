@@ -116,10 +116,11 @@ class GuitarTrainer {
 
   // --- KRESLICÍ NÁSTROJE ---
   setEditTool(tool) {
-    this.editTool = tool;
+    this.editTool = tool; // 'pen' | 'box' | 'eraser'
     document.getElementById('toolBoxBtn')?.classList.toggle('active', tool === 'box');
     document.getElementById('toolPenBtn')?.classList.toggle('active', tool === 'pen');
-    if (tool === 'pen') this.resetActiveSelection();
+    document.getElementById('toolEraserBtn')?.classList.toggle('active', tool === 'eraser');
+    if (tool !== 'box') this.resetActiveSelection();
   }
 
   setPenColor(color) {
@@ -152,6 +153,45 @@ class GuitarTrainer {
       await this.persistCurrentScore();
       this.renderScoreView();
     }
+  }
+
+  eraseAt(cx, cy) {
+    if (!this.currentScore) return false;
+    const key = `page_${this.currentPage}`;
+    const strokes = this.currentScore.drawings?.[key];
+    if (!strokes || strokes.length === 0) return false;
+
+    // Poloměr gumy přesně podle zvolené tloušťky hrotu (minimálně 6px pro snadný dotyk)
+    const radius = Math.max(6, this.penWidth * 1.5);
+    const rSq = radius * radius;
+    let modified = false;
+    const newStrokes = [];
+
+    for (const stroke of strokes) {
+      if (!stroke.points || stroke.points.length === 0) continue;
+      let currentRun = [];
+      for (const pt of stroke.points) {
+        const distSq = (pt.x - cx) ** 2 + (pt.y - cy) ** 2;
+        if (distSq <= rSq) {
+          modified = true;
+          if (currentRun.length > 1) {
+            newStrokes.push({ ...stroke, points: currentRun });
+          }
+          currentRun = [];
+        } else {
+          currentRun.push(pt);
+        }
+      }
+      if (currentRun.length > 1) {
+        newStrokes.push({ ...stroke, points: currentRun });
+      }
+    }
+
+    if (modified) {
+      this.currentScore.drawings[key] = newStrokes;
+      this.renderScoreView();
+    }
+    return modified;
   }
 
   // Metronom
@@ -515,7 +555,16 @@ class GuitarTrainer {
 
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      // Režim kreslení tužkou jedním prstem v Edit módu
+      // 1. Režim Guma
+      if (this.isMarkingMode && this.editTool === 'eraser' && ongoingTouches.size === 1) {
+        this.isErasingStroke = true;
+        const c = this.screenToCanvasCoords(e.clientX, e.clientY);
+        this.eraseAt(c.x, c.y);
+        box.setPointerCapture(e.pointerId);
+        return;
+      }
+
+      // 2. Režim Kreslení tužkou
       if (this.isMarkingMode && this.editTool === 'pen' && ongoingTouches.size === 1) {
         this.isDrawingStroke = true;
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
@@ -527,6 +576,8 @@ class GuitarTrainer {
         box.setPointerCapture(e.pointerId);
         return;
       }
+
+      // ... pokračuje stávající kód pro výběr boxu / zoom / pan
 
       if (ongoingTouches.size === 1) {
         startPoint = { x: e.clientX, y: e.clientY };
@@ -583,6 +634,13 @@ class GuitarTrainer {
         return;
       }
 
+      // Pohyb gumy
+      if (this.isErasingStroke) {
+        const c = this.screenToCanvasCoords(e.clientX, e.clientY);
+        this.eraseAt(c.x, c.y);
+        return;
+      }
+
       if (ongoingTouches.size === 2) {
         const t = Array.from(ongoingTouches.values());
         const dist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
@@ -623,6 +681,12 @@ class GuitarTrainer {
         }
         this.currentStroke = null;
         this.renderScoreView();
+        return;
+      }
+
+      if (this.isErasingStroke) {
+        this.isErasingStroke = false;
+        await this.persistCurrentScore();
         return;
       }
 
@@ -944,6 +1008,37 @@ class GuitarTrainer {
       curM.box.left, curM.box.top, curM.box.width, curM.box.height,
       0, 0, curM.box.width, curM.box.height
     );
+
+    this.labCtx.drawImage(
+      curImg,
+      curM.box.left, curM.box.top, curM.box.width, curM.box.height,
+      0, 0, curM.box.width, curM.box.height
+    );
+
+    // Vykreslení připsaných značek (prstoklady, smyky, crescenda) přímo do výřezu taktu
+    if (this.showAnnotations && this.currentScore?.drawings) {
+      const pageKey = `page_${curM.page || 1}`;
+      const strokes = this.currentScore.drawings[pageKey] || [];
+      if (strokes.length > 0) {
+        this.labCtx.save();
+        this.labCtx.lineCap = 'round';
+        this.labCtx.lineJoin = 'round';
+        // Posun souřadnic přesně na pozici tohoto taktu
+        this.labCtx.translate(-curM.box.left, -curM.box.top);
+        strokes.forEach(stroke => {
+          if (!stroke.points || stroke.points.length < 2) return;
+          this.labCtx.strokeStyle = stroke.color || '#ef4444';
+          this.labCtx.lineWidth = stroke.width || 2;
+          this.labCtx.beginPath();
+          this.labCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < stroke.points.length; i++) {
+            this.labCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          }
+          this.labCtx.stroke();
+        });
+        this.labCtx.restore();
+      }
+    }
   }
 
   async resolveCurrentLabMeasure() {

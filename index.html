@@ -95,9 +95,11 @@
     <!-- EDITAČNÍ KRESLICÍ LIŠTA (aktivní v režimu Edit) -->
     <div class="edit-draw-bar" id="editDrawBar" style="display:none;">
       <!-- Výběr režimu: Rámeček taktu vs Kreslení tužkou -->
+      <!-- Výběr režimu: Rámeček taktu vs Kreslení tužkou vs Guma -->
       <div class="draw-tool-group">
         <button class="draw-tool-btn" id="toolBoxBtn" onclick="window.app.setEditTool('box')" title="Označit takt do laboratoře">📦 Takt</button>
         <button class="draw-tool-btn active" id="toolPenBtn" onclick="window.app.setEditTool('pen')" title="Kreslit do not">✏️ Tužka</button>
+        <button class="draw-tool-btn" id="toolEraserBtn" onclick="window.app.setEditTool('eraser')" title="Guma na drobné opravy">🧹 Guma</button>
       </div>
 
       <div class="draw-separator"></div>
