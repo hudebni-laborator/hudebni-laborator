@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#18181b">
+  <meta name="theme-color" content="#09090b">
   <title>Notový Trenažér</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -13,7 +13,7 @@
 </head>
 <body>
 
-  <!-- HORNÍ ŘÁDEK -->
+  <!-- HORNÍ LIŠTA ZÁLOŽEK -->
   <header>
     <div class="brand">
       <img src="icon.svg" alt="Logo" class="brand-icon">
@@ -22,230 +22,179 @@
     
     <div class="nav-tabs">
       <button class="tab-btn tab-lib active" id="tabLibrary" onclick="switchMode('library')">Knihovna</button>
-      <button class="tab-btn tab-edit" id="tabEdit" onclick="switchMode('edit')">Značkování</button>
-      <button class="tab-btn tab-practice" id="tabPractice" onclick="switchMode('practice')">Cvičení</button>
+      <button class="tab-btn tab-edit" id="tabEdit" onclick="switchMode('edit')">Hraní</button>
+      <button class="tab-btn tab-lab" id="tabLab" onclick="switchMode('lab')">Laboratoř <span class="badge-count" id="labBadgeCount" style="display:none;">0</span></button>
     </div>
   </header>
 
-  <!-- PROUŽEK S NÁZVEM SKLADBY -->
-  <div class="active-file-banner" id="activeFileBanner" style="display:none;">
-    <span class="label">Skladba:</span>
-    <span class="name" id="scoreTitleDisplay">Není vybrána žádná skladba</span>
-  </div>
-
-  <!-- 1. ZÁLOŽKA: KNIHOVNA / PŘEHLED SOUBORŮ -->
+  <!-- 1. ZÁLOŽKA: KNIHOVNA -->
   <div class="view-panel" id="libraryView">
-    <div class="toolbar" style="width:100%; border-radius:8px;">
-      <label class="btn btn-primary" title="Vyfotit noty fotoaparátem">
-        📷 Vyfotit noty
-        <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
-      </label>
-
-      <label class="btn" title="Nahrát PDF nebo obrázek z úložiště">
-        📁 Soubor
-        <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
-      </label>
-
-      <label class="btn" id="addPageBtn" style="display:none;" title="Vyfotit a přidat další list">
-        📷 + Další strana
-        <input type="file" id="addPageInput" class="file-input" accept="image/*" capture="environment">
-      </label>
-
-      <button class="btn" id="cropPaperBtn" style="display:none;" onclick="app.startPaperCrop()" title="Odříznout pult a okraje">
-        ✂ Oříznout papír
-      </button>
-      <button class="btn" id="renameScoreBtn" style="display:none;" onclick="app.renameCurrentScore()" title="Přejmenovat">
-        ✏ Přejmenovat
-      </button>
-      <button class="btn" onclick="app.exportBackupJSON()" title="Zálohovat skladby do souboru">
-        💾 Export JSON
-      </button>
+    <div class="toolbar" style="width:100%;">
+      <label class="btn btn-primary">📷 Fotit noty <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment"></label>
+      <label class="btn">📁 PDF/Obrázek <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf"></label>
+      <button class="btn" onclick="window.app.exportBackupJSON()">💾 Export</button>
     </div>
 
-    <div class="library-container">
-      <div class="library-header">
-        <span>Uložené skladby v zařízení (<span id="libCountSpan">0</span>)</span>
-      </div>
+    <div class="library-container" style="margin-top:10px;">
+      <div class="library-header">Uložené skladby (<span id="libCountSpan">0</span>)</div>
       <div class="library-list" id="libraryList"></div>
     </div>
   </div>
 
-  <!-- 2. ZÁLOŽKA: ZNAČKOVÁNÍ -->
-  <div class="view-panel" id="editView" style="display:none;">
-    <div class="toolbar" id="editToolbar">
-      <!-- Přepínač stránek -->
-      <div class="page-switcher" id="pageSwitcher" style="display:none;">
-        <button class="page-btn" id="prevPageBtn" onclick="app.changePage(-1)">◀</button>
-        <span class="page-indicator" id="pageIndicator">Strana 1/1</span>
-        <button class="page-btn" id="nextPageBtn" onclick="app.changePage(1)">▶</button>
+  <!-- 2. ZÁLOŽKA: HRANÍ & ZNAČKOVÁNÍ -->
+  <div class="view-panel practice-panel" id="editView" style="display:none; padding:0;">
+    
+    <!-- Horní proužek s názvem a stránkováním -->
+    <div class="active-file-banner" id="activeFileBanner" style="display:flex; justify-content:space-between; padding:8px 12px; width:100%;">
+      <div style="display:flex; gap:6px; align-items:center; min-width:0;">
+        <span class="label">Skladba:</span>
+        <span class="name" id="scoreTitleDisplay" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">...</span>
       </div>
-
-      <!-- Zoom ovládání -->
-      <div class="zoom-controls">
-        <button class="page-btn" onclick="app.zoomScore(-0.25)" title="Oddálit">🔍 -</button>
-        <span class="zoom-indicator" id="zoomLevelSpan" onclick="app.resetZoom()" title="Klepnutím vrátíte celou obrazovku">100%</span>
-        <button class="page-btn" onclick="app.zoomScore(0.25)" title="Přiblížit">🔍 +</button>
-        <button class="btn btn-fit" onclick="app.resetZoom()" title="Zobrazit celou stránku na displeji">⛶ Celá stránka</button>
+      <div class="page-switcher" id="pageSwitcher" style="display:flex; flex-shrink:0;">
+        <button class="page-btn" id="prevPageBtn" onclick="window.app.changePage(-1)">◀</button>
+        <span class="page-indicator" id="pageIndicator">Str 1/1</span>
+        <button class="page-btn" id="nextPageBtn" onclick="window.app.changePage(1)">▶</button>
       </div>
-
-      <button id="addMeasureBtn" class="btn btn-accent" style="display:none;" onclick="app.saveCurrentMeasure()">
-        ✔ Uložit takt <span id="nextMeasureNum">1</span>
-      </button>
-      <button id="setKeySigBtn" class="btn btn-gold" style="display:none;" onclick="app.saveCurrentAsKeySignature()">
-        🎼 Uložit jako Klíč/Předznamenání
-      </button>
-      <button id="toggleCategoryBtn" class="btn" style="display:none;" onclick="app.toggleActiveCategory()">
-        🔄 Změnit kategorii
-      </button>
-      <button id="deleteActiveBoxBtn" class="btn btn-danger" style="display:none;" onclick="app.deleteActiveBox()">
-        🗑 Smazat rámeček
-      </button>
     </div>
 
-    <div class="toolbar crop-toolbar" id="cropToolbar" style="display:none;">
-      <span style="font-weight:600; font-size:0.85rem; color:#93c5fd;">✂ Ořez papíru: Posuňte rohy rámečku k okrajům not</span>
+    <!-- Ovládací lišta: Přepínač režimu Hraní vs. Značkování, fullscreen a akce -->
+    <div class="toolbar" id="editToolbar" style="border-radius:0; border-left:none; border-right:none; display:flex; justify-content:space-between; width:100%;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn btn-accent" id="toggleInteractionBtn" onclick="window.app.toggleInteractionMode()">
+          📖 Hraní (listování)
+        </button>
+        <button class="btn" id="renameScoreBtn" onclick="window.app.renameCurrentScore()">
+          ✏ Přejmenovat
+        </button>
+      </div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn btn-fit" id="fullscreenToggleBtn" onclick="window.app.toggleFullscreen()">
+          ⛶ Celá obrazovka
+        </button>
+        <button class="btn" id="cropPaperBtn" style="display:none;" onclick="window.app.startPaperCrop()">
+          ✂ Ořez
+        </button>
+      </div>
+    </div>
+
+    <!-- Ořezová lišta papíru -->
+    <div class="toolbar crop-toolbar" id="cropToolbar" style="display:none; width:100%;">
+      <span style="font-weight:600; font-size:0.85rem; color:#93c5fd;">✂ Nastavte okraje not</span>
       <div style="margin-left:auto; display:flex; gap:6px;">
-        <button class="btn btn-accent" onclick="app.applyPaperCrop()">✔ Použít ořez</button>
-        <button class="btn btn-danger" onclick="app.cancelPaperCrop()">✖ Zrušit</button>
+        <button class="btn btn-accent" onclick="window.app.applyPaperCrop()">✔ Oříznout</button>
+        <button class="btn btn-danger" onclick="window.app.cancelPaperCrop()">✖ Zrušit</button>
       </div>
     </div>
 
+    <!-- Plovoucí editační lišta pro označený takt -->
     <div class="edit-subbar" id="editSubbar" style="display:none;">
-      <div class="subbar-group">
-        <span class="subbar-label">Více taktů:</span>
-        <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('left')">◀ +1 Vlevo</button>
-        <button class="size-btn size-btn-highlight" onclick="app.expandMeasure('right')">+1 Vpravo ▶</button>
-      </div>
-      <div class="subbar-group">
-        <span class="subbar-label">Zúžit:</span>
-        <button class="size-btn" onclick="app.shrinkMeasure('left')">Zleva -1</button>
-        <button class="size-btn" onclick="app.shrinkMeasure('right')">Zprava -1</button>
-      </div>
-      <div class="subbar-group">
-        <span class="subbar-label">Jemně:</span>
-        <button class="size-btn" onclick="app.adjustActiveWidth(-10)">-10</button>
-        <button class="size-btn" onclick="app.adjustActiveWidth(10)">+10</button>
-        <button class="size-btn" onclick="app.adjustActiveEdge('left', -4)">◀ Vlevo</button>
-        <button class="size-btn" onclick="app.adjustActiveEdge('right', 4)">Vpravo ▶</button>
+      <div style="display:flex; justify-content:space-between; width:100%; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; gap:6px;">
+          <button id="addMeasureBtn" class="btn btn-accent" onclick="window.app.saveCurrentMeasure()">✔ Uložit do Laboratoře</button>
+          <button id="deleteActiveBoxBtn" class="btn btn-danger" style="display:none;" onclick="window.app.deleteActiveBox()">🗑 Smazat</button>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="size-btn" onclick="window.app.expandMeasure('left')">◀ +1</button>
+          <button class="size-btn" onclick="window.app.expandMeasure('right')">+1 ▶</button>
+        </div>
       </div>
     </div>
 
-    <!-- KONTEJNER S PINCH ZOOM A PAN POSUVEM -->
-    <div class="canvas-box" id="canvasBox">
+    <!-- Plátno not se zónami pro otáčení stránek -->
+    <div class="canvas-box" id="canvasBox" style="height:76vh; border-radius:0; border-left:none; border-right:none; width:100%;">
       <div class="canvas-viewport" id="canvasViewport">
         <canvas id="scoreCanvas"></canvas>
       </div>
+      <!-- Dotykové zóny aktivní v režimu čtení/hraní -->
+      <div class="page-turn-zone zone-left" id="zoneLeft" onclick="window.app.changePage(-1)"></div>
+      <div class="page-turn-zone zone-right" id="zoneRight" onclick="window.app.changePage(1)"></div>
     </div>
-    <div class="status-msg" id="statusHint">Dvěma prsty libovolně zvětšete/posuňte noty. Dvojklik vrátí celou obrazovku.</div>
-
-    <div class="danger-zone">
-      <button id="clearMeasuresBtn" class="btn btn-subtle-danger" style="display:none;" onclick="app.clearMeasures()">
-        🗑 Smazat všechny označené takty (<span id="measureCountSpan">0</span>)
+    
+    <div class="danger-zone" style="padding:10px 0;">
+      <button id="clearMeasuresBtn" class="btn btn-subtle-danger" style="display:none;" onclick="window.app.clearMeasures()">
+        🗑 Smazat celou Laboratoř skladby (<span id="measureCountSpan">0</span>)
       </button>
     </div>
   </div>
 
-  <!-- 3. ZÁLOŽKA: CVIČENÍ -->
-  <div class="view-panel practice-panel" id="practiceView" style="display:none;">
-    
-    <!-- ZVÝRAZNĚNÝ NÁZEV SKLADBY VE CVIČENÍ -->
-    <div class="practice-song-highlight" id="practiceSongTitleDisplay">
-      🎵 Není vybrána žádná skladba
+  <!-- 3. ZÁLOŽKA: LABORATOŘ -->
+  <div class="view-panel practice-panel" id="labView" style="display:none; padding:10px 8px;">
+    <div class="lab-header-banner">
+      <div class="lab-title-wrap">
+        <span class="lab-badge">🔬 MIKRO-DRILL</span>
+        <span class="lab-heading" id="labSongTitle">Není vybráno</span>
+      </div>
+      <button class="btn btn-accent btn-sm" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">✔ Zvládnuto</button>
     </div>
 
-    <!-- Horní lišta: přepínání taktů a volba zobrazení -->
-    <div class="toolbar compact-toolbar" style="width:100%; border-radius:8px;">
-      <div class="measure-stepper" style="gap:6px;">
-        <button class="btn compact-btn" onclick="app.prevMeasure()">◀</button>
-        <div class="measure-indicator compact-indicator" id="practiceMeasureTitle">Takt 1 / 1</div>
-        <button class="btn compact-btn" onclick="app.nextMeasure(true)">▶</button>
-      </div>
-
-      <div class="ctrl-group" style="margin-left:auto;">
-        <label for="stackCountSelect" style="font-size:0.75rem;">Zobrazit:</label>
-        <select id="stackCountSelect" onchange="app.updatePracticeStackCount()" style="padding:3px 6px; font-size:0.78rem;">
-          <option value="1">1 takt</option>
-          <option value="2">2 takty pod sebou</option>
-          <option value="3">3 takty pod sebou</option>
-          <option value="4">4 takty pod sebou</option>
-          <option value="loop">Všechny ve smyčce</option>
-        </select>
-      </div>
+    <div class="lab-queue-wrap" id="labQueueWrap">
+      <span class="lab-queue-label">Označené:</span>
+      <div class="lab-queue-pills" id="labQueuePills"></div>
     </div>
 
-    <!-- Karta s notami (Klíč + takty) -->
-    <div class="practice-card">
-      <div class="clef-banner" id="clefBanner">
-        <div class="clef-preview-wrap" id="clefPreviewWrap">
-          <canvas id="clefCanvas"></canvas>
-        </div>
-      </div>
-
-      <div class="practice-display" id="practiceDisplay" title="Klepnutím vpravo/vlevo přepnete takt">
-        <canvas id="practiceCanvas"></canvas>
-      </div>
-    </div>
-
-    <!-- DOLŮ PŘILEPENÝ METRONOM S KRUHOVÝM OVLADAČEM -->
-    <div class="docked-metronome" id="dockedMetronome">
-      <!-- 1. Řádek: Kruhový indikátor/spouštěč, tempo a světýlka dob -->
-      <div class="metro-header-row">
-        <!-- Kruhové tlačítko: Červená (stop) -> Oranžová (příprava) -> Zelená (hra) -->
-        <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="app.toggleIncrementalMetronome()" title="Klepnutím spustíte / zastavíte metronom">
-          <span class="circle-icon" id="metroCircleIcon">▶</span>
-        </button>
+    <!-- Optická lupa -->
+    <div class="rect-loupe-container">
+      <div class="rect-loupe-header">
+        <div class="loupe-reticle-dot"></div>
+        <span class="loupe-optic-label" id="loupeOpticLabel">LUPA • TAKT #1</span>
         
-        <div class="metro-tempo-display">
-          <span class="tempo-current" id="metroCurrentBpmText">60</span>
-          <span class="tempo-unit">BPM</span>
-          <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
-        </div>
-
-        <div class="metro-beat-lights" id="metroBeatLights">
-          <div class="beat-light"></div>
-          <div class="beat-light"></div>
-          <div class="beat-light"></div>
-          <div class="beat-light"></div>
+        <div class="context-toggle-group" style="margin-left:auto;">
+          <button class="ctx-btn active" id="ctxSolo" onclick="window.app.setLabContext('solo')">Označené</button>
+          <button class="ctx-btn" id="ctxBefore" onclick="window.app.setLabContext('before')">+ Před</button>
+          <button class="ctx-btn" id="ctxAfter" onclick="window.app.setLabContext('after')">+ Za</button>
         </div>
       </div>
 
-      <!-- 2. Řádek: Vstupy tempa, počet hraných taktů a Reset -->
-      <div class="metro-controls-row">
-        <div class="metro-input-group">
-          <span class="metro-lbl">Start</span>
-          <input type="number" id="metroStartBpm" value="60" min="30" max="260" class="metro-input">
-        </div>
+      <div class="rect-loupe-lens" id="rectLoupeLens">
+        <canvas id="labCanvas"></canvas>
+      </div>
+    </div>
+  </div>
 
-        <div class="metro-input-group">
-          <span class="metro-lbl">Cíl</span>
-          <input type="number" id="metroTargetBpm" value="100" min="30" max="260" class="metro-input">
-        </div>
-
-        <div class="metro-input-group">
-          <span class="metro-lbl">+Krok</span>
-          <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input" title="Zrychlení po odehrání">
-        </div>
-
-        <div class="metro-input-group">
-          <span class="metro-lbl">Taktů</span>
-          <input type="number" id="metroBarsCount" value="1" min="1" max="64" class="metro-input" title="Kolik taktů odehrát v daném tempu před zrychlením">
-        </div>
-
-        <div class="metro-input-group">
-          <span class="metro-lbl">Doby</span>
-          <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input">
-        </div>
-
-        <!-- Místo tlačítka Start je zde tlačítko Reset -->
-        <button class="btn btn-danger metro-reset-btn" onclick="app.resetMetronomeTempo()" title="Vrátit tempo na Start BPM">
-          ↺ Reset
-        </button>
+  <!-- PŘILEPENÝ METRONOM -->
+  <div class="docked-metronome" id="dockedMetronome" style="display:none;">
+    <div class="metro-header-row">
+      <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
+        <span class="circle-icon" id="metroCircleIcon">▶</span>
+      </button>
+      
+      <div class="metro-tempo-display">
+        <span class="tempo-current" id="metroCurrentBpmText">60</span>
+        <span class="tempo-unit">BPM</span>
+        <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
       </div>
 
-      <input type="hidden" id="loopFrom" value="1">
-      <input type="hidden" id="loopTo" value="1">
+      <div class="metro-beat-lights" id="metroBeatLights">
+        <div class="beat-light"></div>
+        <div class="beat-light"></div>
+        <div class="beat-light"></div>
+        <div class="beat-light"></div>
+      </div>
     </div>
 
+    <div class="metro-controls-row">
+      <div class="metro-input-group">
+        <span class="metro-lbl">Start</span>
+        <input type="number" id="metroStartBpm" value="60" min="30" max="260" class="metro-input">
+      </div>
+      <div class="metro-input-group">
+        <span class="metro-lbl">Cíl</span>
+        <input type="number" id="metroTargetBpm" value="100" min="30" max="260" class="metro-input">
+      </div>
+      <div class="metro-input-group">
+        <span class="metro-lbl">+Krok</span>
+        <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input">
+      </div>
+      <div class="metro-input-group">
+        <span class="metro-lbl">Taktů</span>
+        <input type="number" id="metroBarsCount" value="1" min="1" max="64" class="metro-input">
+      </div>
+      <div class="metro-input-group">
+        <span class="metro-lbl">Doby</span>
+        <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input">
+      </div>
+      <button class="btn btn-danger metro-reset-btn" onclick="window.app.resetMetronomeTempo()">↺ Reset</button>
+    </div>
   </div>
 
   <div id="touchLoupe" class="touch-loupe" style="display:none;">
