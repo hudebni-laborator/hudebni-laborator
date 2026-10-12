@@ -1,0 +1,244 @@
+:root {
+  --bg: #09090b;
+  --surface: rgba(24, 24, 27, 0.90);
+  --surface-solid: #18181b;
+  --surface-elevated: #202025;
+  --surface-hover: #27272e;
+  
+  --primary: #3b82f6;
+  --primary-glow: rgba(59, 130, 246, 0.35);
+  --accent-gold: #f59e0b;
+  --accent-gold-glow: rgba(245, 158, 11, 0.35);
+  --accent-green: #10b981;
+  --accent-green-glow: rgba(16, 185, 129, 0.35);
+  --accent-purple: #8b5cf6;
+  --accent-purple-glow: rgba(139, 92, 246, 0.35);
+  --danger: #ef4444;
+  --danger-glow: rgba(239, 68, 68, 0.35);
+  
+  --text: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --text-dim: #71717a;
+  
+  --border: rgba(255, 255, 255, 0.08);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 50% 0%, rgba(35, 30, 50, 0.5) 0%, transparent 60%);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ======================================================== */
+/* HORNÍ LIŠTA & ZÁLOŽKY                                   */
+/* ======================================================== */
+header {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
+}
+
+.app-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #ffffff 30%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-tabs {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  background: rgba(10, 10, 12, 0.85);
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.tab-btn {
+  flex: 1 1 0;
+  text-align: center;
+  border: 1px solid transparent;
+  padding: 9px 2px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.tab-btn:active { transform: scale(0.97); }
+
+.tab-lib { background: rgba(59, 130, 246, 0.08); color: #93c5fd; border-color: rgba(59, 130, 246, 0.2); }
+.tab-lib.active { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; border-color: #60a5fa; box-shadow: 0 0 16px var(--primary-glow); }
+
+.tab-edit { background: rgba(16, 185, 129, 0.08); color: #86efac; border-color: rgba(16, 185, 129, 0.2); }
+.tab-edit.active { background: linear-gradient(135deg, #059669, #047857); color: #ffffff; border-color: #34d399; box-shadow: 0 0 16px var(--accent-green-glow); }
+
+.tab-lab { background: rgba(139, 92, 246, 0.08); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.2); }
+.tab-lab.active { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border-color: #a78bfa; box-shadow: 0 0 16px var(--accent-purple-glow); }
+
+.badge-count {
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+}
+
+/* ======================================================== */
+/* SPOLEČNÉ PRVKY A TLAČÍTKA                                */
+/* ======================================================== */
+.active-file-banner {
+  background: rgba(24, 24, 27, 0.6);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.active-file-banner span.label { color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; }
+.active-file-banner span.name { font-weight: 700; color: #f4f4f5; }
+
+.btn {
+  background: var(--surface-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 11px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.btn:active { transform: scale(0.96); }
+.btn-sm { padding: 4px 8px; font-size: 0.76rem; }
+
+.btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); border-color: #60a5fa; color: #ffffff; box-shadow: 0 2px 8px var(--primary-glow); }
+.btn-accent { background: linear-gradient(135deg, #10b981, #059669); border-color: #34d399; color: #ffffff; font-weight: 700; box-shadow: 0 2px 8px var(--accent-green-glow); }
+.btn-gold { background: linear-gradient(135deg, #d97706, #b45309); border-color: #fde047; color: #ffffff; font-weight: 700; box-shadow: 0 2px 8px var(--accent-gold-glow); }
+.btn-danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
+.btn-danger:active { background: #ef4444; color: #fff; }
+.btn-subtle-danger { background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 0.78rem; padding: 6px 14px; }
+.btn-fit { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.3); color: #93c5fd; font-weight: 600; padding: 4px 8px; font-size: 0.78rem; }
+.file-input { display: none; }
+
+.view-panel {
+  width: 100%;
+  max-width: 950px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  margin: 0 auto;
+}
+.practice-panel { padding-bottom: calc(125px + env(safe-area-inset-bottom, 0px)); }
+
+/* ======================================================== */
+/* 1. KNIHOVNA                                              */
+/* ======================================================== */
+.library-container {
+  width: 100%;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.library-header {
+  padding: 10px 14px;
+  background: var(--surface-elevated);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+.library-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.library-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  gap: 12px;
+}
+.library-item:hover, .library-item.active {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+.library-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; overflow: hidden; }
+.library-name { font-weight: 700; font-size: 0.92rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.library-meta { font-size: 0.74rem; color: var(--text-dim); }
+.library-actions { display: flex; gap: 6px; flex-shrink: 0; }

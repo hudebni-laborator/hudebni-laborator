@@ -1,0 +1,123 @@
+/* ======================================================== */
+/* 2. HRANÍ, ZNAČKOVÁNÍ & PLÁTNO NOT                        */
+/* ======================================================== */
+.toolbar {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+.compact-toolbar { padding: 6px 10px; }
+.crop-toolbar { background: #1e2533; border-color: #3b82f6; }
+
+.page-switcher, .zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(10, 10, 12, 0.7);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.page-indicator, .zoom-indicator { font-size: 0.78rem; font-weight: 700; color: var(--text); min-width: 48px; text-align: center; }
+.page-btn { background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 0.8rem; padding: 3px 6px; border-radius: 4px; transition: background 0.1s; }
+.page-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.canvas-box {
+  width: 100%;
+  height: 65vh;
+  background: #0d0d10;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+.canvas-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+canvas {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+canvas#scoreCanvas {
+  display: block;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+  border-radius: 4px;
+}
+
+/* Průhledné zóny pro rychlé otáčení stránek klepnutím */
+.page-turn-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 25%;
+  z-index: 20;
+}
+.zone-left { left: 0; }
+.zone-right { right: 0; }
+
+/* Plovoucí editační lišta rámečku */
+.edit-subbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #141418;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.size-btn {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.size-btn:active { background: var(--primary); color: #fff; }
+
+/* Plovoucí kruhová lupa při manuálním posunu táhla */
+.touch-loupe {
+  position: fixed;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 3px solid #3b82f6;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+  background: #ffffff;
+  transform: translate(-50%, -100%);
+  margin-top: -35px;
+}
+.touch-loupe canvas { width: 100%; height: 100%; display: block; }
+
+.danger-zone {
+  margin-top: 10px;
+  margin-bottom: 20px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
