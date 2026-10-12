@@ -38,7 +38,12 @@
     <div class="toolbar" style="width:100%;">
       <label class="btn btn-primary">📷 Fotit noty <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment"></label>
       <label class="btn">📁 PDF/Obrázek <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf"></label>
-      <button class="btn" onclick="window.app.exportBackupJSON()">💾 Export</button>
+      <!-- V liště záložky Knihovna v index.html -->
+      <button class="btn" onclick="window.app.exportBackupJSON()">💾 Export zálohy</button>
+      <label class="btn">
+        📥 Obnovit ze zálohy
+        <input type="file" id="importBackupInput" class="file-input" accept=".json,application/json" onchange="window.app.importBackupJSON(event)">
+      </label>
     </div>
 
     <div class="library-container" style="margin-top:10px;">

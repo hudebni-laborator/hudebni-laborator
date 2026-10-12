@@ -410,6 +410,37 @@ class GuitarTrainer {
     } catch (err) { alert('Chyba: ' + err.message); }
   }
 
+  // Obnovení skladeb ze záložního JSON souboru
+  async importBackupJSON(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const importedScores = JSON.parse(text);
+
+      if (!Array.isArray(importedScores)) {
+        throw new Error('Neplatný formát záložního souboru.');
+      }
+
+      let count = 0;
+      for (const score of importedScores) {
+        if (score && score.id && score.name) {
+          await window.scoreDB.saveScore(score);
+          count++;
+        }
+      }
+
+      alert(`Úspěšně obnoveno ${count} skladeb.`);
+      const all = await window.scoreDB.getAllScores();
+      this.renderLibraryList(all);
+      document.getElementById('libCountSpan').innerText = all.length;
+    } catch (err) {
+      alert('Chyba při importu: ' + err.message);
+    }
+    e.target.value = '';
+  }
+
   async persistCurrentScore() {
     if (!this.currentScore) return;
     this.currentScore.updatedAt = Date.now();
