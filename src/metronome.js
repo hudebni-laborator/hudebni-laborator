@@ -3,7 +3,8 @@ class MetronomeController {
     this.audioCtx = null;
     this.isRunning = false;
     this.currentBpm = 60;
-    this.phase = 'idle'; // 'idle', 'leadin', 'playing', 'goal'
+    this.beatsPerBar = 4; // Výchozí počet dob
+    this.phase = 'idle';  // 'idle', 'leadin', 'playing', 'goal'
     this.beatIndex = 0;
     this.measureIndexInCycle = 0;
     this.nextBeatTime = 0;
@@ -47,15 +48,12 @@ class MetronomeController {
     await this.initAudio();
     if (window.wakeLockManager) try { await window.wakeLockManager.request(); } catch (_) {}
 
-    this.currentBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.isRunning = true;
     this.phase = 'leadin';
     this.beatIndex = 0;
     this.measureIndexInCycle = 0;
 
-    const curText = document.getElementById('metroCurrentBpmText');
-    if (curText) curText.innerText = this.currentBpm;
-
+    this.updateTempoDisplays(this.currentBpm);
     this.nextBeatTime = this.audioCtx.currentTime + 0.05;
     this.timerId = setInterval(() => this.schedulerLoop(), this.lookaheadMs);
   }
@@ -70,10 +68,40 @@ class MetronomeController {
     this.updateCircleUI('idle');
   }
 
+  changeBpm(delta) {
+    this.setBpm(this.currentBpm + delta);
+  }
+
+  setBpm(newBpm) {
+    this.currentBpm = Math.max(30, Math.min(260, Number(newBpm) || 60));
+    this.updateTempoDisplays(this.currentBpm);
+  }
+
+  setBeats(beats) {
+    this.beatsPerBar = Math.max(1, Math.min(16, Number(beats) || 4));
+    this.beatIndex = 0;
+
+    // Synchronizace s číselným polem v nastavení Laboratoře
+    const inp = document.getElementById('metroBeatsPerBar');
+    if (inp) inp.value = this.beatsPerBar;
+
+    // Synchronizace s výběrem v liště Hraní
+    const sel = document.getElementById('playMetroBeatsSelect');
+    if (sel && sel.value !== String(this.beatsPerBar)) sel.value = this.beatsPerBar;
+  }
+
   resetTempo() {
-    this.currentBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
-    const curText = document.getElementById('metroCurrentBpmText');
-    if (curText) curText.innerText = this.currentBpm;
+    const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
+    this.setBpm(startBpm);
+  }
+
+  updateTempoDisplays(bpm) {
+    const d1 = document.getElementById('metroCurrentBpmText');
+    if (d1) d1.innerText = bpm;
+    const d2 = document.getElementById('playMetroBpmText');
+    if (d2) d2.innerText = bpm;
+    const input = document.getElementById('metroStartBpm');
+    if (input && !this.isRunning) input.value = bpm;
   }
 
   schedulerLoop() {
@@ -85,7 +113,7 @@ class MetronomeController {
   }
 
   scheduleCurrentBeat(time) {
-    const beatsPerBar = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
+    const beatsPerBar = this.beatsPerBar;
     const isAccent = (this.beatIndex === 0);
     const scheduledBeat = this.beatIndex;
     const scheduledPhase = this.phase;
@@ -99,14 +127,13 @@ class MetronomeController {
       this.renderBeatLight(scheduledBeat, beatsPerBar, scheduledPhase);
       if (scheduledBeat === 0) {
         this.updateCircleUI(scheduledPhase);
-        const curText = document.getElementById('metroCurrentBpmText');
-        if (curText) curText.innerText = scheduledBpm;
+        this.updateTempoDisplays(scheduledBpm);
       }
     }, delayMs);
   }
 
   advanceBeat() {
-    const beats = Number(document.getElementById('metroBeatsPerBar')?.value) || 4;
+    const beats = this.beatsPerBar;
     const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
     const step = Number(document.getElementById('metroStepBpm')?.value) || 2;
     const bars = Number(document.getElementById('metroBarsCount')?.value) || 1;
@@ -135,20 +162,28 @@ class MetronomeController {
   }
 
   updateCircleUI(phase) {
-    const btn = document.getElementById('metroCircleBtn');
-    const icn = document.getElementById('metroCircleIcon');
-    if (!btn || !icn) return;
-    btn.className = 'metro-circle-btn';
-    if (phase === 'idle') {
-      btn.classList.add('circle-idle');
-      icn.innerText = '▶';
-    } else if (phase === 'leadin') {
-      btn.classList.add('circle-leadin');
-      icn.innerText = '⏸';
-    } else {
-      btn.classList.add('circle-playing');
-      icn.innerText = phase === 'goal' ? '🏆' : '⏸';
-    }
+    const buttons = [
+      { btn: document.getElementById('metroCircleBtn'), icn: document.getElementById('metroCircleIcon') },
+      { btn: document.getElementById('playMetroCircleBtn'), icn: document.getElementById('playMetroCircleIcon') }
+    ];
+
+    buttons.forEach(({ btn, icn }) => {
+      if (!btn || !icn) return;
+      btn.className = btn.classList.contains('play-metro-circle') 
+        ? 'metro-circle-btn play-metro-circle' 
+        : 'metro-circle-btn';
+
+      if (phase === 'idle') {
+        btn.classList.add('circle-idle');
+        icn.innerText = '▶';
+      } else if (phase === 'leadin') {
+        btn.classList.add('circle-leadin');
+        icn.innerText = '⏸';
+      } else {
+        btn.classList.add('circle-playing');
+        icn.innerText = phase === 'goal' ? '🏆' : '⏸';
+      }
+    });
   }
 
   renderBeatLight(beatIdx, totalBeats, phase) {

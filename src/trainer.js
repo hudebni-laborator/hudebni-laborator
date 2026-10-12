@@ -391,14 +391,33 @@ class GuitarTrainer {
     this.canvasViewport.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoomScale})`;
   }
 
+  promptSetBpm() {
+    const val = window.prompt('Zadejte tempo (BPM):', this.metronome.currentBpm);
+    if (val && !isNaN(val)) {
+      this.metronome.setBpm(Number(val));
+    }
+  }
+
+
+ // Přesné roztáhnutí na celou obrazovku při zachování poměru stran s vycentrováním
   fitCanvasToScreen() {
     if (!this.scoreCanvas || this.scoreCanvas.width === 0 || !this.canvasBox) return;
-    const rect = this.canvasBox.getBoundingClientRect();
-    const w = rect.width > 0 ? rect.width : window.innerWidth;
-    const h = rect.height > 0 ? rect.height : (window.innerHeight - 80);
-    this.zoomScale = Math.max(0.15, Math.min(w / this.scoreCanvas.width, h / this.scoreCanvas.height, 1.0));
-    this.panX = Math.max(0, (w - this.scoreCanvas.width * this.zoomScale) / 2);
-    this.panY = Math.max(4, (h - this.scoreCanvas.height * this.zoomScale) / 2);
+
+    const boxRect = this.canvasBox.getBoundingClientRect();
+    const w = boxRect.width > 0 ? boxRect.width : window.innerWidth;
+    const h = boxRect.height > 0 ? boxRect.height : window.innerHeight;
+
+    const scaleX = w / this.scoreCanvas.width;
+    const scaleY = h / this.scoreCanvas.height;
+
+    // Zachování poměru stran (contain)
+    this.zoomScale = Math.min(scaleX, scaleY);
+
+    // Vycentrování doprostřed obrazovky
+    this.panX = (w - this.scoreCanvas.width * this.zoomScale) / 2;
+    this.panY = (h - this.scoreCanvas.height * this.zoomScale) / 2;
+
+    this.hasUserAdjustedView = false;
     this.updateViewportTransform();
   }
 
@@ -412,20 +431,31 @@ class GuitarTrainer {
     this.updateViewportTransform();
   }
 
-  // --- DOTYK & GESTA ---
+ // Inicializace dotykového enginu s ochranou proti zoomování celého browseru
   initTouchEngine() {
     const box = this.canvasBox;
     if (!box) return;
+
     let ongoingTouches = new Map();
     let initialPinchDist = null;
     let initialPinchScale = 1.0;
     let isDrag = false, isPan = false;
     let startPoint = null;
 
+    // DŮLEŽITÉ: Zabránění systémovému zoomování celé HTML stránky
+    box.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    box.addEventListener('touchmove', (e) => {
+      e.preventDefault(); // Plátno si zoom a posun řídí výhradně samo
+    }, { passive: false });
+
     box.addEventListener('pointerdown', e => {
       if (!this.isMarkingMode && !this.isCropMode && e.target.classList.contains('page-turn-zone')) return;
 
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
       if (ongoingTouches.size === 1) {
         startPoint = { x: e.clientX, y: e.clientY };
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
@@ -459,12 +489,15 @@ class GuitarTrainer {
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (ongoingTouches.size === 2) {
+        // Pinch-to-zoom POUZE na notovém listu
         const t = Array.from(ongoingTouches.values());
         const dist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
         const rect = box.getBoundingClientRect();
         const cx = (t[0].x + t[1].x) / 2 - rect.left;
         const cy = (t[0].y + t[1].y) / 2 - rect.top;
-        if (initialPinchDist > 0) this.applyZoomAt(initialPinchScale * (dist / initialPinchDist), cx, cy);
+        if (initialPinchDist > 0) {
+          this.applyZoomAt(initialPinchScale * (dist / initialPinchDist), cx, cy);
+        }
         this.panX += dx / 2;
         this.panY += dy / 2;
         this.hasUserAdjustedView = true;
@@ -475,6 +508,7 @@ class GuitarTrainer {
           const c = this.screenToCanvasCoords(e.clientX, e.clientY);
           activeEd.moveDrag(c.x, c.y, e.clientX, e.clientY);
         } else if (isPan) {
+          // Posun prstem v notách
           this.panX += dx;
           this.panY += dy;
           this.hasUserAdjustedView = true;

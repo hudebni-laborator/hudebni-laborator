@@ -102,10 +102,29 @@
         <button class="page-btn" id="nextPageBtn" onclick="window.app.changePage(1)">▶</button>
       </div>
 
-      <!-- Spouštěč metronomu přímo v Hraní -->
-      <button class="btn btn-sm metro-toggle-btn" id="playMetroBtn" onclick="window.app.toggleIncrementalMetronome()" title="Spustit / Zastavit metronom">
-        <span id="playMetroIcon">⏱</span>
-      </button>
+      <!-- Kruhový metronom s volbou tempa a počtu dob v Hraní -->
+      <div class="play-metro-group">
+        <button class="metro-circle-btn circle-idle play-metro-circle" id="playMetroCircleBtn" onclick="window.app.toggleIncrementalMetronome()" title="Spustit / Zastavit metronom">
+          <span class="circle-icon" id="playMetroCircleIcon">▶</span>
+        </button>
+
+        <div class="play-metro-tempo-ctrl">
+          <button class="tempo-step-btn" onclick="window.app.metronome.changeBpm(-2)" title="Zpomalit o 2 BPM">−</button>
+          <span class="play-metro-bpm-val" id="playMetroBpmText" onclick="window.app.promptSetBpm()" title="Klepnutím zadejte BPM">60</span>
+          <button class="tempo-step-btn" onclick="window.app.metronome.changeBpm(2)" title="Zrychlit o 2 BPM">+</button>
+        </div>
+
+        <!-- Volba počtu dob / takt -->
+        <select class="play-metro-beats-select" id="playMetroBeatsSelect" onchange="window.app.metronome.setBeats(this.value)" title="Počet dob v taktu">
+          <option value="2">2/4</option>
+          <option value="3">3/4</option>
+          <option value="4" selected>4/4</option>
+          <option value="5">5/4</option>
+          <option value="6">6/8</option>
+          <option value="7">7/8</option>
+          <option value="1">1/4</option>
+        </select>
+      </div>
 
       <button class="btn btn-fit btn-sm" id="fullscreenToggleBtn" onclick="window.app.toggleFullscreen()">
         ⛶ Celá obrazovka
