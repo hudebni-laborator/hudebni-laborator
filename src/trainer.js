@@ -24,12 +24,13 @@ class GuitarTrainer {
     this.labCurrentIndex = 0;
     this.isMarkingMode = false; // false = Hraní, true = Edit
 
-    // Kreslení poznámek (prstoklady, smyky, crescenda)
-    this.editTool = 'pen';       // 'pen' | 'box'
+    // Kreslicí nástroje (prstoklady, smyky, crescenda, guma)
+    this.editTool = 'pen';       // 'pen' | 'box' | 'eraser'
     this.penColor = '#ef4444';
     this.penWidth = 2;
-    this.showAnnotations = true; // možnost skrýt/zobrazit poznámky
+    this.showAnnotations = true; // přepínač viditelnosti (oko)
     this.isDrawingStroke = false;
+    this.isErasingStroke = false;
     this.currentStroke = null;
 
     this.zoomScale = 1.0;
@@ -39,12 +40,14 @@ class GuitarTrainer {
     this.activeType = null;
     this.editingId = null;
 
+    // Metronom přes dedikovaný kontrolér
     this.metronome = new MetronomeController();
 
     this.initLibrary();
     this.initTouchEngine();
+    this.initLabTouchEngine();
 
-    // Sledování změn fullscreenu
+    // Sledování změn nativního fullscreenu
     document.addEventListener('fullscreenchange', () => {
       const isFull = !!document.fullscreenElement;
       document.body.classList.toggle('is-fullscreen', isFull);
@@ -55,6 +58,7 @@ class GuitarTrainer {
       setTimeout(() => this.fitCanvasToScreen(), 100);
     });
 
+    // Přizpůsobení při otočení displeje / změně velikosti okna
     window.addEventListener('resize', () => {
       if (document.getElementById('editView')?.style.display === 'flex' && !this.hasUserAdjustedView) {
         this.fitCanvasToScreen();
@@ -64,12 +68,13 @@ class GuitarTrainer {
       }
     });
 
+    // Klávesa Escape pro rychlé zrušení výběru rámečku
     window.addEventListener('keydown', e => {
       if (e.key === 'Escape') this.resetActiveSelection();
     });
   }
 
-  // --- FULLSCREEN & CENTROVÁNÍ ---
+  // --- FULLSCREEN & REŽIMY HRANÍ / EDIT ---
   toggleFullscreen() {
     if (!document.fullscreenElement) {
       if (document.documentElement.requestFullscreen) {
@@ -85,7 +90,6 @@ class GuitarTrainer {
     setTimeout(() => this.fitCanvasToScreen(), 120);
   }
 
-  // Přepínání Hraní <-> Edit
   toggleInteractionMode() {
     this.isMarkingMode = !this.isMarkingMode;
     const btn = document.getElementById('toggleInteractionBtn');
@@ -114,54 +118,77 @@ class GuitarTrainer {
     this.renderScoreView();
   }
 
-  // --- KRESLICÍ NÁSTROJE ---
+  // --- NÁSTROJE KRESLENÍ, BAREV A GUMY ---
   setEditTool(tool) {
     this.editTool = tool; // 'pen' | 'box' | 'eraser'
-    document.getElementById('toolBoxBtn')?.classList.toggle('active', tool === 'box');
-    document.getElementById('toolPenBtn')?.classList.toggle('active', tool === 'pen');
-    document.getElementById('toolEraserBtn')?.classList.toggle('active', tool === 'eraser');
+    ['toolBoxBtn'].forEach(id => document.getElementById(id)?.classList.toggle('active', tool === 'box'));
+    ['toolPenBtn', 'labToolPenBtn'].forEach(id => document.getElementById(id)?.classList.toggle('active', tool === 'pen'));
+    ['toolEraserBtn', 'labToolEraserBtn'].forEach(id => document.getElementById(id)?.classList.toggle('active', tool === 'eraser'));
     if (tool !== 'box') this.resetActiveSelection();
   }
 
   setPenColor(color) {
     this.penColor = color;
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
-    if (color === '#ef4444') document.querySelector('.color-red')?.classList.add('active');
-    if (color === '#10b981') document.querySelector('.color-green')?.classList.add('active');
-    if (color === '#3b82f6') document.querySelector('.color-blue')?.classList.add('active');
+    if (color === '#ef4444') {
+      document.querySelector('.color-red')?.classList.add('active');
+      document.getElementById('labColorRed')?.classList.add('active');
+    }
+    if (color === '#10b981') {
+      document.querySelector('.color-green')?.classList.add('active');
+      document.getElementById('labColorGreen')?.classList.add('active');
+    }
+    if (color === '#3b82f6') {
+      document.querySelector('.color-blue')?.classList.add('active');
+      document.getElementById('labColorBlue')?.classList.add('active');
+    }
   }
 
   setPenWidth(width, btnIdx) {
     this.penWidth = width;
     [1, 2, 3].forEach(i => {
       document.getElementById(`widthBtn${i}`)?.classList.toggle('active', i === btnIdx);
+      document.getElementById(`labWidthBtn${i}`)?.classList.toggle('active', i === btnIdx);
     });
   }
 
   toggleDrawingsVisibility() {
     this.showAnnotations = !this.showAnnotations;
-    const btn = document.getElementById('toggleDrawingsBtn');
-    if (btn) btn.style.opacity = this.showAnnotations ? '1.0' : '0.4';
+    const opacity = this.showAnnotations ? '1.0' : '0.4';
+    const b1 = document.getElementById('toggleDrawingsBtn');
+    if (b1) b1.style.opacity = opacity;
+    const b2 = document.getElementById('labToggleDrawingsBtn');
+    if (b2) b2.style.opacity = opacity;
+
     this.renderScoreView();
+    if (document.getElementById('labView')?.style.display === 'flex') {
+      this.showMeasureInLab(this.labCurrentIndex);
+    }
   }
 
   async undoLastDrawing() {
     if (!this.currentScore) return;
-    const key = `page_${this.currentPage}`;
+    const isLab = document.getElementById('labView')?.style.display === 'flex';
+    const targetPage = isLab 
+      ? (this.currentScore.measures?.[this.labCurrentIndex]?.page || 1)
+      : this.currentPage;
+
+    const key = `page_${targetPage}`;
     if (this.currentScore.drawings && this.currentScore.drawings[key] && this.currentScore.drawings[key].length > 0) {
       this.currentScore.drawings[key].pop();
       await this.persistCurrentScore();
       this.renderScoreView();
+      if (isLab) this.showMeasureInLab(this.labCurrentIndex);
     }
   }
 
-  eraseAt(cx, cy) {
+  eraseAt(cx, cy, targetPage = null) {
     if (!this.currentScore) return false;
-    const key = `page_${this.currentPage}`;
+    const pageNum = targetPage || this.currentPage;
+    const key = `page_${pageNum}`;
     const strokes = this.currentScore.drawings?.[key];
     if (!strokes || strokes.length === 0) return false;
 
-    // Poloměr gumy přesně podle zvolené tloušťky hrotu (minimálně 6px pro snadný dotyk)
     const radius = Math.max(6, this.penWidth * 1.5);
     const rSq = radius * radius;
     let modified = false;
@@ -194,7 +221,7 @@ class GuitarTrainer {
     return modified;
   }
 
-  // Metronom
+  // --- METRONOM ---
   toggleIncrementalMetronome() { this.metronome.toggle(); }
   resetMetronomeTempo() { this.metronome.resetTempo(); }
   stopMetronome() { this.metronome.stop(); }
@@ -441,7 +468,7 @@ class GuitarTrainer {
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
     this.scoreCtx.drawImage(p, 0, 0);
 
-    // Vykreslení kreseb / poznámek (pokud nejsou skryté okem)
+    // Vykreslení kreseb a poznámek
     if (this.showAnnotations && this.currentScore?.drawings) {
       const strokes = this.currentScore.drawings[`page_${this.currentPage}`] || [];
       this.scoreCtx.save();
@@ -530,7 +557,98 @@ class GuitarTrainer {
     this.updateViewportTransform();
   }
 
-  // --- DOTYKOVÝ ENGINE (KRESLENÍ & ZNAČKOVÁNÍ & ZOOM) ---
+  // --- OŘEZ PAPÍRU ---
+  startPaperCrop() {
+    if (!this.currentScore || this.currentScore.isPdf) return;
+    this.resetActiveSelection();
+    const cleanCanvas = this.pageCache.get(this.currentPage);
+    if (!cleanCanvas) return;
+
+    this.isCropMode = true;
+    const cropToolbar = document.getElementById('cropToolbar');
+    if (cropToolbar) cropToolbar.style.display = 'flex';
+
+    const marginX = Math.round(cleanCanvas.width * 0.05);
+    const marginY = Math.round(cleanCanvas.height * 0.05);
+    const initBox = {
+      left: marginX,
+      top: marginY,
+      width: cleanCanvas.width - marginX * 2,
+      height: cleanCanvas.height - marginY * 2
+    };
+
+    this.cropEditor = new MeasureBoxEditor(
+      this.scoreCanvas,
+      () => this.renderScoreView(),
+      initBox,
+      () => {},
+      null
+    );
+  }
+
+  async applyPaperCrop() {
+    if (!this.cropEditor || !this.isCropMode) return;
+    const b = this.cropEditor.box;
+    const cleanCanvas = this.pageCache.get(this.currentPage);
+    if (!cleanCanvas) return;
+
+    const cropW = Math.max(50, Math.round(b.width));
+    const cropH = Math.max(50, Math.round(b.height));
+
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropW;
+    croppedCanvas.height = cropH;
+    const cctx = croppedCanvas.getContext('2d');
+    cctx.drawImage(cleanCanvas, b.left, b.top, b.width, b.height, 0, 0, cropW, cropH);
+
+    const croppedDataUrl = croppedCanvas.toDataURL('image/jpeg', 0.90);
+    const shiftX = Math.round(b.left);
+    const shiftY = Math.round(b.top);
+
+    if (this.currentScore.measures) {
+      this.currentScore.measures.forEach(m => {
+        if ((m.page || 1) === this.currentPage) {
+          m.box.left = Math.max(0, m.box.left - shiftX);
+          m.box.top = Math.max(0, m.box.top - shiftY);
+        }
+      });
+    }
+
+    if (this.currentScore.keySignatures) {
+      this.currentScore.keySignatures.forEach(k => {
+        if ((k.page || 1) === this.currentPage) {
+          k.box.left = Math.max(0, k.box.left - shiftX);
+          k.box.top = Math.max(0, k.box.top - shiftY);
+        }
+      });
+    }
+
+    this.pageCache.set(this.currentPage, croppedCanvas);
+
+    if (this.currentScore.pages && this.currentScore.pages.length > 0) {
+      this.currentScore.pages[this.currentPage - 1] = croppedDataUrl;
+    } else {
+      this.currentScore.imageData = croppedDataUrl;
+    }
+
+    await this.persistCurrentScore();
+    this.cancelPaperCrop();
+    await this.renderCurrentPage();
+    this.fitCanvasToScreen();
+  }
+
+  cancelPaperCrop() {
+    if (this.cropEditor) {
+      this.cropEditor.destroy();
+      this.cropEditor = null;
+    }
+    this.isCropMode = false;
+    const cropToolbar = document.getElementById('cropToolbar');
+    if (cropToolbar) cropToolbar.style.display = 'none';
+    this.renderScoreView();
+  }
+
+  // --- DOTYKOVÝ ENGINE V HRANÍ ---
   initTouchEngine() {
     const box = this.canvasBox;
     if (!box) return;
@@ -540,7 +658,7 @@ class GuitarTrainer {
     let isDrag = false, isPan = false;
     let startPoint = null;
 
-    // Zabránění systémovému zoomu prohlížeče
+    // Zabránění systémovému zoomu celé HTML stránky
     box.addEventListener('touchstart', (e) => {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
@@ -577,8 +695,7 @@ class GuitarTrainer {
         return;
       }
 
-      // ... pokračuje stávající kód pro výběr boxu / zoom / pan
-
+      // 3. Režim Výběr/Posun/Zoom
       if (ongoingTouches.size === 1) {
         startPoint = { x: e.clientX, y: e.clientY };
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
@@ -595,7 +712,7 @@ class GuitarTrainer {
         isPan = true;
         box.setPointerCapture(e.pointerId);
       } else if (ongoingTouches.size === 2) {
-        isDrag = isPan = this.isDrawingStroke = false;
+        isDrag = isPan = this.isDrawingStroke = this.isErasingStroke = false;
         if (this.activeEditor) this.activeEditor.endDrag();
         if (this.cropEditor) this.cropEditor.endDrag();
         const t = Array.from(ongoingTouches.values());
@@ -611,11 +728,17 @@ class GuitarTrainer {
       const dy = e.clientY - prev.y;
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+      // Pohyb gumy
+      if (this.isErasingStroke) {
+        const c = this.screenToCanvasCoords(e.clientX, e.clientY);
+        this.eraseAt(c.x, c.y);
+        return;
+      }
+
       // Kreslení tahu
       if (this.isDrawingStroke && this.currentStroke) {
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
         this.currentStroke.points.push({ x: c.x, y: c.y });
-        // Živé vykreslení tahu
         if (this.scoreCtx) {
           this.scoreCtx.save();
           this.scoreCtx.strokeStyle = this.currentStroke.color;
@@ -634,13 +757,7 @@ class GuitarTrainer {
         return;
       }
 
-      // Pohyb gumy
-      if (this.isErasingStroke) {
-        const c = this.screenToCanvasCoords(e.clientX, e.clientY);
-        this.eraseAt(c.x, c.y);
-        return;
-      }
-
+      // Pinch zoom
       if (ongoingTouches.size === 2) {
         const t = Array.from(ongoingTouches.values());
         const dist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
@@ -670,6 +787,13 @@ class GuitarTrainer {
 
     const end = async (e) => {
       ongoingTouches.delete(e.pointerId);
+
+      if (this.isErasingStroke) {
+        this.isErasingStroke = false;
+        await this.persistCurrentScore();
+        return;
+      }
+
       if (this.isDrawingStroke && this.currentStroke) {
         this.isDrawingStroke = false;
         if (this.currentStroke.points.length > 1 && this.currentScore) {
@@ -681,12 +805,6 @@ class GuitarTrainer {
         }
         this.currentStroke = null;
         this.renderScoreView();
-        return;
-      }
-
-      if (this.isErasingStroke) {
-        this.isErasingStroke = false;
-        await this.persistCurrentScore();
         return;
       }
 
@@ -725,6 +843,7 @@ class GuitarTrainer {
     const c = this.screenToCanvasCoords(clientX, clientY);
     if (c.x < 0 || c.x > clean.width || c.y < 0 || c.y > clean.height) return;
 
+    // 1. Takt
     const clickedMeasure = (this.currentScore.measures || []).find(item => item.page === this.currentPage && c.x >= item.box.left && c.x <= item.box.left + item.box.width && c.y >= item.box.top && c.y <= item.box.top + item.box.height);
     if (clickedMeasure) {
       this.activeType = 'measure';
@@ -738,6 +857,7 @@ class GuitarTrainer {
       return;
     }
 
+    // 2. Klíč
     const clickedKey = (this.currentScore.keySignatures || []).find(item => item.page === this.currentPage && c.x >= item.box.left && c.x <= item.box.left + item.box.width && c.y >= item.box.top && c.y <= item.box.top + item.box.height);
     if (clickedKey) {
       this.activeType = 'keySig';
@@ -751,6 +871,7 @@ class GuitarTrainer {
       return;
     }
 
+    // 3. Nový rámeček
     this.activeType = 'new';
     this.editingId = null;
     const s = scanStaffAndBarlinesFromCanvas(clean, c.x, c.y);
@@ -914,6 +1035,113 @@ class GuitarTrainer {
     return sigs[0];
   }
 
+  // --- DOTYKOVÝ ENGINE V LABORATOŘI ---
+  initLabTouchEngine() {
+    if (!this.labCanvas) return;
+    const canvas = this.labCanvas;
+    let isLabDrawing = false;
+    let isLabErasing = false;
+    let currentLabStroke = null;
+
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+
+    canvas.addEventListener('pointerdown', e => {
+      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
+      if (!curM) return;
+
+      const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
+      if (!pageCoords) return;
+
+      canvas.setPointerCapture(e.pointerId);
+
+      if (this.editTool === 'eraser') {
+        isLabErasing = true;
+        this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
+        this.showMeasureInLab(this.labCurrentIndex);
+      } else {
+        isLabDrawing = true;
+        currentLabStroke = {
+          color: this.penColor,
+          width: this.penWidth,
+          points: [{ x: pageCoords.x, y: pageCoords.y }]
+        };
+      }
+    });
+
+    canvas.addEventListener('pointermove', e => {
+      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
+      if (!curM) return;
+
+      const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
+      if (!pageCoords) return;
+
+      if (isLabErasing) {
+        this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
+        this.showMeasureInLab(this.labCurrentIndex);
+        return;
+      }
+
+      if (isLabDrawing && currentLabStroke) {
+        currentLabStroke.points.push({ x: pageCoords.x, y: pageCoords.y });
+
+        // Živé vykreslení tahu do plátna lupy
+        if (this.labCtx) {
+          this.labCtx.save();
+          this.labCtx.strokeStyle = currentLabStroke.color;
+          this.labCtx.lineWidth = currentLabStroke.width;
+          this.labCtx.lineCap = 'round';
+          this.labCtx.lineJoin = 'round';
+          this.labCtx.translate(-curM.box.left, -curM.box.top);
+
+          const pts = currentLabStroke.points;
+          if (pts.length >= 2) {
+            this.labCtx.beginPath();
+            this.labCtx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
+            this.labCtx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+            this.labCtx.stroke();
+          }
+          this.labCtx.restore();
+        }
+      }
+    });
+
+    const finishLabPointer = async () => {
+      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
+      if (isLabDrawing && currentLabStroke && curM) {
+        isLabDrawing = false;
+        if (currentLabStroke.points.length > 1 && this.currentScore) {
+          const key = `page_${curM.page || 1}`;
+          if (!this.currentScore.drawings) this.currentScore.drawings = {};
+          if (!this.currentScore.drawings[key]) this.currentScore.drawings[key] = [];
+          this.currentScore.drawings[key].push(currentLabStroke);
+          await this.persistCurrentScore();
+        }
+        currentLabStroke = null;
+        this.showMeasureInLab(this.labCurrentIndex);
+      }
+      isLabErasing = false;
+    };
+
+    canvas.addEventListener('pointerup', finishLabPointer);
+    canvas.addEventListener('pointercancel', finishLabPointer);
+  }
+
+  labCanvasToPageCoords(clientX, clientY, curM) {
+    if (!this.labCanvas) return null;
+    const rect = this.labCanvas.getBoundingClientRect();
+    const scaleX = this.labCanvas.width / rect.width;
+    const scaleY = this.labCanvas.height / rect.height;
+
+    const localX = (clientX - rect.left) * scaleX;
+    const localY = (clientY - rect.top) * scaleY;
+
+    return {
+      x: Math.round(curM.box.left + localX),
+      y: Math.round(curM.box.top + localY)
+    };
+  }
+
   // --- LABORATOŘ ---
   updateLabBadge() {
     const c = (this.currentScore?.measures || []).length;
@@ -975,7 +1203,7 @@ class GuitarTrainer {
     const curM = measures[this.labCurrentIndex];
     if (ind) ind.innerText = `Takt #${curM.id}`;
 
-    // Klíč
+    // 1. Klíč & předznamenání
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
       const keyImg = await this.getPageImage(keySig.page || 1);
@@ -994,7 +1222,7 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // Takt
+    // 2. Výřez taktu
     const curImg = await this.getPageImage(curM.page || 1);
     if (!this.labCanvas || !this.labCtx || !curImg) return;
 
@@ -1009,13 +1237,7 @@ class GuitarTrainer {
       0, 0, curM.box.width, curM.box.height
     );
 
-    this.labCtx.drawImage(
-      curImg,
-      curM.box.left, curM.box.top, curM.box.width, curM.box.height,
-      0, 0, curM.box.width, curM.box.height
-    );
-
-    // Vykreslení připsaných značek (prstoklady, smyky, crescenda) přímo do výřezu taktu
+    // 3. Vykreslení připsaných poznámek v Laboratoři
     if (this.showAnnotations && this.currentScore?.drawings) {
       const pageKey = `page_${curM.page || 1}`;
       const strokes = this.currentScore.drawings[pageKey] || [];
@@ -1023,7 +1245,6 @@ class GuitarTrainer {
         this.labCtx.save();
         this.labCtx.lineCap = 'round';
         this.labCtx.lineJoin = 'round';
-        // Posun souřadnic přesně na pozici tohoto taktu
         this.labCtx.translate(-curM.box.left, -curM.box.top);
         strokes.forEach(stroke => {
           if (!stroke.points || stroke.points.length < 2) return;
@@ -1058,7 +1279,7 @@ class GuitarTrainer {
     }
   }
 
-  // --- STRÁNKOVÁNÍ ZA BĚHU ---
+  // --- STRÁNKOVÁNÍ ZA BĚHU S UCHOVÁNÍM ZOOMU A POZICE ---
   updatePageSwitcherUI() {
     const ind = document.getElementById('pageIndicator');
     if (ind) ind.innerText = `${this.currentPage}/${this.totalPages}`;
@@ -1074,6 +1295,8 @@ class GuitarTrainer {
     this.currentPage = t;
     this.updatePageSwitcherUI();
     this.resetActiveSelection();
+    
+    // Načteme novou stranu bez resetování zoomScale, panX a panY
     await this.renderCurrentPage();
     this.updateViewportTransform();
   }

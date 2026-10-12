@@ -170,32 +170,77 @@
   </div>
 
   <!-- 3. ZÁLOŽKA: LABORATOŘ -->
+  <!-- 3. ZÁLOŽKA: LABORATOŘ S EDITAČNÍMI PRVKY -->
   <div class="view-panel practice-panel" id="labView" style="display:none; padding:8px 6px;">
     
+    <!-- Fronta označených taktů -->
     <div class="lab-queue-wrap" id="labQueueWrap">
       <div class="lab-queue-pills" id="labQueuePills"></div>
     </div>
 
-    <!-- Hlavní cvičební plocha (v landscape se klíč řadí vedle not) -->
+    <!-- Hlavní cvičební plocha -->
     <div class="lab-main-display" id="labMainDisplay">
-      <!-- Čistý výřez klíče a předznamenání (bez textu) -->
+      <!-- Čistý výřez klíče a předznamenání -->
       <div class="lab-clef-box" id="labClefWrap" style="display:none;">
         <canvas id="labClefCanvas"></canvas>
       </div>
 
-      <!-- Hranatá lupa – kliknutím vlevo/vpravo se přepíná takt -->
+      <!-- Hranatá lupa pro takt -->
       <div class="rect-loupe-container">
-        <div class="rect-loupe-lens" id="rectLoupeLens" title="Klikněte vlevo pro předchozí takt, vpravo pro další takt">
+        <div class="rect-loupe-lens" id="rectLoupeLens">
           <canvas id="labCanvas"></canvas>
-          <div class="lab-tap-zone lab-tap-left" onclick="window.app.prevLabMeasure()"></div>
-          <div class="lab-tap-zone lab-tap-right" onclick="window.app.nextLabMeasure()"></div>
         </div>
       </div>
     </div>
 
-    <!-- Pruh s tlačítkem Zvládnuto umístěný POD procvičovaným taktem -->
+    <!-- EDITAČNÍ KRESLICÍ LIŠTA V LABORATOŘI -->
+    <div class="lab-draw-bar" id="labDrawBar">
+      <!-- Nástroje: Tužka vs Guma -->
+      <div class="draw-tool-group">
+        <button class="draw-tool-btn active" id="labToolPenBtn" onclick="window.app.setEditTool('pen')" title="Psát do not">✏️</button>
+        <button class="draw-tool-btn" id="labToolEraserBtn" onclick="window.app.setEditTool('eraser')" title="Guma na drobné opravy">🧹</button>
+      </div>
+
+      <div class="draw-separator"></div>
+
+      <!-- Barvy -->
+      <div class="draw-colors-group">
+        <button class="color-btn color-red active" id="labColorRed" onclick="window.app.setPenColor('#ef4444')" title="Červená"></button>
+        <button class="color-btn color-green" id="labColorGreen" onclick="window.app.setPenColor('#10b981')" title="Zelená"></button>
+        <button class="color-btn color-blue" id="labColorBlue" onclick="window.app.setPenColor('#3b82f6')" title="Modrá"></button>
+      </div>
+
+      <div class="draw-separator"></div>
+
+      <!-- 3 Tloušťky -->
+      <div class="draw-widths-group">
+        <button class="width-btn active" id="labWidthBtn1" onclick="window.app.setPenWidth(2, 1)" title="Tenká (prstoklad)">
+          <span class="dot-indicator dot-1"></span>
+        </button>
+        <button class="width-btn" id="labWidthBtn2" onclick="window.app.setPenWidth(4, 2)" title="Střední (smyky)">
+          <span class="dot-indicator dot-2"></span>
+        </button>
+        <button class="width-btn" id="labWidthBtn3" onclick="window.app.setPenWidth(7, 3)" title="Tlustá (dynamika)">
+          <span class="dot-indicator dot-3"></span>
+        </button>
+      </div>
+
+      <div class="draw-separator"></div>
+
+      <!-- Akce: Skrýt a Zpět -->
+      <div class="draw-action-group">
+        <button class="draw-tool-btn" id="labToggleDrawingsBtn" onclick="window.app.toggleDrawingsVisibility()" title="Zobrazit/Skrýt značky">👁️</button>
+        <button class="draw-tool-btn" onclick="window.app.undoLastDrawing()" title="Krok zpět">↩</button>
+      </div>
+    </div>
+
+    <!-- Akční lišta s navigací mezi takty a tlačítkem Zvládnuto -->
     <div class="lab-action-bar">
-      <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
+      <div class="lab-nav-group">
+        <button class="btn btn-sm" onclick="window.app.prevLabMeasure()" title="Předchozí takt">◀</button>
+        <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
+        <button class="btn btn-sm" onclick="window.app.nextLabMeasure()" title="Další takt">▶</button>
+      </div>
       <button class="btn btn-accent btn-sm" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">
         ✔ Zvládnuto
       </button>

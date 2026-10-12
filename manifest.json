@@ -1,14 +1,14 @@
 {
-  "id": "/Notovy-trenazer",
+  "id": "music-sheet-trainer-pwa",
   "name": "Notový Trenažér",
-  "short_name": "NotyPWA",
-  "description": "Cvičení skladeb po taktech z not a fotek",
+  "short_name": "Trenažér",
+  "description": "Cvičení taktů, mikro-drill a metronom pro hudebníky",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#121212",
-  "theme_color": "#18181b",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
   "icons": [
     {
       "src": "icon.svg",
