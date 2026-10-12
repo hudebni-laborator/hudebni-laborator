@@ -1,7 +1,5 @@
-// Globální instance dostupná pro inline handlery a modulární funkce
 window.app = new GuitarTrainer();
 
-// PŘEPÍNÁNÍ ZÁLOŽEK (KNIHOVNA | HRANÍ | LABORATOŘ)
 function switchMode(mode) {
   ['tabLibrary', 'tabEdit', 'tabLab'].forEach(id => {
     const t = document.getElementById(id);
@@ -13,13 +11,13 @@ function switchMode(mode) {
   });
   
   const metro = document.getElementById('dockedMetronome');
-  if (metro) metro.style.display = 'none';
-  window.app.stopMetronome();
 
   if (mode === 'library') {
     const t = document.getElementById('tabLibrary'); if (t) t.classList.add('active');
     const v = document.getElementById('libraryView'); if (v) v.style.display = 'flex';
     const ht = document.getElementById('headerSongTitle'); if (ht) ht.style.display = 'none';
+    if (metro) metro.style.display = 'none';
+    window.app.stopMetronome();
   } else if (mode === 'edit') {
     if (!window.app.currentScore) {
       alert('Nejprve vyberte skladbu.');
@@ -29,7 +27,11 @@ function switchMode(mode) {
     const v = document.getElementById('editView'); if (v) v.style.display = 'flex';
     window.app.updateHeaderTitle();
     window.app.renderScoreView();
-    setTimeout(() => window.app.fitCanvasToScreen(), 20);
+    // Metronom je ve spodní liště k dispozici
+    if (metro) metro.style.display = 'none';
+    setTimeout(() => {
+      if (!window.app.hasUserAdjustedView) window.app.fitCanvasToScreen();
+    }, 20);
   } else if (mode === 'lab') {
     if (!window.app.currentScore) {
       alert('Nejprve vyberte skladbu.');
@@ -47,7 +49,7 @@ function switchMode(mode) {
 
 window.switchMode = switchMode;
 
-// OBSLUHA NAHRÁVÁNÍ SOUBORŮ A FOCENÍ
+// Nahrávání
 const cameraInput = document.getElementById('cameraInput');
 if (cameraInput) {
   cameraInput.addEventListener('change', async e => {

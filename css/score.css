@@ -1,5 +1,5 @@
 /* ======================================================== */
-/* 2. HRANÍ, ZNAČKOVÁNÍ & PLÁTNO NOT                        */
+/* HRANÍ, ZNAČKOVÁNÍ & SPOLEČNÉ PLÁTNO                      */
 /* ======================================================== */
 
 .play-fullscreen-panel {
@@ -14,11 +14,11 @@
   position: relative;
 }
 
-/* Plátno vyplní celou výšku mezi záhlavím a spodním pruhem */
+/* Plátno vyplní celou výšku nad spodní lištou */
 .canvas-box.play-canvas-box {
   flex: 1 1 auto;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 50px);
   background: #0d0d10;
   border: none;
   border-radius: 0;
@@ -59,12 +59,14 @@ canvas#scoreCanvas {
 .zone-right { right: 0; }
 
 /* ======================================================== */
-/* NEVYSOKÝ SPODNÍ PRUH PŘIPEVNĚNÝ K DOLNÍMU OKRAJI         */
+/* PŘILEPENÁ SPODNÍ LIŠTA K DOLNÍMU OKRAJI                  */
 /* ======================================================== */
 .docked-play-bar {
-  flex: 0 0 auto;
-  width: 100%;
-  height: 48px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
   background: rgba(18, 18, 24, 0.96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -89,10 +91,10 @@ canvas#scoreCanvas {
 }
 
 .compact-page-switcher .page-indicator {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 800;
   color: var(--text);
-  min-width: 40px;
+  min-width: 38px;
   text-align: center;
 }
 
@@ -102,12 +104,21 @@ canvas#scoreCanvas {
   color: var(--text);
   cursor: pointer;
   font-size: 0.8rem;
-  padding: 3px 6px;
+  padding: 4px 6px;
   border-radius: 4px;
 }
 
-.compact-page-switcher .page-btn:disabled {
-  opacity: 0.3;
+.metro-toggle-btn {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fde047;
+  font-size: 0.95rem;
+  padding: 4px 10px;
+}
+.metro-toggle-btn.active {
+  background: #f59e0b;
+  color: #000;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
 }
 
 /* Plovoucí editační lišta rámečku */
@@ -137,7 +148,6 @@ canvas#scoreCanvas {
 }
 .size-btn:active { background: var(--primary); color: #fff; }
 
-/* Plovoucí lupa při manuálním posunu táhla */
 .touch-loupe {
   position: fixed;
   width: 130px;
@@ -155,12 +165,38 @@ canvas#scoreCanvas {
 .touch-loupe canvas { width: 100%; height: 100%; display: block; }
 
 /* ======================================================== */
-/* STAV CELÉ OBRAZOVKY (FULLSCREEN)                         */
+/* FULLSCREEN: SKRÝT LIŠTY, PONECHAT POUZE NÁVRATOVÉ TLAČÍTKO*/
 /* ======================================================== */
-body.is-fullscreen header {
+.floating-exit-btn {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  background: rgba(18, 18, 24, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #f4f4f5;
+  padding: 5px 18px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+}
+
+body.is-fullscreen header,
+body.is-fullscreen .docked-play-bar {
   display: none !important;
 }
 
-body.is-fullscreen .play-fullscreen-panel {
+body.is-fullscreen .play-fullscreen-panel,
+body.is-fullscreen .canvas-box.play-canvas-box {
   height: 100vh !important;
+}
+
+body.is-fullscreen .floating-exit-btn {
+  display: inline-flex;
 }

@@ -1,73 +1,49 @@
-/* 3. LABORATOŘ */
-.lab-header-banner {
-  width: 100%;
-  background: linear-gradient(135deg, rgba(35, 25, 55, 0.9) 0%, rgba(20, 18, 30, 0.95) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.35);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  margin-bottom: 6px;
-}
-.lab-title-wrap { display: flex; flex-direction: column; gap: 2px; }
-.lab-badge { font-size: 0.65rem; color: #c4b5fd; font-weight: 800; letter-spacing: 0.05em; }
-.lab-heading { font-size: 0.95rem; font-weight: 800; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+/* ======================================================== */
+/* 3. LABORATOŘ: OPTICKÁ LUPA, ČISTÝ KLÍČ & LANDSCAPE       */
+/* ======================================================== */
 
 .lab-queue-wrap {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
   overflow-x: auto;
-  padding: 4px 0 8px 0;
+  padding: 4px 0 6px 0;
 }
-.lab-queue-label { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; }
 .lab-queue-pills { display: flex; gap: 5px; overflow-x: auto; }
 .queue-pill {
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.4);
   color: #fca5a5;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
 }
 .queue-pill.active { background: #ef4444; color: #ffffff; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
 
-/* Proužek s klíčem a předznamenáním v Laboratoři */
-.lab-clef-container {
+/* Uspořádání hlavní plochy v Laboratoři */
+.lab-main-display {
   width: 100%;
-  background: #18181f;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-radius: var(--radius-md);
-  padding: 4px 10px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
-.lab-clef-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #fde047;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.lab-clef-canvas-box {
+
+/* Čistý výřez klíče bez textových popisků */
+.lab-clef-box {
   background: #ffffff;
-  border-radius: 4px;
-  padding: 2px 4px;
-  display: flex;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 6px;
+  padding: 2px 6px;
+  display: inline-flex;
   align-items: center;
-  max-height: 44px;
-  overflow: hidden;
+  align-self: flex-start;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
-.lab-clef-canvas-box canvas {
-  height: 40px;
+.lab-clef-box canvas {
+  height: 38px;
   width: auto;
   display: block;
 }
@@ -77,47 +53,23 @@
   width: 100%;
   background: #ffffff;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(139, 92, 246, 0.4);
+  border: 1.5px solid rgba(139, 92, 246, 0.45);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
-.rect-loupe-header {
-  background: rgba(20, 20, 28, 0.95);
-  border-bottom: 1px solid rgba(139, 92, 246, 0.3);
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.loupe-reticle-dot { width: 8px; height: 8px; border-radius: 50%; background: #a78bfa; box-shadow: 0 0 8px #8b5cf6; }
-.loupe-optic-label { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; color: #e9d5ff; text-transform: uppercase; }
-
-.context-toggle-group { display: flex; gap: 4px; }
-.ctx-btn {
-  background: var(--surface-elevated);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.ctx-btn.active { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff; border-color: #a78bfa; }
 
 .rect-loupe-lens {
   position: relative;
   background: #ffffff;
-  min-height: 160px;
-  max-height: 48vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 140px;
+  max-height: 44vh;
+  overflow: hidden;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
 }
+
 .rect-loupe-lens canvas {
   width: 100% !important;
   height: auto !important;
@@ -125,44 +77,83 @@
   image-rendering: -webkit-optimize-contrast;
 }
 
+/* Neviditelné zóny vlevo a vpravo pro přepínání taktů klepnutím na noty */
+.lab-tap-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  z-index: 10;
+  cursor: pointer;
+}
+.lab-tap-left { left: 0; }
+.lab-tap-right { right: 0; }
+
+/* Pruh s tlačítkem Zvládnuto umístěný POD taktem */
+.lab-action-bar {
+  width: 100%;
+  background: rgba(24, 24, 28, 0.95);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.lab-measure-indicator {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #c4b5fd;
+}
+
 /* ======================================================== */
-/* LANDSCAPE REŽIM PRO MOBIL V LABORATOŘI                   */
+/* LANDSCAPE OPTIMALIZACE PRO LABORATOŘ                    */
 /* ======================================================== */
 @media (orientation: landscape) and (max-height: 520px) {
-  header {
+  header, .lab-queue-wrap {
     display: none !important;
   }
 
   #labView {
-    padding: 2px 6px !important;
+    padding: 4px !important;
     max-width: 100vw !important;
   }
 
-  /* Skryjeme textové záhlaví a frontu, ať nezabírají drahocennou vertikální výšku */
-  .lab-header-banner,
-  .lab-queue-wrap {
-    display: none !important;
+  /* Klíč se v landscape umístí vlevo vedle taktu */
+  .lab-main-display {
+    flex-direction: row !important;
+    align-items: stretch !important;
+    height: calc(100vh - 54px) !important;
   }
 
-  .lab-clef-container {
-    padding: 2px 8px;
-    margin-bottom: 4px;
+  .lab-clef-box {
+    align-self: center !important;
+    max-height: 100% !important;
   }
 
-  .rect-loupe-header {
-    padding: 3px 8px;
+  .lab-clef-box canvas {
+    height: 60px !important;
   }
 
-  /* Lupa se roztáhne přes celou dostupnou výšku displeje na šířku */
+  .rect-loupe-container {
+    flex: 1 1 auto;
+    height: 100% !important;
+  }
+
   .rect-loupe-lens {
-    min-height: unset !important;
-    height: calc(100vh - 65px) !important;
-    max-height: calc(100vh - 65px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
 
   .rect-loupe-lens canvas {
     max-height: 100%;
-    width: 100% !important;
+    width: auto !important;
     object-fit: contain;
+  }
+
+  .lab-action-bar {
+    padding: 4px 10px !important;
+    margin-top: 4px !important;
   }
 }

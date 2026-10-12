@@ -9,7 +9,6 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   
-  <!-- Modulární CSS -->
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/score.css">
   <link rel="stylesheet" href="css/lab.css">
@@ -24,7 +23,6 @@
     <div class="brand">
       <img src="icon.svg" alt="Logo" class="brand-icon">
       <div class="app-title">Notový Trenažér</div>
-      <!-- Název skladby pro režim Hraní -->
       <div class="header-song-title" id="headerSongTitle" style="display:none;"></div>
     </div>
     
@@ -52,7 +50,7 @@
   <!-- 2. ZÁLOŽKA: HRANÍ & ZNAČKOVÁNÍ -->
   <div class="view-panel play-fullscreen-panel" id="editView" style="display:none; padding:0;">
     
-    <!-- Ořezová lišta papíru (zobrazí se pouze při aktivním ořezu) -->
+    <!-- Ořezová lišta papíru -->
     <div class="toolbar crop-toolbar" id="cropToolbar" style="display:none; width:100%;">
       <span style="font-weight:600; font-size:0.85rem; color:#93c5fd;">✂ Nastavte okraje not</span>
       <div style="margin-left:auto; display:flex; gap:6px;">
@@ -61,14 +59,15 @@
       </div>
     </div>
 
-    <!-- Plovoucí editační lišta pro označený takt nebo klíč -->
+    <!-- Plovoucí editační lišta s tlačítkem Zrušit (Escape) -->
     <div class="edit-subbar" id="editSubbar" style="display:none;">
       <div style="display:flex; justify-content:space-between; width:100%; flex-wrap:wrap; gap:6px;">
-        <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:6px; align-items:center;">
           <button id="addMeasureBtn" class="btn btn-accent btn-sm" onclick="window.app.saveCurrentMeasure()">✔ Uložit takt</button>
           <button id="setKeySigBtn" class="btn btn-gold btn-sm" onclick="window.app.saveCurrentAsKeySignature()">🎼 Uložit jako Klíč</button>
           <button id="toggleCategoryBtn" class="btn btn-sm" style="display:none;" onclick="window.app.toggleActiveCategory()">🔄 Změnit</button>
           <button id="deleteActiveBoxBtn" class="btn btn-danger btn-sm" style="display:none;" onclick="window.app.deleteActiveBox()">🗑 Smazat</button>
+          <button class="btn btn-sm" onclick="window.app.resetActiveSelection()" title="Zrušit výběr bez uložení (Esc)">✖ Zrušit</button>
         </div>
         <div style="display:flex; gap:6px;">
           <button class="size-btn" onclick="window.app.expandMeasure('left')">◀ +1</button>
@@ -82,15 +81,19 @@
       <div class="canvas-viewport" id="canvasViewport">
         <canvas id="scoreCanvas"></canvas>
       </div>
-      <!-- Dotykové zóny aktivní v režimu listování -->
+      <!-- Plovoucí tlačítko návratu z celé obrazovky -->
+      <button class="floating-exit-btn" id="exitFullscreenBtn" onclick="window.app.toggleFullscreen()" title="Ukončit celou obrazovku">
+        ⛶ Zpět
+      </button>
+      <!-- Zóny pro otáčení stran -->
       <div class="page-turn-zone zone-left" id="zoneLeft" onclick="window.app.changePage(-1)"></div>
       <div class="page-turn-zone zone-right" id="zoneRight" onclick="window.app.changePage(1)"></div>
     </div>
 
-    <!-- NEVYSOKÝ SPODNÍ PRUH PŘIPEVNĚNÝ K DOLNÍMU OKRAJI -->
+    <!-- PŘILEPENÁ SPODNÍ LIŠTA V HRANÍ -->
     <div class="docked-play-bar" id="dockedPlayBar">
       <button class="btn btn-accent btn-sm" id="toggleInteractionBtn" onclick="window.app.toggleInteractionMode()">
-        📖 Hraní (listování)
+        📖 Hraní
       </button>
 
       <div class="page-switcher compact-page-switcher" id="pageSwitcher">
@@ -98,6 +101,11 @@
         <span class="page-indicator" id="pageIndicator">1/1</span>
         <button class="page-btn" id="nextPageBtn" onclick="window.app.changePage(1)">▶</button>
       </div>
+
+      <!-- Spouštěč metronomu přímo v Hraní -->
+      <button class="btn btn-sm metro-toggle-btn" id="playMetroBtn" onclick="window.app.toggleIncrementalMetronome()" title="Spustit / Zastavit metronom">
+        <span id="playMetroIcon">⏱</span>
+      </button>
 
       <button class="btn btn-fit btn-sm" id="fullscreenToggleBtn" onclick="window.app.toggleFullscreen()">
         ⛶ Celá obrazovka
@@ -108,49 +116,40 @@
     </div>
   </div>
 
-  <!-- 3. ZÁLOŽKA: LABORATOŘ S LOUPOU A KLÍČEM -->
-  <div class="view-panel practice-panel" id="labView" style="display:none; padding:10px 8px;">
-    <div class="lab-header-banner">
-      <div class="lab-title-wrap">
-        <span class="lab-badge">🔬 MIKRO-DRILL</span>
-        <span class="lab-heading" id="labSongTitle">Není vybráno</span>
-      </div>
-      <button class="btn btn-accent btn-sm" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">✔ Zvládnuto</button>
-    </div>
-
+  <!-- 3. ZÁLOŽKA: LABORATOŘ -->
+  <div class="view-panel practice-panel" id="labView" style="display:none; padding:8px 6px;">
+    
     <div class="lab-queue-wrap" id="labQueueWrap">
-      <span class="lab-queue-label">Označené:</span>
       <div class="lab-queue-pills" id="labQueuePills"></div>
     </div>
 
-    <!-- Klíč & předznamenání -->
-    <div class="lab-clef-container" id="labClefWrap" style="display:none;">
-      <span class="lab-clef-label">Klíč:</span>
-      <div class="lab-clef-canvas-box">
+    <!-- Hlavní cvičební plocha (v landscape se klíč řadí vedle not) -->
+    <div class="lab-main-display" id="labMainDisplay">
+      <!-- Čistý výřez klíče a předznamenání (bez textu) -->
+      <div class="lab-clef-box" id="labClefWrap" style="display:none;">
         <canvas id="labClefCanvas"></canvas>
+      </div>
+
+      <!-- Hranatá lupa – kliknutím vlevo/vpravo se přepíná takt -->
+      <div class="rect-loupe-container">
+        <div class="rect-loupe-lens" id="rectLoupeLens" title="Klikněte vlevo pro předchozí takt, vpravo pro další takt">
+          <canvas id="labCanvas"></canvas>
+          <div class="lab-tap-zone lab-tap-left" onclick="window.app.prevLabMeasure()"></div>
+          <div class="lab-tap-zone lab-tap-right" onclick="window.app.nextLabMeasure()"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Hranatá optická lupa -->
-    <div class="rect-loupe-container">
-      <div class="rect-loupe-header">
-        <div class="loupe-reticle-dot"></div>
-        <span class="loupe-optic-label" id="loupeOpticLabel">LUPA • TAKT #1</span>
-        
-        <div class="context-toggle-group" style="margin-left:auto;">
-          <button class="ctx-btn active" id="ctxSolo" onclick="window.app.setLabContext('solo')">Označené</button>
-          <button class="ctx-btn" id="ctxBefore" onclick="window.app.setLabContext('before')">+ Před</button>
-          <button class="ctx-btn" id="ctxAfter" onclick="window.app.setLabContext('after')">+ Za</button>
-        </div>
-      </div>
-
-      <div class="rect-loupe-lens" id="rectLoupeLens">
-        <canvas id="labCanvas"></canvas>
-      </div>
+    <!-- Pruh s tlačítkem Zvládnuto umístěný POD procvičovaným taktem -->
+    <div class="lab-action-bar">
+      <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
+      <button class="btn btn-accent btn-sm" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">
+        ✔ Zvládnuto
+      </button>
     </div>
   </div>
 
-  <!-- DOKOVACÍ METRONOM (V LABORATOŘI) -->
+  <!-- METRONOM (VYSOUVACÍ NEBO DOKOVANÝ) -->
   <div class="docked-metronome" id="dockedMetronome" style="display:none;">
     <div class="metro-header-row">
       <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
@@ -200,7 +199,6 @@
     <canvas id="loupeCanvas" width="130" height="130"></canvas>
   </div>
 
-  <!-- Skripty -->
   <script src="src/wakeLock.js"></script>
   <script src="src/db.js"></script>
   <script src="src/scanner.js"></script>
