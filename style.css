@@ -626,19 +626,6 @@ canvas#scoreCanvas {
   image-rendering: -webkit-optimize-contrast;
 }
 
-.tap-hint {
-  position: absolute;
-  bottom: 8px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.45);
-  pointer-events: none;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-}
-
 .compact-btn {
   padding: 6px 12px;
   font-size: 0.82rem;
