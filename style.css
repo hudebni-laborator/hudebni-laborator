@@ -1,7 +1,7 @@
 :root {
   --bg: #09090b;
   --bg-subtle: #111115;
-  --surface: rgba(24, 24, 27, 0.85);
+  --surface: rgba(24, 24, 27, 0.88);
   --surface-solid: #18181b;
   --surface-elevated: #202025;
   --surface-hover: #27272e;
@@ -58,6 +58,7 @@ header {
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -117,7 +118,7 @@ header {
   transform: scale(0.97);
 }
 
-/* Barevná stylizace záložek */
+/* Barevné tóny záložek */
 .tab-lib {
   background: rgba(59, 130, 246, 0.08);
   color: #93c5fd;
@@ -160,7 +161,7 @@ header {
 .active-file-banner {
   background: rgba(24, 24, 27, 0.6);
   border-bottom: 1px solid var(--border);
-  padding: 5px 12px;
+  padding: 6px 12px;
   font-size: 0.78rem;
   display: flex;
   align-items: center;
@@ -171,9 +172,9 @@ header {
 
 .active-file-banner span.label {
   color: var(--text-dim);
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   letter-spacing: 0.05em;
 }
 
@@ -182,7 +183,7 @@ header {
   color: #f4f4f5;
 }
 
-/* VÝRAZNÝ ŠTÍTEK SKLADBY V REŽIMU CVIČENÍ */
+/* ŠTÍTEK NÁZVU VE CVIČENÍ */
 .practice-song-highlight {
   width: 100%;
   background: linear-gradient(135deg, rgba(39, 39, 42, 0.9) 0%, rgba(24, 24, 27, 0.9) 100%);
@@ -213,6 +214,7 @@ header {
   flex-wrap: wrap;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  width: 100%;
 }
 
 .compact-toolbar {
@@ -238,6 +240,8 @@ header {
   gap: 6px;
   transition: all 0.15s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .btn:active {
@@ -327,7 +331,7 @@ header {
   cursor: not-allowed;
 }
 
-/* Lišta pro úpravu rozměrů rámečku */
+/* Lišta jemných úprav rámečku */
 .edit-subbar {
   display: flex;
   align-items: center;
@@ -394,10 +398,11 @@ header {
 }
 
 .practice-panel {
-  padding-bottom: 120px; /* Rezerva pro dokovací metronom */
+  /* Bezpečná rezerva pro metronom včetně gesture baru na Androidu/iOS */
+  padding-bottom: calc(125px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Knihovna skladeb */
+/* Knihovna skladeb (s ochranou proti přetečení dlouhého názvu) */
 .library-container {
   width: 100%;
   background: var(--surface-solid);
@@ -437,6 +442,7 @@ header {
   border: 1px solid var(--border);
   cursor: pointer;
   transition: all 0.15s ease;
+  gap: 12px;
 }
 
 .library-item:hover, .library-item.active {
@@ -448,12 +454,18 @@ header {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .library-name {
   font-weight: 700;
   font-size: 0.92rem;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .library-meta {
@@ -461,10 +473,16 @@ header {
   color: var(--text-dim);
 }
 
+.library-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 /* Plátno se zoomem a posuvem */
 .canvas-box {
   width: 100%;
-  height: 72vh;
+  height: 70vh;
   background: #0d0d10;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -480,6 +498,13 @@ header {
   left: 0;
   transform-origin: 0 0;
   will-change: transform;
+}
+
+/* Ochrana proti systémovému kontextovému menu na plátně */
+canvas {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 canvas#scoreCanvas {
@@ -582,20 +607,23 @@ canvas#scoreCanvas {
   width: 100%;
   background: #ffffff;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  min-height: 180px;
-  max-height: 48vh;
+  min-height: 140px;
+  max-height: 52vh;
   cursor: pointer;
   position: relative;
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Noty se roztáhnou přes celou šířku displeje mobilu */
 .practice-display canvas {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .tap-hint {
@@ -608,7 +636,7 @@ canvas#scoreCanvas {
   background: rgba(255, 255, 255, 0.9);
   padding: 3px 8px;
   border-radius: var(--radius-full);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .compact-btn {
@@ -654,13 +682,13 @@ canvas#scoreCanvas {
   width: 100%;
   max-width: 950px;
   margin: 0 auto;
-  background: rgba(18, 18, 22, 0.92);
+  background: rgba(18, 18, 22, 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.8);
   padding: 8px 12px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -676,7 +704,7 @@ canvas#scoreCanvas {
   gap: 8px;
 }
 
-/* KRUHOVÝ TRANSPORT OVLADAČ */
+/* Kruhový transportní ovladač */
 .metro-circle-btn {
   width: 44px;
   height: 44px;
@@ -753,7 +781,7 @@ canvas#scoreCanvas {
   font-weight: 600;
 }
 
-/* LED DIODY DOB */
+/* LED diody dob */
 .metro-beat-lights {
   display: flex;
   gap: 5px;
@@ -783,10 +811,10 @@ canvas#scoreCanvas {
   box-shadow: 0 0 8px #10b981;
 }
 
-/* ŘÁDEK S POLÍČKY METRONOMU */
+/* OPRAVA: align-items: flex-end srovná tlačítko Reset přesně na linku inputů */
 .metro-controls-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 4px;
   width: 100%;
@@ -797,22 +825,26 @@ canvas#scoreCanvas {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  flex: 1 1 0;
+  min-width: 36px;
+  max-width: 46px;
 }
 
 .metro-lbl {
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   color: var(--text-dim);
   text-transform: uppercase;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .metro-input {
-  width: 44px;
+  width: 100%;
   height: 28px;
   padding: 0;
   text-align: center;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 800;
   background: var(--surface-elevated);
   border: 1px solid var(--border);
@@ -827,7 +859,7 @@ canvas#scoreCanvas {
   box-shadow: 0 0 8px var(--primary-glow);
 }
 
-/* Skrytí nativních šipek inputu number */
+/* Skrytí šipek inputu number */
 .metro-input::-webkit-outer-spin-button,
 .metro-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -837,10 +869,13 @@ canvas#scoreCanvas {
   -moz-appearance: textfield;
 }
 
+/* OPRAVA: Odstraněn vadný margin-top: 12px; tlačítko sedí dokonale na stejné lince */
 .metro-reset-btn {
-  padding: 5px 10px;
-  font-size: 0.82rem;
+  padding: 0 8px;
+  font-size: 0.78rem;
   font-weight: 700;
   height: 28px;
-  margin-top: 12px;
+  margin-top: 0;
+  flex-shrink: 0;
+  align-self: flex-end;
 }

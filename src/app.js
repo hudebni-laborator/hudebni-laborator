@@ -598,7 +598,7 @@ class GuitarTrainer {
     this.audioCtx = null;
     this.isMetroRunning = false;
     this.metroCurrentBpm = 60;
-    this.metroPhase = 'idle'; // 'idle', 'leadin', 'playing', 'goal'
+    this.metroPhase = 'idle';
     this.metroBeatIndex = 0;
     this.metroMeasureIndexInCycle = 0;
     this.metroNextBeatTime = 0;
@@ -669,11 +669,10 @@ class GuitarTrainer {
     const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
     this.metroCurrentBpm = startBpm;
     this.isMetroRunning = true;
-    this.metroPhase = 'leadin'; // Startuje s přípravným taktem
+    this.metroPhase = 'leadin';
     this.metroBeatIndex = 0;
     this.metroMeasureIndexInCycle = 0;
 
-    // Aktualizujeme texty BPM, ale kruh se barevně přepne až PŘESNĚ s 1. dobou
     const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
     const stepBpm = Number(document.getElementById('metroStepBpm')?.value) || 2;
     const curText = document.getElementById('metroCurrentBpmText');
@@ -729,7 +728,6 @@ class GuitarTrainer {
       if (!this.isMetroRunning) return;
       this.renderBeatLight(scheduledBeat, beatsPerBar, scheduledPhase);
 
-      // ZMĚNA BARVY KRUHU NASTÁVÁ PŘESNĚ S PRVNÍ DOBOU DANÉHO REŽIMU
       if (scheduledBeat === 0) {
         this.updateCircleUI(scheduledPhase);
         const curText = document.getElementById('metroCurrentBpmText');
@@ -753,7 +751,6 @@ class GuitarTrainer {
       this.metroBeatIndex = 0;
 
       if (this.metroPhase === 'leadin') {
-        // Po přípravném taktu přechází do hraní (zelená naskočí s 1. dobou hraní)
         this.metroPhase = 'playing';
         this.metroMeasureIndexInCycle = 0;
       } else if (this.metroPhase === 'playing') {
@@ -762,7 +759,7 @@ class GuitarTrainer {
         if (this.metroMeasureIndexInCycle >= barsCountToPlay) {
           if (this.metroCurrentBpm < targetBpm) {
             this.metroCurrentBpm = Math.min(targetBpm, this.metroCurrentBpm + stepBpm);
-            this.metroPhase = 'leadin'; // Nové tempo zahájí příprava (oranžová s 1. dobou přípravy)
+            this.metroPhase = 'leadin';
           } else {
             this.metroPhase = 'goal';
           }
@@ -772,7 +769,6 @@ class GuitarTrainer {
     }
   }
 
-  // Přepínání stylů kruhového indikátoru
   updateCircleUI(phase) {
     const circleBtn = document.getElementById('metroCircleBtn');
     const circleIcon = document.getElementById('metroCircleIcon');
@@ -780,13 +776,13 @@ class GuitarTrainer {
 
     circleBtn.className = 'metro-circle-btn';
     if (phase === 'idle') {
-      circleBtn.classList.add('circle-idle'); // Červená s ikonou play
+      circleBtn.classList.add('circle-idle');
       circleIcon.innerText = '▶';
     } else if (phase === 'leadin') {
-      circleBtn.classList.add('circle-leadin'); // Oranžová s pauzou
+      circleBtn.classList.add('circle-leadin');
       circleIcon.innerText = '⏸';
     } else if (phase === 'playing') {
-      circleBtn.classList.add('circle-playing'); // Zelená s pauzou
+      circleBtn.classList.add('circle-playing');
       circleIcon.innerText = '⏸';
     } else if (phase === 'goal') {
       circleBtn.classList.add('circle-playing');
@@ -1013,7 +1009,6 @@ class GuitarTrainer {
 
     if (clickX < 0 || clickX > cleanCanvas.width || clickY < 0 || clickY > cleanCanvas.height) return;
 
-    // 1. Klepnutí do existujícího uloženého TAKTU
     const measures = this.currentScore.measures || [];
     const clickedMeasure = measures.find(m => {
       if ((m.page || 1) !== this.currentPage) return false;
@@ -1042,7 +1037,6 @@ class GuitarTrainer {
       return;
     }
 
-    // 2. Klepnutí do existujícího uloženého KLÍČE
     const keySigs = this.currentScore.keySignatures || [];
     const clickedKeySig = keySigs.find(k => {
       if ((k.page || 1) !== this.currentPage) return false;
@@ -1071,7 +1065,6 @@ class GuitarTrainer {
       return;
     }
 
-    // 3. Nový výběr podle osnovy
     this.activeType = 'new';
     this.editingId = null;
 
@@ -1762,14 +1755,14 @@ class GuitarTrainer {
     if (loopFrom && Number(loopFrom.value) < 1) loopFrom.value = 1;
   }
 
- renderScoreView() {
+  renderScoreView() {
     const pageCanvas = this.pageCache.get(this.currentPage);
     if (!pageCanvas) return;
 
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
     this.scoreCtx.drawImage(pageCanvas, 0, 0);
 
-    // 1. Klíče a předznamenání (Zlatý akcent)
+    // 1. Klíče a předznamenání
     if (this.currentScore && this.currentScore.keySignatures) {
       this.currentScore.keySignatures.forEach((k) => {
         if ((k.page || 1) !== this.currentPage) return;
@@ -1790,7 +1783,7 @@ class GuitarTrainer {
       });
     }
 
-    // 2. Takty (Smaragdový akcent)
+    // 2. Takty
     if (this.currentScore && this.currentScore.measures) {
       this.currentScore.measures.forEach((m) => {
         if ((m.page || 1) !== this.currentPage) return;
@@ -1880,7 +1873,7 @@ class GuitarTrainer {
       if (clefBanner) clefBanner.style.display = 'none';
     }
 
-    // 2. Takty pod sebou
+    // 2. Příprava taktů k zobrazení přes celou šířku obrazovky
     let measuresToStack = [];
     if (this.stackCount === 'loop') {
       const loopFrom = Math.max(1, Math.min(count, Number(document.getElementById('loopFrom')?.value) || 1)) - 1;
@@ -1896,38 +1889,56 @@ class GuitarTrainer {
       }
     }
 
-    let maxWidth = 0;
     const renderedImages = [];
     for (const m of measuresToStack) {
       const pImg = await this.getPageImage(m.page || 1);
       renderedImages.push({ m, pImg });
-      if (m.box.width > maxWidth) maxWidth = m.box.width;
     }
-    if (maxWidth < 200) maxWidth = 200;
 
-    const rowSpacing = 16;
-    let totalCanvasHeight = 0;
-
-    renderedImages.forEach(item => {
-      totalCanvasHeight += item.m.box.height + rowSpacing;
-    });
-
-    this.practiceCanvas.width = maxWidth;
-    this.practiceCanvas.height = Math.max(160, totalCanvasHeight);
-    this.practiceCtx.fillStyle = '#ffffff';
-    this.practiceCtx.fillRect(0, 0, this.practiceCanvas.width, this.practiceCanvas.height);
-
-    let currentY = 8;
-    renderedImages.forEach(({ m, pImg }) => {
+    if (renderedImages.length === 1) {
+      // 1 takt: Plný přesný poměr bez umělých bílých okrajů (roztáhne se na 100 % šířky)
+      const { m, pImg } = renderedImages[0];
+      this.practiceCanvas.width = m.box.width;
+      this.practiceCanvas.height = m.box.height;
       if (pImg) {
         this.practiceCtx.drawImage(
           pImg,
           m.box.left, m.box.top, m.box.width, m.box.height,
-          0, currentY, m.box.width, m.box.height
+          0, 0, m.box.width, m.box.height
         );
       }
-      currentY += m.box.height + rowSpacing;
-    });
+    } else {
+      // Více taktů: Srovnání na maximální šířku pro shodné roztažení
+      let maxWidth = 0;
+      for (const item of renderedImages) {
+        if (item.m.box.width > maxWidth) maxWidth = item.m.box.width;
+      }
+      const rowSpacing = 12;
+      let totalH = 0;
+      const rows = renderedImages.map(item => {
+        const scale = maxWidth / item.m.box.width;
+        const rowH = Math.round(item.m.box.height * scale);
+        const y = totalH;
+        totalH += rowH + rowSpacing;
+        return { ...item, y, rowH };
+      });
+      totalH -= rowSpacing;
+
+      this.practiceCanvas.width = maxWidth;
+      this.practiceCanvas.height = Math.max(10, totalH);
+      this.practiceCtx.fillStyle = '#ffffff';
+      this.practiceCtx.fillRect(0, 0, this.practiceCanvas.width, this.practiceCanvas.height);
+
+      rows.forEach(({ m, pImg, y, rowH }) => {
+        if (pImg) {
+          this.practiceCtx.drawImage(
+            pImg,
+            m.box.left, m.box.top, m.box.width, m.box.height,
+            0, y, maxWidth, rowH
+          );
+        }
+      });
+    }
 
     const pageStr = this.totalPages > 1 ? ` (strana ${targetPage})` : '';
     const titleEl = document.getElementById('practiceMeasureTitle');
