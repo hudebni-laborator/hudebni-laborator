@@ -27,7 +27,6 @@ function switchMode(mode) {
     const v = document.getElementById('editView'); if (v) v.style.display = 'flex';
     window.app.updateHeaderTitle();
     window.app.renderScoreView();
-    // Metronom je ve spodní liště k dispozici
     if (metro) metro.style.display = 'none';
     setTimeout(() => {
       if (!window.app.hasUserAdjustedView) window.app.fitCanvasToScreen();
