@@ -1,0 +1,126 @@
+/* 3. LABORATOŘ */
+.lab-header-banner {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(35, 25, 55, 0.9) 0%, rgba(20, 18, 30, 0.95) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  margin-bottom: 6px;
+}
+.lab-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+.lab-badge { font-size: 0.65rem; color: #c4b5fd; font-weight: 800; letter-spacing: 0.05em; }
+.lab-heading { font-size: 0.95rem; font-weight: 800; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+
+.lab-queue-wrap {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 8px 0;
+}
+.lab-queue-label { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; }
+.lab-queue-pills { display: flex; gap: 5px; overflow-x: auto; }
+.queue-pill {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.queue-pill.active { background: #ef4444; color: #ffffff; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+
+/* Proužek s klíčem a předznamenáním v Laboratoři */
+.lab-clef-container {
+  width: 100%;
+  background: #18181f;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.lab-clef-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fde047;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lab-clef-canvas-box {
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  max-height: 44px;
+  overflow: hidden;
+}
+.lab-clef-canvas-box canvas {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
+/* Hranatá optická lupa */
+.rect-loupe-container {
+  width: 100%;
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.rect-loupe-header {
+  background: rgba(20, 20, 28, 0.95);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.loupe-reticle-dot { width: 8px; height: 8px; border-radius: 50%; background: #a78bfa; box-shadow: 0 0 8px #8b5cf6; }
+.loupe-optic-label { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; color: #e9d5ff; text-transform: uppercase; }
+
+.context-toggle-group { display: flex; gap: 4px; }
+.ctx-btn {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ctx-btn.active { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff; border-color: #a78bfa; }
+
+.rect-loupe-lens {
+  position: relative;
+  background: #ffffff;
+  min-height: 160px;
+  max-height: 48vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.rect-loupe-lens canvas {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+}
