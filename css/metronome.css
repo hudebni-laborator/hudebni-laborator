@@ -191,3 +191,42 @@
   flex-shrink: 0;
   align-self: flex-end;
 }
+
+/* ======================================================== */
+/* LANDSCAPE REŽIM METRONOMU (POUZE PLOVOUCÍ TLAČÍTKO)      */
+/* ======================================================== */
+@media (orientation: landscape) and (max-height: 520px) {
+  .docked-metronome {
+    left: auto !important;
+    right: 14px !important;
+    bottom: 14px !important;
+    width: auto !important;
+    max-width: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    z-index: 500;
+  }
+
+  /* Skryjeme veškerá číselná pole, tempo i světýlka dob */
+  .metro-controls-row,
+  .metro-tempo-display,
+  .metro-beat-lights {
+    display: none !important;
+  }
+
+  .metro-header-row {
+    justify-content: flex-end;
+  }
+
+  /* Plovoucí kruhové tlačítko start/stop v pravém dolním rohu */
+  .metro-circle-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8) !important;
+  }
+}

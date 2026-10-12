@@ -49,6 +49,20 @@
 
   <!-- 2. ZÁLOŽKA: HRANÍ & ZNAČKOVÁNÍ -->
   <div class="view-panel practice-panel" id="editView" style="display:none; padding:0;">
+    <!-- FULLSCREEN PLÁTNO NA HRANÍ A ZNAČKOVÁNÍ -->
+    <div class="canvas-box" id="canvasBox" style="height:76vh; border-radius:0; border-left:none; border-right:none; width:100%;">
+      <div class="canvas-viewport" id="canvasViewport">
+        <canvas id="scoreCanvas"></canvas>
+      </div>
+      <!-- Plovoucí tlačítko pro návrat - u horního okraje uprostřed -->
+      <button class="floating-exit-btn" id="exitFullscreenBtn" onclick="window.app.toggleFullscreen()" title="Ukončit celou obrazovku">
+        ⛶ Zpět
+      </button>
+
+      <!-- Dotykové zóny po stranách -->
+      <div class="page-turn-zone zone-left" id="zoneLeft" onclick="window.app.changePage(-1)"></div>
+      <div class="page-turn-zone zone-right" id="zoneRight" onclick="window.app.changePage(1)"></div>
+    </div>
     
     <div class="active-file-banner" id="activeFileBanner" style="display:flex; justify-content:space-between; padding:8px 12px; width:100%;">
       <div style="display:flex; gap:6px; align-items:center; min-width:0;">

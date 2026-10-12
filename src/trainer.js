@@ -32,16 +32,38 @@ class GuitarTrainer {
 
     this.initLibrary();
     this.initTouchEngine();
+
+    // Sledování změn fullscreen režimu
+    document.addEventListener('fullscreenchange', () => {
+      const isFull = !!document.fullscreenElement;
+      document.body.classList.toggle('is-fullscreen', isFull);
+      setTimeout(() => this.fitCanvasToScreen(), 80);
+    });
+
+    // Přizpůsobení při otočení mobilu na šířku / na výšku
+    window.addEventListener('resize', () => {
+      if (document.body.classList.contains('is-fullscreen')) {
+        this.fitCanvasToScreen();
+      }
+      if (document.getElementById('labView')?.style.display === 'flex') {
+        this.showMeasureInLab(this.labCurrentIndex);
+      }
+    });
   }
 
   // --- FULLSCREEN A PŘEPÍNAČ REŽIMU ---
   toggleFullscreen() {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => {
+        // Fallback pro prohlížeče nepodporující requestFullscreen
+        document.body.classList.toggle('is-fullscreen');
+        setTimeout(() => this.fitCanvasToScreen(), 80);
+      });
     } else {
-      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
     }
-    setTimeout(() => this.fitCanvasToScreen(), 150);
   }
 
   toggleInteractionMode() {
