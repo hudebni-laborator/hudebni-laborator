@@ -1762,54 +1762,54 @@ class GuitarTrainer {
     if (loopFrom && Number(loopFrom.value) < 1) loopFrom.value = 1;
   }
 
-  renderScoreView() {
+ renderScoreView() {
     const pageCanvas = this.pageCache.get(this.currentPage);
     if (!pageCanvas) return;
 
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
     this.scoreCtx.drawImage(pageCanvas, 0, 0);
 
-    // 1. Klíče a předznamenání
+    // 1. Klíče a předznamenání (Zlatý akcent)
     if (this.currentScore && this.currentScore.keySignatures) {
       this.currentScore.keySignatures.forEach((k) => {
         if ((k.page || 1) !== this.currentPage) return;
         if (this.activeType === 'keySig' && this.editingId === k.id) return;
 
-        this.scoreCtx.fillStyle = 'rgba(234, 179, 8, 0.16)';
+        this.scoreCtx.fillStyle = 'rgba(245, 158, 11, 0.18)';
         this.scoreCtx.fillRect(k.box.left, k.box.top, k.box.width, k.box.height);
 
-        this.scoreCtx.strokeStyle = '#ca8a04';
+        this.scoreCtx.strokeStyle = '#d97706';
         this.scoreCtx.lineWidth = 3.5;
         this.scoreCtx.strokeRect(k.box.left, k.box.top, k.box.width, k.box.height);
 
-        this.scoreCtx.fillStyle = '#ca8a04';
-        this.scoreCtx.fillRect(k.box.left, k.box.top, 54, 22);
+        this.scoreCtx.fillStyle = '#d97706';
+        this.scoreCtx.fillRect(k.box.left, k.box.top, 56, 22);
         this.scoreCtx.fillStyle = '#ffffff';
-        this.scoreCtx.font = 'bold 13px sans-serif';
-        this.scoreCtx.fillText('🎼 Klíč', k.box.left + 5, k.box.top + 16);
+        this.scoreCtx.font = 'bold 12px sans-serif';
+        this.scoreCtx.fillText('🎼 Klíč', k.box.left + 6, k.box.top + 15);
       });
     }
 
-    // 2. Takty
+    // 2. Takty (Smaragdový akcent)
     if (this.currentScore && this.currentScore.measures) {
       this.currentScore.measures.forEach((m) => {
         if ((m.page || 1) !== this.currentPage) return;
         if (this.activeType === 'measure' && this.editingId === m.id) return;
 
-        this.scoreCtx.fillStyle = 'rgba(34, 197, 94, 0.16)';
+        this.scoreCtx.fillStyle = 'rgba(16, 185, 129, 0.18)';
         this.scoreCtx.fillRect(m.box.left, m.box.top, m.box.width, m.box.height);
 
-        this.scoreCtx.strokeStyle = '#16a34a';
+        this.scoreCtx.strokeStyle = '#059669';
         this.scoreCtx.lineWidth = 3.5;
         this.scoreCtx.strokeRect(m.box.left, m.box.top, m.box.width, m.box.height);
 
         const numText = `${m.id}`;
-        const badgeW = Math.max(28, numText.length * 11 + 12);
-        this.scoreCtx.fillStyle = '#16a34a';
+        const badgeW = Math.max(30, numText.length * 10 + 14);
+        this.scoreCtx.fillStyle = '#059669';
         this.scoreCtx.fillRect(m.box.left, m.box.top, badgeW, 22);
         this.scoreCtx.fillStyle = '#ffffff';
-        this.scoreCtx.font = 'bold 14px sans-serif';
-        this.scoreCtx.fillText(numText, m.box.left + 6, m.box.top + 16);
+        this.scoreCtx.font = 'bold 13px sans-serif';
+        this.scoreCtx.fillText(numText, m.box.left + 7, m.box.top + 16);
       });
     }
   }

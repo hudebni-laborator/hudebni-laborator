@@ -1,15 +1,33 @@
 :root {
-  --bg: #121212;
-  --surface: #1e1e1e;
-  --surface-2: #2a2a2a;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --accent: #22c55e;
-  --accent-gold: #eab308;
+  --bg: #09090b;
+  --bg-subtle: #111115;
+  --surface: rgba(24, 24, 27, 0.85);
+  --surface-solid: #18181b;
+  --surface-elevated: #202025;
+  --surface-hover: #27272e;
+  
+  --primary: #3b82f6;
+  --primary-glow: rgba(59, 130, 246, 0.35);
+  --accent-gold: #f59e0b;
+  --accent-gold-glow: rgba(245, 158, 11, 0.35);
+  --accent-green: #10b981;
+  --accent-green-glow: rgba(16, 185, 129, 0.35);
   --danger: #ef4444;
-  --text: #f3f4f6;
-  --text-muted: #9ca3af;
-  --border: #374151;
+  --danger-glow: rgba(239, 68, 68, 0.35);
+  
+  --text: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --text-dim: #71717a;
+  
+  --border: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(255, 255, 255, 0.2);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
 }
 
 * {
@@ -21,22 +39,31 @@
 
 body {
   background-color: var(--bg);
+  background-image: radial-gradient(circle at 50% 0%, rgba(30, 30, 45, 0.5) 0%, transparent 60%);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ======================================================== */
+/* HLAVNÍ HEADER & NAVIGACE                                */
+/* ======================================================== */
 header {
-  background-color: #18181b;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
-  padding: 8px 10px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .brand {
@@ -49,23 +76,26 @@ header {
   width: 24px;
   height: 24px;
   border-radius: 6px;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
 }
 
 .app-title {
   font-size: 0.95rem;
   font-weight: 800;
-  color: #f3f4f6;
-  letter-spacing: 0.3px;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #ffffff 30%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-/* ROZPROSTŘENÁ TLAČÍTKA PŘES CELOU ŠÍŘKU */
+/* ROZPROSTŘENÁ ZÁLOŽKOVÁ LIŠTA */
 .nav-tabs {
   display: flex;
   width: 100%;
   gap: 6px;
-  background: #111113;
+  background: rgba(10, 10, 12, 0.8);
   padding: 4px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
 }
 
@@ -73,60 +103,65 @@ header {
   flex: 1 1 0;
   text-align: center;
   border: 1px solid transparent;
-  padding: 9px 4px;
-  font-size: 0.86rem;
+  padding: 9px 2px;
+  font-size: 0.84rem;
   font-weight: 700;
-  border-radius: 8px;
+  letter-spacing: -0.01em;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
 }
 
-/* 1. Knihovna: Modrá */
+.tab-btn:active {
+  transform: scale(0.97);
+}
+
+/* Barevná stylizace záložek */
 .tab-lib {
-  background: rgba(37, 99, 235, 0.12);
+  background: rgba(59, 130, 246, 0.08);
   color: #93c5fd;
-  border-color: rgba(37, 99, 235, 0.3);
+  border-color: rgba(59, 130, 246, 0.2);
 }
 .tab-lib.active {
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #ffffff;
-  border-color: #3b82f6;
-  box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+  border-color: #60a5fa;
+  box-shadow: 0 0 16px var(--primary-glow);
 }
 
-/* 2. Značkování: Jantarová / Zlatá */
 .tab-edit {
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(245, 158, 11, 0.08);
   color: #fde047;
-  border-color: rgba(217, 119, 6, 0.3);
+  border-color: rgba(245, 158, 11, 0.2);
 }
 .tab-edit.active {
-  background: #d97706;
+  background: linear-gradient(135deg, #d97706, #b45309);
   color: #ffffff;
-  border-color: #f59e0b;
-  box-shadow: 0 0 12px rgba(217, 119, 6, 0.5);
+  border-color: #fbbf24;
+  box-shadow: 0 0 16px var(--accent-gold-glow);
 }
 
-/* 3. Cvičení: Smaragdová */
 .tab-practice {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.08);
   color: #86efac;
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.2);
 }
 .tab-practice.active {
-  background: #059669;
+  background: linear-gradient(135deg, #059669, #047857);
   color: #ffffff;
-  border-color: #10b981;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+  border-color: #34d399;
+  box-shadow: 0 0 16px var(--accent-green-glow);
 }
 
+/* ======================================================== */
+/* PROUŽEK OTEVŘENÉ SKLADBY                                 */
+/* ======================================================== */
 .active-file-banner {
-  background: #27272a;
+  background: rgba(24, 24, 27, 0.6);
   border-bottom: 1px solid var(--border);
   padding: 5px 12px;
-  font-size: 0.8rem;
-  color: #93c5fd;
+  font-size: 0.78rem;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -135,128 +170,141 @@ header {
 }
 
 .active-file-banner span.label {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
 }
 
 .active-file-banner span.name {
   font-weight: 700;
-  color: #ffffff;
+  color: #f4f4f5;
 }
 
-/* VÝRAZNÝ ŠTÍTEK NÁZVU SKLADBY VE CVIČENÍ */
+/* VÝRAZNÝ ŠTÍTEK SKLADBY V REŽIMU CVIČENÍ */
 .practice-song-highlight {
   width: 100%;
-  background: linear-gradient(90deg, #1e1e24 0%, #27272f 50%, #1e1e24 100%);
-  border: 1.5px solid var(--accent-gold);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.98rem;
+  background: linear-gradient(135deg, rgba(39, 39, 42, 0.9) 0%, rgba(24, 24, 27, 0.9) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 0.95rem;
   font-weight: 800;
   color: #fef08a;
   text-align: center;
-  letter-spacing: 0.4px;
-  box-shadow: 0 2px 10px rgba(234, 179, 8, 0.2);
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* ======================================================== */
+/* LIŠTY & TLAČÍTKA                                        */
+/* ======================================================== */
 .toolbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
   padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .compact-toolbar {
-  padding: 4px 10px;
+  padding: 6px 10px;
 }
 
 .crop-toolbar {
-  background: #1e293b;
-  border-bottom: 2px solid #3b82f6;
+  background: #1e2533;
+  border-color: #3b82f6;
 }
 
 .btn {
-  background: var(--surface-2);
+  background: var(--surface-elevated);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 11px;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
   font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-weight: 500;
+  gap: 6px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 
 .btn-primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: #60a5fa;
+  color: #ffffff;
+  box-shadow: 0 2px 8px var(--primary-glow);
 }
 
 .btn-accent {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #052e16;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #34d399;
+  color: #ffffff;
   font-weight: 700;
+  box-shadow: 0 2px 8px var(--accent-green-glow);
 }
 
 .btn-gold {
-  background: var(--accent-gold);
-  border-color: var(--accent-gold);
-  color: #422006;
+  background: linear-gradient(135deg, #d97706, #b45309);
+  border-color: #fde047;
+  color: #ffffff;
   font-weight: 700;
+  box-shadow: 0 2px 8px var(--accent-gold-glow);
 }
 
 .btn-danger {
-  background: transparent;
-  border-color: var(--danger);
-  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+.btn-danger:active {
+  background: #ef4444;
+  color: #fff;
 }
 
 .btn-fit {
-  background: #1e293b;
-  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
   color: #93c5fd;
   font-weight: 600;
-  padding: 3px 8px;
+  padding: 4px 8px;
   font-size: 0.78rem;
-  margin-left: 2px;
 }
 
 .file-input { display: none; }
 
+/* Přepínač stránek a Zoom widget */
 .page-switcher, .zoom-controls {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: var(--surface-2);
-  padding: 2px 6px;
-  border-radius: 6px;
+  gap: 3px;
+  background: rgba(10, 10, 12, 0.7);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }
 
 .page-indicator, .zoom-indicator {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   color: var(--text);
-  min-width: 50px;
+  min-width: 48px;
   text-align: center;
-}
-
-.zoom-indicator {
-  cursor: pointer;
 }
 
 .page-btn {
@@ -264,13 +312,14 @@ header {
   border: none;
   color: var(--text);
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   padding: 3px 6px;
   border-radius: 4px;
+  transition: background 0.1s;
 }
 
 .page-btn:hover {
-  background: var(--border);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .page-btn:disabled {
@@ -278,15 +327,18 @@ header {
   cursor: not-allowed;
 }
 
+/* Lišta pro úpravu rozměrů rámečku */
 .edit-subbar {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: #18181b;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.8rem;
+  background: #141418;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .subbar-group {
@@ -296,22 +348,24 @@ header {
 }
 
 .subbar-label {
-  color: var(--text-muted);
-  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 600;
   margin-right: 2px;
 }
 
 .size-btn {
-  background: var(--surface-2);
+  background: var(--surface-elevated);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 4px 7px;
+  padding: 4px 8px;
   border-radius: 5px;
   font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  font-weight: 500;
 }
 
 .size-btn:active {
@@ -320,54 +374,56 @@ header {
 }
 
 .size-btn-highlight {
-  border-color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.4);
   color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
 }
 
+/* ======================================================== */
+/* HLAVNÍ PANELY A KONTEJNERY                              */
+/* ======================================================== */
 .view-panel {
   width: 100%;
-  max-width: 1000px;
+  max-width: 950px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 8px;
+  padding: 10px 8px;
   margin: 0 auto;
 }
 
 .practice-panel {
-  padding-bottom: 110px;
+  padding-bottom: 120px; /* Rezerva pro dokovací metronom */
 }
 
-/* KNIHOVNA */
+/* Knihovna skladeb */
 .library-container {
   width: 100%;
-  background: var(--surface);
+  background: var(--surface-solid);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  margin-top: 4px;
+  box-shadow: var(--shadow-sm);
 }
 
 .library-header {
   padding: 10px 14px;
-  background: var(--surface-2);
-  font-weight: 600;
-  font-size: 0.88rem;
+  background: var(--surface-elevated);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .library-list {
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 72vh;
+  gap: 6px;
+  max-height: 70vh;
   overflow-y: auto;
 }
 
@@ -375,49 +431,47 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--surface-2);
-  padding: 10px 12px;
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: all 0.15s ease;
 }
 
 .library-item:hover, .library-item.active {
-  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .library-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .library-name {
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #fff;
 }
 
 .library-meta {
   font-size: 0.74rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
-.library-actions {
-  display: flex;
-  gap: 6px;
-}
-
-/* KONTEJNER PLÁTNA */
+/* Plátno se zoomem a posuvem */
 .canvas-box {
   width: 100%;
   height: 72vh;
-  background: #18181b;
-  border-radius: 8px;
+  background: #0d0d10;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   overflow: hidden;
   position: relative;
   touch-action: none;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8);
 }
 
 .canvas-viewport {
@@ -430,19 +484,20 @@ header {
 
 canvas#scoreCanvas {
   display: block;
-  box-shadow: 0 4px 25px rgba(0,0,0,0.7);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+  border-radius: 4px;
 }
 
 .status-msg {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   text-align: center;
   padding: 2px;
 }
 
 .danger-zone {
   margin-top: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   padding-top: 10px;
   border-top: 1px dashed var(--border);
   width: 100%;
@@ -452,20 +507,20 @@ canvas#scoreCanvas {
 
 .btn-subtle-danger {
   background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   color: #f87171;
   font-size: 0.78rem;
-  padding: 5px 12px;
-  opacity: 0.8;
+  padding: 6px 14px;
 }
 
+/* Zvětšovací lupa nad prstem */
 .touch-loupe {
   position: fixed;
   width: 130px;
   height: 130px;
   border-radius: 50%;
   border: 3px solid #3b82f6;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
   pointer-events: none;
   z-index: 9999;
   overflow: hidden;
@@ -480,21 +535,24 @@ canvas#scoreCanvas {
   display: block;
 }
 
-/* REŽIM CVIČENÍ */
+/* ======================================================== */
+/* REŽIM CVIČENÍ - NOTOVÝ STOJAN                            */
+/* ======================================================== */
 .practice-card {
   width: 100%;
-  background: var(--surface);
+  background: var(--surface-solid);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-sm);
 }
 
 .clef-banner {
-  background: #27272a;
+  background: #141418;
   border-bottom: 1px solid var(--border);
-  padding: 4px 10px;
+  padding: 6px 10px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -503,14 +561,15 @@ canvas#scoreCanvas {
 
 .clef-preview-wrap {
   background: #ffffff;
-  border-radius: 4px;
+  border-radius: 5px;
   overflow: hidden;
   display: flex;
   align-items: center;
   padding: 2px 4px;
   height: 48px;
-  max-width: 340px;
-  border: 1px solid var(--border);
+  max-width: 320px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .clef-preview-wrap canvas {
@@ -527,9 +586,10 @@ canvas#scoreCanvas {
   justify-content: center;
   align-items: flex-start;
   min-height: 180px;
-  max-height: 50vh;
+  max-height: 48vh;
   cursor: pointer;
   position: relative;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
 }
 
 .practice-display canvas {
@@ -540,23 +600,25 @@ canvas#scoreCanvas {
 
 .tap-hint {
   position: absolute;
-  bottom: 6px;
-  font-size: 0.68rem;
+  bottom: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: rgba(0, 0, 0, 0.45);
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 
 .compact-btn {
-  padding: 5px 10px;
-  font-size: 0.8rem;
+  padding: 6px 12px;
+  font-size: 0.82rem;
 }
 
 .compact-indicator {
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 800;
 }
 
 .measure-stepper {
@@ -571,8 +633,18 @@ canvas#scoreCanvas {
   gap: 6px;
 }
 
+.ctrl-group select {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 /* ======================================================== */
-/* PŘILEPENÝ METRONOM S KRUHOVÝM OVLADAČEM                  */
+/* PŘILEPENÝ DOKOVACÍ METRONOM (STUDIO TRANSPORT)          */
 /* ======================================================== */
 .docked-metronome {
   position: fixed;
@@ -580,17 +652,21 @@ canvas#scoreCanvas {
   left: 0;
   right: 0;
   width: 100%;
-  max-width: 1000px;
+  max-width: 950px;
   margin: 0 auto;
-  background: #18181b;
-  border-top: 2px solid var(--primary);
-  box-shadow: 0 -6px 25px rgba(0, 0, 0, 0.7);
-  padding: 6px 10px;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  background: rgba(18, 18, 22, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.8);
+  padding: 8px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   z-index: 100;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
 }
 
 .metro-header-row {
@@ -600,7 +676,7 @@ canvas#scoreCanvas {
   gap: 8px;
 }
 
-/* Kruhový indikátor/spouštěč bez textu */
+/* KRUHOVÝ TRANSPORT OVLADAČ */
 .metro-circle-btn {
   width: 44px;
   height: 44px;
@@ -609,11 +685,12 @@ canvas#scoreCanvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid transparent;
+  border: none;
   cursor: pointer;
-  transition: all 0.18s ease-in-out;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  position: relative;
 }
 
 .metro-circle-btn:active {
@@ -626,29 +703,28 @@ canvas#scoreCanvas {
   line-height: 1;
 }
 
-/* Červená = V klidu (Play) */
+/* Červená (Idle/Zastaveno) */
 .circle-idle {
-  background: #dc2626;
-  border-color: #f87171;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 0 14px var(--danger-glow);
 }
 
-/* Oranžová = Příprava (Lead-in) */
+/* Oranžová (Příprava / Lead-in) */
 .circle-leadin {
-  background: #d97706;
-  border-color: #fbbf24;
-  animation: pulseCircleOrange 0.5s infinite alternate;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 0 16px var(--accent-gold-glow);
+  animation: pulseLeadIn 0.5s infinite alternate;
 }
 
-/* Zelená = Hrajeme! */
+/* Zelená (Hraní) */
 .circle-playing {
-  background: #16a34a;
-  border-color: #4ade80;
-  box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 0 18px var(--accent-green-glow);
 }
 
-@keyframes pulseCircleOrange {
-  from { transform: scale(1); box-shadow: 0 0 4px #f59e0b; }
-  to { transform: scale(1.08); box-shadow: 0 0 16px #f59e0b; }
+@keyframes pulseLeadIn {
+  from { transform: scale(1); filter: brightness(1); }
+  to { transform: scale(1.08); filter: brightness(1.25); }
 }
 
 .metro-tempo-display {
@@ -658,54 +734,56 @@ canvas#scoreCanvas {
 }
 
 .tempo-current {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 900;
   color: #ffffff;
+  letter-spacing: -0.02em;
 }
 
 .tempo-unit {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 700;
 }
 
 .tempo-target {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #93c5fd;
-  margin-left: 2px;
-  font-weight: 500;
+  margin-left: 4px;
+  font-weight: 600;
 }
 
+/* LED DIODY DOB */
 .metro-beat-lights {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   align-items: center;
 }
 
 .beat-light {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  transition: background 0.05s, transform 0.05s;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.05s ease;
 }
 
 .beat-light.active-accent {
-  background: #eab308;
-  border-color: #fde047;
+  background: #fde047;
+  border-color: #fef08a;
   transform: scale(1.3);
-  box-shadow: 0 0 6px #eab308;
+  box-shadow: 0 0 10px #f59e0b, 0 0 4px #fde047;
 }
 
 .beat-light.active-regular {
-  background: #22c55e;
-  border-color: #86efac;
+  background: #34d399;
+  border-color: #a7f3d0;
   transform: scale(1.2);
-  box-shadow: 0 0 5px #22c55e;
+  box-shadow: 0 0 8px #10b981;
 }
 
-/* 2. Řádek: Ovládání na 100% šířky bez přetékání */
+/* ŘÁDEK S POLÍČKY METRONOMU */
 .metro-controls-row {
   display: flex;
   align-items: center;
@@ -718,32 +796,51 @@ canvas#scoreCanvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
 }
 
 .metro-lbl {
-  font-size: 0.64rem;
-  color: var(--text-muted);
+  font-size: 0.65rem;
+  color: var(--text-dim);
   text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .metro-input {
-  width: 40px;
+  width: 44px;
   height: 28px;
-  padding: 2px;
+  padding: 0;
   text-align: center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  background: var(--surface-2);
+  font-size: 0.88rem;
+  font-weight: 800;
+  background: var(--surface-elevated);
   border: 1px solid var(--border);
   color: #ffffff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s;
+}
+
+.metro-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* Skrytí nativních šipek inputu number */
+.metro-input::-webkit-outer-spin-button,
+.metro-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.metro-input[type=number] {
+  -moz-appearance: textfield;
 }
 
 .metro-reset-btn {
-  padding: 6px 10px;
+  padding: 5px 10px;
   font-size: 0.82rem;
   font-weight: 700;
-  height: 30px;
-  white-space: nowrap;
+  height: 28px;
+  margin-top: 12px;
 }
