@@ -1259,7 +1259,7 @@ class GuitarTrainer {
 
     this.labCanvas.width = curM.box.width;
     this.labCanvas.height = curM.box.height;
-    this.labCtx.fillStyle = '#ffffff';
+    this.labCtx.fillStyle = '#f4f2ec';
     this.labCtx.fillRect(0, 0, this.labCanvas.width, this.labCanvas.height);
 
     this.labCtx.drawImage(

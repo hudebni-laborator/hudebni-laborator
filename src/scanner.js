@@ -9,7 +9,7 @@ function compareMusicPosition(a, b) {
   return a.box.left - b.box.left;
 }
 
-// Zpracování a optimalizace kontrastu z fotomobilu
+// Zpracování fotky: sytě černé noty na přirozeném (nepřeběleném) papíru
 async function processAndEnhancePhoto(file, maxDim = 2400) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -20,22 +20,55 @@ async function processAndEnhancePhoto(file, maxDim = 2400) {
         if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; } 
         else { w = Math.round((w * maxDim) / h); h = maxDim; }
       }
+      
       const cvs = document.createElement('canvas');
-      cvs.width = w; cvs.height = h;
+      cvs.width = w;
+      cvs.height = h;
       const ctx = cvs.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
+      
       const data = ctx.getImageData(0, 0, w, h);
       const d = data.data;
+      
+      // 1. Změříme průměrný jas fotky pro adaptaci na stíny v místnosti
       let sum = 0, c = 0;
-      for (let i = 0; i < d.length; i += 64) { sum += d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114; c++; }
-      const avg = c > 0 ? sum / c : 200;
-      const wp = Math.min(255, Math.max(160, avg * 0.92));
-      const bp = 75;
-      for (let i = 0; i < d.length; i += 4) {
-        let lum = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
-        let e = lum >= wp ? 255 : (lum <= bp ? 0 : Math.round(((lum - bp)/(wp - bp))*255));
-        d[i] = d[i+1] = d[i+2] = e;
+      for (let i = 0; i < d.length; i += 64) {
+        sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+        c++;
       }
+      const avg = c > 0 ? sum / c : 195;
+
+      // 2. Nastavení prahů:
+      // wp (bílý bod) držíme vysoko, abychom nevypálili strukturu papíru a tenké čáry
+      // bp (černý bod) posuneme výše (kolem 115–130), aby i šedé noty zčernaly
+      const wp = Math.min(250, Math.max(185, avg * 0.98));
+      const bp = Math.min(135, Math.max(95, avg * 0.62));
+      const range = Math.max(10, wp - bp);
+
+      // Barva skutečného papíru (jemný přírodní tón místo agresivní 255)
+      const paperR = 244, paperG = 242, paperB = 236;
+      // Barva sytého tiskařského inkoustu
+      const inkR = 15, inkG = 15, inkB = 18;
+
+      for (let i = 0; i < d.length; i += 4) {
+        const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+        
+        let norm;
+        if (lum <= bp) {
+          norm = 0.0; // Sytá černá (noty, taktové čáry, linky)
+        } else if (lum >= wp) {
+          norm = 1.0; // Přirozený papír
+        } else {
+          // Přechodová oblast (hrany not) s mírným přitmavením středních tónů (gamma 1.35),
+          // aby okraje not nebyly vybledlé a šedivé
+          norm = Math.pow((lum - bp) / range, 1.35);
+        }
+
+        d[i]     = Math.round(inkR + norm * (paperR - inkR));
+        d[i + 1] = Math.round(inkG + norm * (paperG - inkG));
+        d[i + 2] = Math.round(inkB + norm * (paperB - inkB));
+      }
+      
       ctx.putImageData(data, 0, 0);
       resolve(cvs.toDataURL('image/jpeg', 0.90));
     };
