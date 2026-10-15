@@ -1,7 +1,5 @@
-// Globální instance přístupná pro inline HTML handlery
 window.app = new GuitarTrainer();
 
-// PŘEPÍNÁNÍ ZÁLOŽEK (Knihovna | Hraní | Laboratoř)
 function switchMode(mode) {
   ['tabLibrary', 'tabEdit', 'tabLab'].forEach(id => {
     const t = document.getElementById(id);
@@ -20,6 +18,7 @@ function switchMode(mode) {
     const ht = document.getElementById('headerSongTitle'); if (ht) ht.style.display = 'none';
     if (metro) metro.style.display = 'none';
     window.app.stopMetronome();
+    window.app.dismissAddPagePrompt();
   } else if (mode === 'edit') {
     if (!window.app.currentScore) {
       alert('Nejprve vyberte skladbu.');
@@ -41,6 +40,7 @@ function switchMode(mode) {
     const t = document.getElementById('tabLab'); if (t) t.classList.add('active');
     const v = document.getElementById('labView'); if (v) v.style.display = 'flex';
     const ht = document.getElementById('headerSongTitle'); if (ht) ht.style.display = 'none';
+    window.app.dismissAddPagePrompt();
     if (metro) metro.style.display = 'flex';
     if (window.wakeLockManager) {
       try { window.wakeLockManager.request(); } catch (_) {}
@@ -52,48 +52,58 @@ function switchMode(mode) {
 
 window.switchMode = switchMode;
 
-// 1. FOCENÍ NOT (S možností plynule nafotit celý sešit)
+// 1. FOCENÍ PRVNÍ STRANY SKLADBY V KNIHOVNĚ
 const cameraInput = document.getElementById('cameraInput');
-let isAddingNextCameraPage = false;
-
 if (cameraInput) {
   cameraInput.addEventListener('change', async e => {
     const f = e.target.files[0];
-    if (!f) {
-      isAddingNextCameraPage = false;
-      return;
-    }
+    if (!f) return;
 
     try {
       const d = await processAndEnhancePhoto(f);
+      const n = prompt('Název skladby:', 'Noty ' + new Date().toLocaleDateString('cs-CZ')) || 'Nová skladba';
+      await window.app.saveNewScoreToLibrary(n.trim(), { isPdf: false, imageData: d, pages: [d] });
 
-      if (isAddingNextCameraPage && window.app.currentScore && !window.app.currentScore.isPdf) {
-        await window.app.appendPageToCurrentScore(d);
-      } else {
-        const n = prompt('Název skladby:', 'Noty ' + new Date().toLocaleDateString('cs-CZ')) || 'Nová skladba';
-        await window.app.saveNewScoreToLibrary(n.trim(), { isPdf: false, imageData: d, pages: [d] });
-      }
-
-      e.target.value = '';
-
-      setTimeout(() => {
-        if (confirm(`Strana ${window.app.totalPages} uložena.\nChcete vyfotit další stranu?`)) {
-          isAddingNextCameraPage = true;
-          cameraInput.click();
-        } else {
-          isAddingNextCameraPage = false;
-        }
-      }, 250);
-
+      // Zobrazí plovoucí banner s přímým tlačítkem pro další stranu
+      window.app.showAddPagePrompt();
     } catch (err) {
-      isAddingNextCameraPage = false;
       alert('Chyba při zpracování fotky: ' + err.message);
-      e.target.value = '';
     }
+    e.target.value = '';
   });
 }
 
-// 2. NAHRÁNÍ SOUBORU Z DISKU (PDF nebo obrázek)
+// SPOLEČNÉ ZPRACOVÁNÍ PŘIDANÉ DALŠÍ STRANY
+async function handleAddNextPage(file) {
+  if (!file || !window.app.currentScore || window.app.currentScore.isPdf) return;
+  try {
+    const d = await processAndEnhancePhoto(file);
+    await window.app.appendPageToCurrentScore(d);
+    window.app.showAddPagePrompt(); // Aktualizuje číslo strany na banneru
+  } catch (err) {
+    alert('Chyba při přidání strany: ' + err.message);
+  }
+}
+
+// 2. FOCENÍ DALŠÍ STRANY Z BANNERU
+const promptAddPageInput = document.getElementById('promptAddPageInput');
+if (promptAddPageInput) {
+  promptAddPageInput.addEventListener('change', async e => {
+    await handleAddNextPage(e.target.files[0]);
+    e.target.value = '';
+  });
+}
+
+// 3. PŘIFOCENÍ STRANY Z LIŠTY V EDIT REŽIMU
+const addPageInput = document.getElementById('addPageInput');
+if (addPageInput) {
+  addPageInput.addEventListener('change', async e => {
+    await handleAddNextPage(e.target.files[0]);
+    e.target.value = '';
+  });
+}
+
+// 4. NAHRÁNÍ SOUBORU Z DISKU (PDF / Obrázek)
 const fileInput = document.getElementById('fileInput');
 if (fileInput) {
   fileInput.addEventListener('change', async e => {
@@ -109,22 +119,6 @@ if (fileInput) {
       }
     } catch (err) {
       alert('Chyba při nahrání: ' + err.message);
-    }
-    e.target.value = '';
-  });
-}
-
-// 3. PŘIFOCENÍ STRANY KE STÁVAJÍCÍ SKLADBĚ V REŽIMU EDIT
-const addPageInput = document.getElementById('addPageInput');
-if (addPageInput) {
-  addPageInput.addEventListener('change', async e => {
-    const f = e.target.files[0];
-    if (!f) return;
-    try {
-      const d = await processAndEnhancePhoto(f);
-      await window.app.appendPageToCurrentScore(d);
-    } catch (err) {
-      alert('Chyba při přidání strany: ' + err.message);
     }
     e.target.value = '';
   });

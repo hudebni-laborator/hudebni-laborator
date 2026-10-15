@@ -383,3 +383,50 @@ body.is-fullscreen .floating-fs-btn {
   background: rgba(220, 38, 38, 0.85) !important;
   border-color: #f87171 !important;
 }
+
+/* Plovoucí banner po vyfocení strany */
+.add-page-prompt-banner {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 60px;
+  z-index: 1100;
+  background: rgba(24, 24, 32, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.add-page-prompt-banner .prompt-text {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fde047;
+  white-space: nowrap;
+}
+
+/* Ořezová lišta v horní části plátna */
+.crop-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 1150;
+  background: rgba(15, 23, 42, 0.96) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.8) !important;
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: auto !important;
+}
