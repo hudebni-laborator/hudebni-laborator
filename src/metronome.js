@@ -3,8 +3,8 @@ class MetronomeController {
     this.audioCtx = null;
     this.isRunning = false;
     this.currentBpm = 60;
-    this.beatsPerBar = 4; // Výchozí počet dob
-    this.phase = 'idle';  // 'idle', 'leadin', 'playing', 'goal'
+    this.beatsPerBar = 4;
+    this.phase = 'idle'; // 'idle', 'leadin', 'playing', 'goal'
     this.beatIndex = 0;
     this.measureIndexInCycle = 0;
     this.nextBeatTime = 0;
@@ -46,7 +46,9 @@ class MetronomeController {
 
   async start() {
     await this.initAudio();
-    if (window.wakeLockManager) try { await window.wakeLockManager.request(); } catch (_) {}
+    if (window.wakeLockManager) {
+      try { await window.wakeLockManager.request(); } catch (_) {}
+    }
 
     this.isRunning = true;
     this.phase = 'leadin';
@@ -81,11 +83,9 @@ class MetronomeController {
     this.beatsPerBar = Math.max(1, Math.min(16, Number(beats) || 4));
     this.beatIndex = 0;
 
-    // Synchronizace s číselným polem v nastavení Laboratoře
     const inp = document.getElementById('metroBeatsPerBar');
     if (inp) inp.value = this.beatsPerBar;
 
-    // Synchronizace s výběrem v liště Hraní
     const sel = document.getElementById('playMetroBeatsSelect');
     if (sel && sel.value !== String(this.beatsPerBar)) sel.value = this.beatsPerBar;
   }
@@ -169,8 +169,8 @@ class MetronomeController {
 
     buttons.forEach(({ btn, icn }) => {
       if (!btn || !icn) return;
-      btn.className = btn.classList.contains('play-metro-circle') 
-        ? 'metro-circle-btn play-metro-circle' 
+      btn.className = btn.classList.contains('play-metro-circle')
+        ? 'metro-circle-btn play-metro-circle'
         : 'metro-circle-btn';
 
       if (phase === 'idle') {
