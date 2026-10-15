@@ -39,6 +39,44 @@ class MetronomeController {
     } catch (_) {}
   }
 
+  // Oslavný fanfárový akord (rozložený C dur s basem a měkkým dozvukem)
+  playCelebratoryChord(startTime) {
+    if (!this.audioCtx) return;
+    const t0 = Math.max(this.audioCtx.currentTime, startTime || this.audioCtx.currentTime);
+
+    const chordNotes = [
+      { freq: 130.81, delay: 0.00 }, // C3 (plný bas)
+      { freq: 261.63, delay: 0.05 }, // C4
+      { freq: 329.63, delay: 0.10 }, // E4
+      { freq: 392.00, delay: 0.15 }, // G4
+      { freq: 523.25, delay: 0.20 }, // C5
+      { freq: 659.25, delay: 0.25 }, // E5
+      { freq: 783.99, delay: 0.30 }, // G5
+      { freq: 1046.5, delay: 0.35 }  // C6 (horní lesk)
+    ];
+
+    chordNotes.forEach(({ freq, delay }) => {
+      try {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+
+        osc.type = 'triangle'; // Teplý, harmonický tón připomínající kytarový/harfový souzvuk
+        osc.frequency.setValueAtTime(freq, t0 + delay);
+
+        const noteStart = t0 + delay;
+        gain.gain.setValueAtTime(0.0001, noteStart);
+        gain.gain.exponentialRampToValueAtTime(0.18, noteStart + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 2.4);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+
+        osc.start(noteStart);
+        osc.stop(noteStart + 2.5);
+      } catch (_) {}
+    });
+  }
+
   async toggle() {
     if (this.isRunning) this.stop();
     else await this.start();
@@ -109,6 +147,7 @@ class MetronomeController {
     while (this.nextBeatTime < this.audioCtx.currentTime + this.scheduleAheadSec) {
       this.scheduleCurrentBeat(this.nextBeatTime);
       this.advanceBeat();
+      if (!this.isRunning) break;
     }
   }
 
@@ -123,7 +162,7 @@ class MetronomeController {
 
     const delayMs = Math.max(0, (time - this.audioCtx.currentTime) * 1000);
     setTimeout(() => {
-      if (!this.isRunning) return;
+      if (!this.isRunning && scheduledPhase !== 'goal') return;
       this.renderBeatLight(scheduledBeat, beatsPerBar, scheduledPhase);
       if (scheduledBeat === 0) {
         this.updateCircleUI(scheduledPhase);
@@ -153,7 +192,30 @@ class MetronomeController {
             this.currentBpm = Math.min(targetBpm, this.currentBpm + step);
             this.phase = 'leadin';
           } else {
-            this.phase = 'goal';
+            // CÍL SPLNĚN (odehrán požadovaný počet taktů na cílovém BPM)
+            const isLab = document.getElementById('labView')?.style.display === 'flex';
+            if (isLab) {
+              const finishTime = this.nextBeatTime;
+              const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
+
+              // Zastavíme další tikání
+              this.isRunning = false;
+              if (this.timerId) clearInterval(this.timerId);
+              this.timerId = null;
+
+              // Spustíme oslavný akord přesně na začátku následující doby
+              this.playCelebratoryChord(finishTime);
+
+              // UI přepneme na trofej a zhasneme diody
+              setTimeout(() => {
+                this.clearBeatLights();
+                this.updateCircleUI('goal');
+              }, delayMs);
+
+              return;
+            } else {
+              this.phase = 'goal';
+            }
           }
           this.measureIndexInCycle = 0;
         }
