@@ -560,7 +560,7 @@ class GuitarTrainer {
     this.canvasViewport.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoomScale})`;
   }
 
-  // Přesné vycentrování vertikálně i horizontálně při zachování poměru stran
+ // Přizpůsobení velikosti: šířka na střed, ale HORNÍ OKRAJ PŘILEPEN NAHORU
   fitCanvasToScreen() {
     if (!this.scoreCanvas || this.scoreCanvas.width === 0 || !this.canvasBox) return;
     const rect = this.canvasBox.getBoundingClientRect();
@@ -570,9 +570,14 @@ class GuitarTrainer {
     const scaleX = w / this.scoreCanvas.width;
     const scaleY = h / this.scoreCanvas.height;
 
+    // Zachováme poměr stran
     this.zoomScale = Math.min(scaleX, scaleY);
+    
+    // Horizontálně vycentrovat doprostřed
     this.panX = Math.round((w - this.scoreCanvas.width * this.zoomScale) / 2);
-    this.panY = Math.round((h - this.scoreCanvas.height * this.zoomScale) / 2);
+    
+    // Vertikálně: PŘILEPIT K HORNÍMU OKRAJI (0 px shora, ne na střed)
+    this.panY = 0;
 
     this.hasUserAdjustedView = false;
     this.updateViewportTransform();
