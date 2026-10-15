@@ -3,6 +3,7 @@ class MetronomeController {
     this.audioCtx = null;
     this.isRunning = false;
     this.currentBpm = 60;
+    this.targetBpm = 100;
     this.beatsPerBar = 4;
     this.phase = 'idle'; // 'idle', 'leadin', 'playing', 'goal'
     this.beatIndex = 0;
@@ -39,20 +40,19 @@ class MetronomeController {
     } catch (_) {}
   }
 
-  // Oslavný fanfárový akord (rozložený C dur s basem a měkkým dozvukem)
   playCelebratoryChord(startTime) {
     if (!this.audioCtx) return;
     const t0 = Math.max(this.audioCtx.currentTime, startTime || this.audioCtx.currentTime);
 
     const chordNotes = [
-      { freq: 130.81, delay: 0.00 }, // C3 (plný bas)
+      { freq: 130.81, delay: 0.00 }, // C3
       { freq: 261.63, delay: 0.05 }, // C4
       { freq: 329.63, delay: 0.10 }, // E4
       { freq: 392.00, delay: 0.15 }, // G4
       { freq: 523.25, delay: 0.20 }, // C5
       { freq: 659.25, delay: 0.25 }, // E5
       { freq: 783.99, delay: 0.30 }, // G5
-      { freq: 1046.5, delay: 0.35 }  // C6 (horní lesk)
+      { freq: 1046.5, delay: 0.35 }  // C6
     ];
 
     chordNotes.forEach(({ freq, delay }) => {
@@ -60,7 +60,7 @@ class MetronomeController {
         const osc = this.audioCtx.createOscillator();
         const gain = this.audioCtx.createGain();
 
-        osc.type = 'triangle'; // Teplý, harmonický tón připomínající kytarový/harfový souzvuk
+        osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, t0 + delay);
 
         const noteStart = t0 + delay;
@@ -88,6 +88,14 @@ class MetronomeController {
       try { await window.wakeLockManager.request(); } catch (_) {}
     }
 
+    // Načteme hodnotu start a cíl z posuvníků
+    const startInput = document.getElementById('metroStartBpm');
+    if (startInput) this.currentBpm = Number(startInput.value) || this.currentBpm;
+
+    const targetInput = document.getElementById('metroTargetBpm');
+    if (targetInput) this.targetBpm = Number(targetInput.value) || 100;
+    this.updateTargetDisplay(this.targetBpm);
+
     this.isRunning = true;
     this.phase = 'leadin';
     this.beatIndex = 0;
@@ -108,12 +116,52 @@ class MetronomeController {
     this.updateCircleUI('idle');
   }
 
+  // --- OBSLUHA POSUVNÍKŮ A TEMPA ---
+  onStartBpmInput(val) {
+    const bpm = Math.max(30, Math.min(240, Number(val)));
+    const lbl = document.getElementById('metroStartVal');
+    if (lbl) lbl.innerText = bpm;
+    if (!this.isRunning) {
+      this.setBpm(bpm);
+    }
+  }
+
+  adjustStartBpm(delta) {
+    const slider = document.getElementById('metroStartBpm');
+    if (slider) {
+      slider.value = Number(slider.value) + delta;
+      this.onStartBpmInput(slider.value);
+    }
+  }
+
+  onTargetBpmInput(val) {
+    this.targetBpm = Math.max(30, Math.min(240, Number(val)));
+    const lbl = document.getElementById('metroTargetVal');
+    if (lbl) lbl.innerText = this.targetBpm;
+    this.updateTargetDisplay(this.targetBpm);
+  }
+
+  adjustTargetBpm(delta) {
+    const slider = document.getElementById('metroTargetBpm');
+    if (slider) {
+      slider.value = Number(slider.value) + delta;
+      this.onTargetBpmInput(slider.value);
+    }
+  }
+
+  updateTargetDisplay(targetBpm) {
+    const targetText = document.getElementById('metroTargetBpmText');
+    if (targetText) {
+      targetText.innerText = `➔ Cíl: ${targetBpm}`;
+    }
+  }
+
   changeBpm(delta) {
     this.setBpm(this.currentBpm + delta);
   }
 
   setBpm(newBpm) {
-    this.currentBpm = Math.max(30, Math.min(260, Number(newBpm) || 60));
+    this.currentBpm = Math.max(30, Math.min(240, Number(newBpm) || 60));
     this.updateTempoDisplays(this.currentBpm);
   }
 
@@ -122,14 +170,15 @@ class MetronomeController {
     this.beatIndex = 0;
 
     const inp = document.getElementById('metroBeatsPerBar');
-    if (inp) inp.value = this.beatsPerBar;
+    if (inp && inp.value !== String(this.beatsPerBar)) inp.value = this.beatsPerBar;
 
     const sel = document.getElementById('playMetroBeatsSelect');
     if (sel && sel.value !== String(this.beatsPerBar)) sel.value = this.beatsPerBar;
   }
 
   resetTempo() {
-    const startBpm = Number(document.getElementById('metroStartBpm')?.value) || 60;
+    const startSlider = document.getElementById('metroStartBpm');
+    const startBpm = startSlider ? Number(startSlider.value) : 60;
     this.setBpm(startBpm);
   }
 
@@ -138,8 +187,18 @@ class MetronomeController {
     if (d1) d1.innerText = bpm;
     const d2 = document.getElementById('playMetroBpmText');
     if (d2) d2.innerText = bpm;
-    const input = document.getElementById('metroStartBpm');
-    if (input && !this.isRunning) input.value = bpm;
+
+    // Posuvník v Hraní
+    const playSlider = document.getElementById('playTempoSlider');
+    if (playSlider) playSlider.value = bpm;
+
+    // Posuvník Start v Laboratoři (pokud metronom neběží)
+    if (!this.isRunning) {
+      const startSlider = document.getElementById('metroStartBpm');
+      if (startSlider) startSlider.value = bpm;
+      const startLbl = document.getElementById('metroStartVal');
+      if (startLbl) startLbl.innerText = bpm;
+    }
   }
 
   schedulerLoop() {
@@ -173,7 +232,7 @@ class MetronomeController {
 
   advanceBeat() {
     const beats = this.beatsPerBar;
-    const targetBpm = Number(document.getElementById('metroTargetBpm')?.value) || 100;
+    const targetBpm = this.targetBpm;
     const step = Number(document.getElementById('metroStepBpm')?.value) || 2;
     const bars = Number(document.getElementById('metroBarsCount')?.value) || 1;
 
@@ -192,21 +251,18 @@ class MetronomeController {
             this.currentBpm = Math.min(targetBpm, this.currentBpm + step);
             this.phase = 'leadin';
           } else {
-            // CÍL SPLNĚN (odehrán požadovaný počet taktů na cílovém BPM)
+            // CÍL SPLNĚN
             const isLab = document.getElementById('labView')?.style.display === 'flex';
             if (isLab) {
               const finishTime = this.nextBeatTime;
               const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
 
-              // Zastavíme další tikání
               this.isRunning = false;
               if (this.timerId) clearInterval(this.timerId);
               this.timerId = null;
 
-              // Spustíme oslavný akord přesně na začátku následující doby
               this.playCelebratoryChord(finishTime);
 
-              // UI přepneme na trofej a zhasneme diody
               setTimeout(() => {
                 this.clearBeatLights();
                 this.updateCircleUI('goal');

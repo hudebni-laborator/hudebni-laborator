@@ -230,3 +230,94 @@
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8) !important;
   }
 }
+
+/* Posuvníkové řádky v Laboratoři */
+.metro-slider-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.slider-lbl {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  min-width: 65px;
+  white-space: nowrap;
+}
+.slider-lbl b {
+  color: #ffffff;
+  font-size: 0.88rem;
+}
+
+/* Styl posuvníku pro pohodlné tažení prstem */
+.metro-range-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+}
+.metro-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+.metro-range-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+/* Malá krokovací tlačítka ±5 */
+.step-btn-mini {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.step-btn-mini:active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* Vysouvací rychlý posuvník pro Hraní (přilepený nad spodní lištou) */
+.play-tempo-popup {
+  position: fixed;
+  bottom: 54px;
+  right: 10px;
+  width: calc(100vw - 20px);
+  max-width: 320px;
+  background: rgba(20, 20, 26, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  z-index: 105;
+}
+.tempo-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

@@ -72,6 +72,12 @@ class GuitarTrainer {
     });
   }
 
+  togglePlayTempoPopup() {
+    const popup = document.getElementById('playTempoPopup');
+    if (!popup) return;
+    popup.style.display = (popup.style.display === 'none') ? 'block' : 'none';
+  }
+
   showAddPagePrompt() {
     const banner = document.getElementById('addPagePromptBanner');
     const text = document.getElementById('addPagePromptText');
@@ -504,6 +510,9 @@ class GuitarTrainer {
   }
 
   renderScoreView() {
+    const popup = document.getElementById('playTempoPopup');
+    if (popup) popup.style.display = 'none';
+    
     const p = this.pageCache.get(this.currentPage);
     if (!p || !this.scoreCtx) return;
     this.scoreCtx.clearRect(0, 0, this.scoreCanvas.width, this.scoreCanvas.height);
