@@ -215,10 +215,12 @@
         <canvas id="labClefCanvas"></canvas>
       </div>
 
-      <!-- Hranatá lupa pro takt -->
+      <!-- Karta taktu s fixní výškou a podporou přiblížení (zoom/pan) -->
       <div class="rect-loupe-container">
         <div class="rect-loupe-lens" id="rectLoupeLens">
-          <canvas id="labCanvas"></canvas>
+          <div class="lab-viewport" id="labViewport">
+            <canvas id="labCanvas"></canvas>
+          </div>
         </div>
       </div>
     </div>
@@ -260,16 +262,26 @@
       </div>
     </div>
 
-    <!-- Akční lišta s navigací mezi takty a tlačítkem Zvládnuto -->
+    <!-- POHODLNÁ AKČNÍ LIŠTA: Šipky uprostřed a větší, Zvládnuto vpravo -->
     <div class="lab-action-bar">
-      <div class="lab-nav-group">
-        <button class="btn btn-sm" onclick="window.app.prevLabMeasure()" title="Předchozí takt">◀</button>
-        <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
-        <button class="btn btn-sm" onclick="window.app.nextLabMeasure()" title="Další takt">▶</button>
+      <!-- Levý prostor pro vyvážení středu -->
+      <div class="lab-action-side">
+        <button class="btn btn-sm" onclick="window.app.fitLabCanvas()" title="Přizpůsobit velikost do okénka" style="padding: 6px 8px;">🔍 1:1</button>
       </div>
-      <button class="btn btn-accent btn-sm" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">
-        ✔ Zvládnuto
-      </button>
+
+      <!-- Středové přepínání taktů -->
+      <div class="lab-nav-center">
+        <button class="lab-nav-btn" onclick="window.app.prevLabMeasure()" title="Předchozí takt">◀</button>
+        <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
+        <button class="lab-nav-btn" onclick="window.app.nextLabMeasure()" title="Další takt">▶</button>
+      </div>
+
+      <!-- Pravá strana -->
+      <div class="lab-action-side" style="justify-content: flex-end;">
+        <button class="btn btn-accent btn-sm lab-resolve-btn" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">
+          ✔ Zvládnuto
+        </button>
+      </div>
     </div>
   </div>
 

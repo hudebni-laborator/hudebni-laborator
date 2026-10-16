@@ -39,6 +39,10 @@ class GuitarTrainer {
     this.activeType = null;
     this.editingId = null;
 
+    this.labZoomScale = 1.0;
+    this.labPanX = 0;
+    this.labPanY = 0;
+
     this.metronome = new MetronomeController();
 
     this.initLibrary();
@@ -1129,71 +1133,153 @@ class GuitarTrainer {
     return sigs[0];
   }
 
+  // Aktualizace transformace viewportu v Laboratoři
+  updateLabTransform() {
+    const vp = document.getElementById('labViewport');
+    if (vp) {
+      vp.style.transform = `translate(${this.labPanX}px, ${this.labPanY}px) scale(${this.labZoomScale})`;
+    }
+  }
+
+  // Přizpůsobení taktu přesně do rozměrů fixního okna (fit)
+  fitLabCanvas() {
+    const lens = document.getElementById('rectLoupeLens');
+    if (!lens || !this.labCanvas || this.labCanvas.width === 0) return;
+    const w = lens.clientWidth;
+    const h = lens.clientHeight;
+
+    const scale = Math.min(w / this.labCanvas.width, h / this.labCanvas.height);
+    this.labZoomScale = Math.max(0.15, scale);
+    this.labPanX = Math.round((w - this.labCanvas.width * this.labZoomScale) / 2);
+    this.labPanY = Math.round((h - this.labCanvas.height * this.labZoomScale) / 2);
+    this.updateLabTransform();
+  }
+
+  // Dotykový engine v Laboratoři: kreslení, mazání jedním prstem a PINCH-TO-ZOOM dvěma prsty
   initLabTouchEngine() {
-    if (!this.labCanvas) return;
-    const canvas = this.labCanvas;
+    const lens = document.getElementById('rectLoupeLens');
+    if (!lens || !this.labCanvas) return;
+
+    let ongoingTouches = new Map();
+    let initialPinchDist = null;
+    let initialPinchScale = 1.0;
     let isLabDrawing = false;
     let isLabErasing = false;
+    let isLabPanning = false;
     let currentLabStroke = null;
 
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
-    canvas.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+    lens.addEventListener('touchstart', e => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
 
-    canvas.addEventListener('pointerdown', e => {
+    lens.addEventListener('touchmove', e => {
+      e.preventDefault();
+    }, { passive: false });
+
+    lens.addEventListener('pointerdown', e => {
       const curM = this.currentScore?.measures?.[this.labCurrentIndex];
       if (!curM) return;
 
-      const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
-      if (!pageCoords) return;
+      ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      canvas.setPointerCapture(e.pointerId);
+      if (ongoingTouches.size === 1) {
+        lens.setPointerCapture(e.pointerId);
+        const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
 
-      if (this.editTool === 'eraser') {
-        isLabErasing = true;
-        this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
-        this.showMeasureInLab(this.labCurrentIndex);
-      } else {
-        isLabDrawing = true;
-        currentLabStroke = {
-          color: this.penColor,
-          width: this.penWidth,
-          points: [{ x: pageCoords.x, y: pageCoords.y }]
-        };
+        if (this.editTool === 'eraser') {
+          if (pageCoords) {
+            isLabErasing = true;
+            this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
+            this.showMeasureInLab(this.labCurrentIndex, false);
+          }
+        } else if (this.editTool === 'pen') {
+          if (pageCoords) {
+            isLabDrawing = true;
+            currentLabStroke = {
+              color: this.penColor,
+              width: this.penWidth,
+              points: [{ x: pageCoords.x, y: pageCoords.y }]
+            };
+          }
+        } else {
+          isLabPanning = true;
+        }
+      } else if (ongoingTouches.size === 2) {
+        isLabDrawing = isLabErasing = isLabPanning = false;
+        const t = Array.from(ongoingTouches.values());
+        initialPinchDist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
+        initialPinchScale = this.labZoomScale;
       }
     });
 
-    canvas.addEventListener('pointermove', e => {
+    lens.addEventListener('pointermove', e => {
+      if (!ongoingTouches.has(e.pointerId)) return;
+      const prev = ongoingTouches.get(e.pointerId);
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
       const curM = this.currentScore?.measures?.[this.labCurrentIndex];
       if (!curM) return;
 
-      const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
-      if (!pageCoords) return;
+      // 2 PRSTY: Plynulý Pinch-to-zoom a posun v okně taktu
+      if (ongoingTouches.size === 2) {
+        const t = Array.from(ongoingTouches.values());
+        const dist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
+        const rect = lens.getBoundingClientRect();
+        const cx = (t[0].x + t[1].x) / 2 - rect.left;
+        const cy = (t[0].y + t[1].y) / 2 - rect.top;
 
-      if (isLabErasing) {
-        this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
-        this.showMeasureInLab(this.labCurrentIndex);
+        if (initialPinchDist > 0) {
+          const newScale = Math.max(0.2, Math.min(5.0, initialPinchScale * (dist / initialPinchDist)));
+          const f = newScale / this.labZoomScale;
+          this.labPanX = cx - (cx - this.labPanX) * f;
+          this.labPanY = cy - (cy - this.labPanY) * f;
+          this.labZoomScale = newScale;
+        }
+        this.labPanX += dx / 2;
+        this.labPanY += dy / 2;
+        this.updateLabTransform();
         return;
       }
 
-      if (isLabDrawing && currentLabStroke) {
-        currentLabStroke.points.push({ x: pageCoords.x, y: pageCoords.y });
+      if (ongoingTouches.size === 1) {
+        if (isLabPanning) {
+          this.labPanX += dx;
+          this.labPanY += dy;
+          this.updateLabTransform();
+          return;
+        }
 
-        if (this.labCtx) {
-          this.labCtx.save();
-          this.labCtx.strokeStyle = currentLabStroke.color;
-          this.labCtx.lineWidth = currentLabStroke.width;
-          this.labCtx.lineCap = 'round';
-          this.labCtx.lineJoin = 'round';
-          this.labCtx.translate(-curM.box.left, -curM.box.top);
+        const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
+        if (!pageCoords) return;
 
-          const pts = currentLabStroke.points;
-          if (pts.length >= 2) {
-            this.labCtx.beginPath();
-            this.labCtx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
-            this.labCtx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-            this.labCtx.stroke();
+        if (isLabErasing) {
+          this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
+          this.showMeasureInLab(this.labCurrentIndex, false);
+          return;
+        }
+
+        if (isLabDrawing && currentLabStroke) {
+          currentLabStroke.points.push({ x: pageCoords.x, y: pageCoords.y });
+
+          if (this.labCtx) {
+            this.labCtx.save();
+            this.labCtx.strokeStyle = currentLabStroke.color;
+            this.labCtx.lineWidth = currentLabStroke.width;
+            this.labCtx.lineCap = 'round';
+            this.labCtx.lineJoin = 'round';
+            this.labCtx.translate(-curM.box.left, -curM.box.top);
+
+            const pts = currentLabStroke.points;
+            if (pts.length >= 2) {
+              this.labCtx.beginPath();
+              this.labCtx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
+              this.labCtx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+              this.labCtx.stroke();
+            }
+            this.labCtx.restore();
           }
-          this.labCtx.restore();
         }
       }
     });
@@ -1210,23 +1296,24 @@ class GuitarTrainer {
           await this.persistCurrentScore();
         }
         currentLabStroke = null;
-        this.showMeasureInLab(this.labCurrentIndex);
+        this.showMeasureInLab(this.labCurrentIndex, false);
       }
       isLabErasing = false;
+      isLabPanning = false;
+      ongoingTouches.clear();
     };
 
-    canvas.addEventListener('pointerup', finishLabPointer);
-    canvas.addEventListener('pointercancel', finishLabPointer);
+    lens.addEventListener('pointerup', finishLabPointer);
+    lens.addEventListener('pointercancel', finishLabPointer);
   }
 
+  // Přepočet souřadnic přes labPanX/Y a labZoomScale
   labCanvasToPageCoords(clientX, clientY, curM) {
-    if (!this.labCanvas) return null;
-    const rect = this.labCanvas.getBoundingClientRect();
-    const scaleX = this.labCanvas.width / rect.width;
-    const scaleY = this.labCanvas.height / rect.height;
-
-    const localX = (clientX - rect.left) * scaleX;
-    const localY = (clientY - rect.top) * scaleY;
+    const lens = document.getElementById('rectLoupeLens');
+    if (!lens || !this.labCanvas) return null;
+    const rect = lens.getBoundingClientRect();
+    const localX = (clientX - rect.left - this.labPanX) / this.labZoomScale;
+    const localY = (clientY - rect.top - this.labPanY) / this.labZoomScale;
 
     return {
       x: Math.round(curM.box.left + localX),
@@ -1267,7 +1354,7 @@ class GuitarTrainer {
     if (m.length <= 1) return;
     this.labCurrentIndex = (this.labCurrentIndex + 1) % m.length;
     this.renderLabQueue();
-    this.showMeasureInLab(this.labCurrentIndex);
+    this.showMeasureInLab(this.labCurrentIndex, true);
   }
 
   prevLabMeasure() {
@@ -1275,10 +1362,10 @@ class GuitarTrainer {
     if (m.length <= 1) return;
     this.labCurrentIndex = (this.labCurrentIndex - 1 + m.length) % m.length;
     this.renderLabQueue();
-    this.showMeasureInLab(this.labCurrentIndex);
+    this.showMeasureInLab(this.labCurrentIndex, true);
   }
 
-  async showMeasureInLab(idx) {
+  async showMeasureInLab(idx, autoFit = true) {
     const measures = this.currentScore?.measures || [];
     const clefWrap = document.getElementById('labClefWrap');
     const ind = document.getElementById('labMeasureIndicator');
@@ -1350,6 +1437,12 @@ class GuitarTrainer {
         });
         this.labCtx.restore();
       }
+    }
+
+    if (autoFit) {
+      this.fitLabCanvas();
+    } else {
+      this.updateLabTransform();
     }
   }
 
