@@ -54,7 +54,7 @@
 .rect-loupe-container {
   width: 100%;
   /* Zvýšeno: minimum 260px, ideál 42% výšky displeje, maximum 420px */
-  height: clamp(260px, 42vh, 420px);
+  height: clamp(260px, 40vh, 400px);
   background: #f4f2ec;
   border-radius: var(--radius-lg);
   border: 1.5px solid rgba(139, 92, 246, 0.45);
