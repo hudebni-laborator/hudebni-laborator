@@ -1312,10 +1312,9 @@ class GuitarTrainer {
     const lens = document.getElementById('rectLoupeLens');
     if (!lens || !this.labCanvas) return null;
     const rect = lens.getBoundingClientRect();
-    const sf = this.labScaleFactor || 1;
 
-    const localX = (clientX - rect.left - this.labPanX) / (this.labZoomScale * sf);
-    const localY = (clientY - rect.top - this.labPanY) / (this.labZoomScale * sf);
+    const localX = (clientX - rect.left - this.labPanX) / this.labZoomScale;
+    const localY = (clientY - rect.top - this.labPanY) / this.labZoomScale;
 
     return {
       x: Math.round(curM.box.left + localX),
@@ -1439,33 +1438,24 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. Takt s 2x supersamplingem a doostřením
+    // 2. Takt: Čistý 1:1 přenos z originálu bez mezilehlého rozostření
     const curImg = await this.getPageImage(curM.page || 1);
     if (!this.labCanvas || !this.labCtx || !curImg) return;
 
-    // 2x upscale fyzického rozlišení plátna
-    this.labScaleFactor = 2;
-    this.labCanvas.width = Math.round(curM.box.width * this.labScaleFactor);
-    this.labCanvas.height = Math.round(curM.box.height * this.labScaleFactor);
+    this.labCanvas.width = curM.box.width;
+    this.labCanvas.height = curM.box.height;
 
     this.labCtx.fillStyle = '#f4f2ec';
     this.labCtx.fillRect(0, 0, this.labCanvas.width, this.labCanvas.height);
 
-    // Kvalitní převzorkování do 2x rozlišení
-    this.labCtx.imageSmoothingEnabled = true;
-    this.labCtx.imageSmoothingQuality = 'high';
+    // Přímé zkopírování pixelů 1:1 z původního snímku strany
     this.labCtx.drawImage(
       curImg,
       curM.box.left, curM.box.top, curM.box.width, curM.box.height,
-      0, 0, this.labCanvas.width, this.labCanvas.height
+      0, 0, curM.box.width, curM.box.height
     );
 
-    // Doostření hran a vyčištění šumu
-    if (typeof this.enhanceMeasurePixels === 'function') {
-      this.enhanceMeasurePixels(this.labCtx, this.labCanvas.width, this.labCanvas.height);
-    }
-
-    // 3. Vykreslení kreseb / poznámek přizpůsobené měřítku 2x
+    // 3. Vykreslení kreseb / poznámek (v nativním měřítku 1:1)
     if (this.showAnnotations && this.currentScore?.drawings) {
       const pageKey = `page_${curM.page || 1}`;
       const strokes = this.currentScore.drawings[pageKey] || [];
@@ -1473,7 +1463,6 @@ class GuitarTrainer {
         this.labCtx.save();
         this.labCtx.lineCap = 'round';
         this.labCtx.lineJoin = 'round';
-        this.labCtx.scale(this.labScaleFactor, this.labScaleFactor);
         this.labCtx.translate(-curM.box.left, -curM.box.top);
         strokes.forEach(stroke => {
           if (!stroke.points || stroke.points.length < 2) return;
