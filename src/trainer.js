@@ -1312,8 +1312,10 @@ class GuitarTrainer {
     const lens = document.getElementById('rectLoupeLens');
     if (!lens || !this.labCanvas) return null;
     const rect = lens.getBoundingClientRect();
-    const localX = (clientX - rect.left - this.labPanX) / this.labZoomScale;
-    const localY = (clientY - rect.top - this.labPanY) / this.labZoomScale;
+    const sf = this.labScaleFactor || 1;
+
+    const localX = (clientX - rect.left - this.labPanX) / (this.labZoomScale * sf);
+    const localY = (clientY - rect.top - this.labPanY) / (this.labZoomScale * sf);
 
     return {
       x: Math.round(curM.box.left + localX),
@@ -1365,6 +1367,43 @@ class GuitarTrainer {
     this.showMeasureInLab(this.labCurrentIndex, true);
   }
 
+  // Rychlé doostření a zpevnění kontrastu taktu v paměti (nezvětšuje soubory)
+  enhanceMeasurePixels(ctx, width, height) {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const src = imgData.data;
+    // Klon pro čtení původních sousedních pixelů
+    const copy = new Uint8ClampedArray(src);
+    const strength = 0.40; // Síla doostření hran
+
+    for (let y = 1; y < height - 1; y++) {
+      const rowOffset = y * width;
+      for (let x = 1; x < width - 1; x++) {
+        const idx = (rowOffset + x) * 4;
+
+        for (let c = 0; c < 3; c++) {
+          const center = copy[idx + c];
+          const up = copy[((y - 1) * width + x) * 4 + c];
+          const down = copy[((y + 1) * width + x) * 4 + c];
+          const left = copy[(rowOffset + x - 1) * 4 + c];
+          const right = copy[(rowOffset + x + 1) * 4 + c];
+
+          // 1. Laplaciánové doostření hran
+          let val = center + strength * (4 * center - up - down - left - right);
+
+          // 2. Kontrastní křivka pro notopisy (odstraní šedý šum, zpevní linky)
+          if (val < 135) {
+            val = Math.max(12, val * 0.82); // Sytý inkoust
+          } else if (val > 195) {
+            val = Math.min(255, val * 1.04); // Čisté pozadí papíru
+          }
+
+          src[idx + c] = val;
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
   async showMeasureInLab(idx, autoFit = true) {
     const measures = this.currentScore?.measures || [];
     const clefWrap = document.getElementById('labClefWrap');
@@ -1381,7 +1420,7 @@ class GuitarTrainer {
     const curM = measures[this.labCurrentIndex];
     if (ind) ind.innerText = `Takt #${curM.id}`;
 
-    // 1. Klíč
+    // 1. Klíč & předznamenání
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
       const keyImg = await this.getPageImage(keySig.page || 1);
@@ -1400,22 +1439,33 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. Takt
+    // 2. Takt s 2x supersamplingem a doostřením
     const curImg = await this.getPageImage(curM.page || 1);
     if (!this.labCanvas || !this.labCtx || !curImg) return;
 
-    this.labCanvas.width = curM.box.width;
-    this.labCanvas.height = curM.box.height;
+    // 2x upscale fyzického rozlišení plátna
+    this.labScaleFactor = 2;
+    this.labCanvas.width = Math.round(curM.box.width * this.labScaleFactor);
+    this.labCanvas.height = Math.round(curM.box.height * this.labScaleFactor);
+
     this.labCtx.fillStyle = '#f4f2ec';
     this.labCtx.fillRect(0, 0, this.labCanvas.width, this.labCanvas.height);
 
+    // Kvalitní převzorkování do 2x rozlišení
+    this.labCtx.imageSmoothingEnabled = true;
+    this.labCtx.imageSmoothingQuality = 'high';
     this.labCtx.drawImage(
       curImg,
       curM.box.left, curM.box.top, curM.box.width, curM.box.height,
-      0, 0, curM.box.width, curM.box.height
+      0, 0, this.labCanvas.width, this.labCanvas.height
     );
 
-    // 3. Vykreslení kreseb
+    // Doostření hran a vyčištění šumu
+    if (typeof this.enhanceMeasurePixels === 'function') {
+      this.enhanceMeasurePixels(this.labCtx, this.labCanvas.width, this.labCanvas.height);
+    }
+
+    // 3. Vykreslení kreseb / poznámek přizpůsobené měřítku 2x
     if (this.showAnnotations && this.currentScore?.drawings) {
       const pageKey = `page_${curM.page || 1}`;
       const strokes = this.currentScore.drawings[pageKey] || [];
@@ -1423,6 +1473,7 @@ class GuitarTrainer {
         this.labCtx.save();
         this.labCtx.lineCap = 'round';
         this.labCtx.lineJoin = 'round';
+        this.labCtx.scale(this.labScaleFactor, this.labScaleFactor);
         this.labCtx.translate(-curM.box.left, -curM.box.top);
         strokes.forEach(stroke => {
           if (!stroke.points || stroke.points.length < 2) return;
