@@ -48,9 +48,14 @@
 }
 
 /* FIXNÍ VÝŠKA OKNA TAKTU – NIKDY NEZASAHUJE DO METRONOMU */
+/* ======================================================== */
+/* KARTA TAKTU V LABORATOŘI – ZVÝŠENÉ OKÉNKO                */
+/* ======================================================== */
 .rect-loupe-container {
   width: 100%;
-  height: clamp(165px, 24vh, 205px);
+  /* Původně: clamp(165px, 24vh, 205px); */
+  /* Zvýšeno na příjemnějších cca 220px až 320px podle výšky displeje: */
+  height: clamp(220px, 34vh, 320px);
   background: #f4f2ec;
   border-radius: var(--radius-lg);
   border: 1.5px solid rgba(139, 92, 246, 0.45);
