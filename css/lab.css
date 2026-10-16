@@ -53,9 +53,8 @@
 /* ======================================================== */
 .rect-loupe-container {
   width: 100%;
-  /* Původně: clamp(165px, 24vh, 205px); */
-  /* Zvýšeno na příjemnějších cca 220px až 320px podle výšky displeje: */
-  height: clamp(220px, 34vh, 320px);
+  /* Zvýšeno: minimum 260px, ideál 42% výšky displeje, maximum 420px */
+  height: clamp(260px, 42vh, 420px);
   background: #f4f2ec;
   border-radius: var(--radius-lg);
   border: 1.5px solid rgba(139, 92, 246, 0.45);
