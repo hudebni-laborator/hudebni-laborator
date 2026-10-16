@@ -192,11 +192,40 @@
     </div>
 
     <!-- VYSOUVACÍ RYCHLÝ POSUVNÍK PRO HRANÍ -->
+    <!-- VYSOUVACÍ PANEL TEMPA A AKCELERACE PRO HRANÍ -->
     <div class="play-tempo-popup" id="playTempoPopup" style="display:none;">
-      <div class="tempo-slider-row">
-        <button class="btn btn-sm" onclick="window.app.metronome.changeBpm(-5)">−5</button>
-        <input type="range" id="playTempoSlider" min="30" max="240" value="60" class="metro-range-slider" oninput="window.app.metronome.setBpm(this.value)">
-        <button class="btn btn-sm" onclick="window.app.metronome.changeBpm(5)">+5</button>
+      <!-- Řádek 1: Aktuální / Start tempo -->
+      <div class="metro-slider-line" style="margin-bottom: 6px;">
+        <span class="slider-lbl">Start: <b id="playStartVal">60</b></span>
+        <button class="step-btn-mini" onclick="window.app.metronome.changePlayBpm(-5)">−5</button>
+        <input type="range" id="playTempoSlider" min="30" max="240" value="60" class="metro-range-slider" oninput="window.app.metronome.setPlayBpm(this.value)">
+        <button class="step-btn-mini" onclick="window.app.metronome.changePlayBpm(5)">+5</button>
+      </div>
+
+      <!-- Řádek 2: Cílové tempo -->
+      <div class="metro-slider-line" style="margin-bottom: 8px;">
+        <span class="slider-lbl">Cíl: <b id="playTargetVal">60</b></span>
+        <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(-5)">−5</button>
+        <input type="range" id="playTargetBpmSlider" min="30" max="240" value="60" class="metro-range-slider" oninput="window.app.metronome.onPlayTargetInput(this.value)">
+        <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(5)">+5</button>
+      </div>
+
+      <!-- Řádek 3: Krok zrychlení a po kolika taktech -->
+      <div class="metro-controls-row" style="padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08);">
+        <div class="metro-input-group">
+          <span class="metro-lbl">+Krok</span>
+          <input type="number" id="playStepBpm" value="2" min="1" max="20" class="metro-input" onchange="window.app.metronome.setPlayStep(this.value)">
+        </div>
+        <div class="metro-input-group">
+          <span class="metro-lbl">Taktů</span>
+          <input type="number" id="playBarsCount" value="4" min="1" max="64" class="metro-input" onchange="window.app.metronome.setPlayBars(this.value)">
+        </div>
+        <button class="btn btn-sm" onclick="window.app.metronome.matchPlayTargetToStart()" title="Vypnout zrychlování (Cíl = Start)">
+          Rovnoměrně
+        </button>
+        <button class="btn btn-sm" onclick="window.app.togglePlayTempoPopup()" style="margin-left: auto;">
+          ✔ Zavřít
+        </button>
       </div>
     </div>
   </div>
