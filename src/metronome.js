@@ -2,8 +2,20 @@ class MetronomeController {
   constructor() {
     this.audioCtx = null;
     this.isRunning = false;
+    this.activeMode = 'play'; // 'play' | 'lab'
+
+    // Samostatné nastavení pro REŽIM HRANÍ (klasický metronom)
+    this.playBpm = 60;
+    this.playBeats = 4;
+
+    // Samostatné nastavení pro REŽIM LABORATOŘ (graduální cvičení)
+    this.labStartBpm = 60;
+    this.labTargetBpm = 100;
+    this.labCurrentBpm = 60;
+    this.labBeats = 4;
+
+    // Běhový stav
     this.currentBpm = 60;
-    this.targetBpm = 100;
     this.beatsPerBar = 4;
     this.phase = 'idle'; // 'idle', 'leadin', 'playing', 'goal'
     this.beatIndex = 0;
@@ -17,6 +29,11 @@ class MetronomeController {
   async initAudio() {
     if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (this.audioCtx.state === 'suspended') await this.audioCtx.resume();
+  }
+
+  detectCurrentMode() {
+    const isLab = document.getElementById('labView')?.style.display === 'flex';
+    return isLab ? 'lab' : 'play';
   }
 
   playClickSound(time, isAccent, isLeadIn) {
@@ -59,7 +76,6 @@ class MetronomeController {
       try {
         const osc = this.audioCtx.createOscillator();
         const gain = this.audioCtx.createGain();
-
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, t0 + delay);
 
@@ -70,7 +86,6 @@ class MetronomeController {
 
         osc.connect(gain);
         gain.connect(this.audioCtx.destination);
-
         osc.start(noteStart);
         osc.stop(noteStart + 2.5);
       } catch (_) {}
@@ -88,20 +103,37 @@ class MetronomeController {
       try { await window.wakeLockManager.request(); } catch (_) {}
     }
 
-    // Načteme hodnotu start a cíl z posuvníků
-    const startInput = document.getElementById('metroStartBpm');
-    if (startInput) this.currentBpm = Number(startInput.value) || this.currentBpm;
-
-    const targetInput = document.getElementById('metroTargetBpm');
-    if (targetInput) this.targetBpm = Number(targetInput.value) || 100;
-    this.updateTargetDisplay(this.targetBpm);
-
+    this.activeMode = this.detectCurrentMode();
     this.isRunning = true;
-    this.phase = 'leadin';
     this.beatIndex = 0;
     this.measureIndexInCycle = 0;
 
-    this.updateTempoDisplays(this.currentBpm);
+    if (this.activeMode === 'play') {
+      // HRANÍ: Přímé rovnoměrné tempo bez cíle a bez navyšování
+      this.currentBpm = this.playBpm;
+      this.beatsPerBar = this.playBeats;
+      this.phase = 'playing';
+      this.updatePlayTempoUI();
+    } else {
+      // LABORATOŘ: Postupné zrychlování ze Start do Cíl
+      const startSlider = document.getElementById('metroStartBpm');
+      if (startSlider) this.labStartBpm = Number(startSlider.value) || this.labStartBpm;
+
+      const targetSlider = document.getElementById('metroTargetBpm');
+      if (targetSlider) this.labTargetBpm = Number(targetSlider.value) || this.labTargetBpm;
+
+      const beatsInput = document.getElementById('metroBeatsPerBar');
+      if (beatsInput) this.labBeats = Number(beatsInput.value) || this.labBeats;
+
+      this.currentBpm = this.labStartBpm;
+      this.beatsPerBar = this.labBeats;
+      this.phase = 'leadin';
+
+      this.updateLabTargetDisplay(this.labTargetBpm);
+      this.updateLabTempoUI(this.currentBpm);
+    }
+
+    this.updateCircleUI(this.phase);
     this.nextBeatTime = this.audioCtx.currentTime + 0.05;
     this.timerId = setInterval(() => this.schedulerLoop(), this.lookaheadMs);
   }
@@ -116,13 +148,54 @@ class MetronomeController {
     this.updateCircleUI('idle');
   }
 
-  // --- OBSLUHA POSUVNÍKŮ A TEMPA ---
+  // ==========================================================
+  // OVLÁDÁNÍ PRO REŽIM HRANÍ (Nemá vliv na Laboratoř)
+  // ==========================================================
+  setPlayBpm(val) {
+    this.playBpm = Math.max(30, Math.min(260, Number(val) || 60));
+    if (this.isRunning && this.activeMode === 'play') {
+      this.currentBpm = this.playBpm;
+    }
+    this.updatePlayTempoUI();
+  }
+
+  changePlayBpm(delta) {
+    this.setPlayBpm(this.playBpm + delta);
+  }
+
+  setPlayBeats(val) {
+    this.playBeats = Math.max(1, Math.min(16, Number(val) || 4));
+    if (this.isRunning && this.activeMode === 'play') {
+      this.beatsPerBar = this.playBeats;
+      this.beatIndex = 0;
+    }
+    const sel = document.getElementById('playMetroBeatsSelect');
+    if (sel && sel.value !== String(this.playBeats)) sel.value = String(this.playBeats);
+  }
+
+  updatePlayTempoUI() {
+    const textEl = document.getElementById('playMetroBpmText');
+    if (textEl) textEl.innerText = this.playBpm;
+
+    const slider = document.getElementById('playTempoSlider');
+    if (slider) slider.value = this.playBpm;
+  }
+
+  // Zpětná kompatibilita pro stará volání
+  setBpm(val) { this.setPlayBpm(val); }
+  changeBpm(delta) { this.changePlayBpm(delta); }
+  setBeats(val) { this.setPlayBeats(val); }
+
+  // ==========================================================
+  // OVLÁDÁNÍ PRO REŽIM LABORATOŘ (Nemá vliv na Hraní)
+  // ==========================================================
   onStartBpmInput(val) {
-    const bpm = Math.max(30, Math.min(240, Number(val)));
+    this.labStartBpm = Math.max(30, Math.min(240, Number(val) || 60));
     const lbl = document.getElementById('metroStartVal');
-    if (lbl) lbl.innerText = bpm;
-    if (!this.isRunning) {
-      this.setBpm(bpm);
+    if (lbl) lbl.innerText = this.labStartBpm;
+
+    if (!this.isRunning && this.detectCurrentMode() === 'lab') {
+      this.updateLabTempoUI(this.labStartBpm);
     }
   }
 
@@ -135,10 +208,10 @@ class MetronomeController {
   }
 
   onTargetBpmInput(val) {
-    this.targetBpm = Math.max(30, Math.min(240, Number(val)));
+    this.labTargetBpm = Math.max(30, Math.min(240, Number(val) || 100));
     const lbl = document.getElementById('metroTargetVal');
-    if (lbl) lbl.innerText = this.targetBpm;
-    this.updateTargetDisplay(this.targetBpm);
+    if (lbl) lbl.innerText = this.labTargetBpm;
+    this.updateLabTargetDisplay(this.labTargetBpm);
   }
 
   adjustTargetBpm(delta) {
@@ -149,58 +222,28 @@ class MetronomeController {
     }
   }
 
-  updateTargetDisplay(targetBpm) {
+  updateLabTargetDisplay(targetBpm) {
     const targetText = document.getElementById('metroTargetBpmText');
     if (targetText) {
       targetText.innerText = `➔ Cíl: ${targetBpm}`;
     }
   }
 
-  changeBpm(delta) {
-    this.setBpm(this.currentBpm + delta);
-  }
-
-  setBpm(newBpm) {
-    this.currentBpm = Math.max(30, Math.min(240, Number(newBpm) || 60));
-    this.updateTempoDisplays(this.currentBpm);
-  }
-
-  setBeats(beats) {
-    this.beatsPerBar = Math.max(1, Math.min(16, Number(beats) || 4));
-    this.beatIndex = 0;
-
-    const inp = document.getElementById('metroBeatsPerBar');
-    if (inp && inp.value !== String(this.beatsPerBar)) inp.value = this.beatsPerBar;
-
-    const sel = document.getElementById('playMetroBeatsSelect');
-    if (sel && sel.value !== String(this.beatsPerBar)) sel.value = this.beatsPerBar;
+  updateLabTempoUI(bpm) {
+    const d1 = document.getElementById('metroCurrentBpmText');
+    if (d1) d1.innerText = bpm;
   }
 
   resetTempo() {
     const startSlider = document.getElementById('metroStartBpm');
-    const startBpm = startSlider ? Number(startSlider.value) : 60;
-    this.setBpm(startBpm);
+    const startVal = startSlider ? Number(startSlider.value) : this.labStartBpm;
+    this.labCurrentBpm = startVal;
+    this.updateLabTempoUI(startVal);
   }
 
-  updateTempoDisplays(bpm) {
-    const d1 = document.getElementById('metroCurrentBpmText');
-    if (d1) d1.innerText = bpm;
-    const d2 = document.getElementById('playMetroBpmText');
-    if (d2) d2.innerText = bpm;
-
-    // Posuvník v Hraní
-    const playSlider = document.getElementById('playTempoSlider');
-    if (playSlider) playSlider.value = bpm;
-
-    // Posuvník Start v Laboratoři (pokud metronom neběží)
-    if (!this.isRunning) {
-      const startSlider = document.getElementById('metroStartBpm');
-      if (startSlider) startSlider.value = bpm;
-      const startLbl = document.getElementById('metroStartVal');
-      if (startLbl) startLbl.innerText = bpm;
-    }
-  }
-
+  // ==========================================================
+  // ZVUKOVÝ PLÁNOVAČ A SMYČKA
+  // ==========================================================
   schedulerLoop() {
     if (!this.audioCtx || !this.isRunning) return;
     while (this.nextBeatTime < this.audioCtx.currentTime + this.scheduleAheadSec) {
@@ -222,17 +265,33 @@ class MetronomeController {
     const delayMs = Math.max(0, (time - this.audioCtx.currentTime) * 1000);
     setTimeout(() => {
       if (!this.isRunning && scheduledPhase !== 'goal') return;
-      this.renderBeatLight(scheduledBeat, beatsPerBar, scheduledPhase);
-      if (scheduledBeat === 0) {
-        this.updateCircleUI(scheduledPhase);
-        this.updateTempoDisplays(scheduledBpm);
+
+      if (this.activeMode === 'lab') {
+        this.renderBeatLight(scheduledBeat, beatsPerBar, scheduledPhase);
+        if (scheduledBeat === 0) {
+          this.updateCircleUI(scheduledPhase);
+          this.updateLabTempoUI(scheduledBpm);
+        }
+      } else {
+        if (scheduledBeat === 0) {
+          this.updateCircleUI(scheduledPhase);
+        }
       }
     }, delayMs);
   }
 
   advanceBeat() {
     const beats = this.beatsPerBar;
-    const targetBpm = this.targetBpm;
+
+    if (this.activeMode === 'play') {
+      // V HRANÍ: Pouze plynule plyne čas bez jakéhokoliv navyšování či cíle
+      this.nextBeatTime += (60.0 / this.currentBpm);
+      this.beatIndex = (this.beatIndex + 1) % beats;
+      return;
+    }
+
+    // V LABORATOŘI: Zpracování fází cvičení
+    const targetBpm = this.labTargetBpm;
     const step = Number(document.getElementById('metroStepBpm')?.value) || 2;
     const bars = Number(document.getElementById('metroBarsCount')?.value) || 1;
 
@@ -251,27 +310,21 @@ class MetronomeController {
             this.currentBpm = Math.min(targetBpm, this.currentBpm + step);
             this.phase = 'leadin';
           } else {
-            // CÍL SPLNĚN
-            const isLab = document.getElementById('labView')?.style.display === 'flex';
-            if (isLab) {
-              const finishTime = this.nextBeatTime;
-              const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
+            // Cíl splněn v Laboratoři: Fanfára a zastavení
+            const finishTime = this.nextBeatTime;
+            const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
 
-              this.isRunning = false;
-              if (this.timerId) clearInterval(this.timerId);
-              this.timerId = null;
+            this.isRunning = false;
+            if (this.timerId) clearInterval(this.timerId);
+            this.timerId = null;
 
-              this.playCelebratoryChord(finishTime);
+            this.playCelebratoryChord(finishTime);
 
-              setTimeout(() => {
-                this.clearBeatLights();
-                this.updateCircleUI('goal');
-              }, delayMs);
-
-              return;
-            } else {
-              this.phase = 'goal';
-            }
+            setTimeout(() => {
+              this.clearBeatLights();
+              this.updateCircleUI('goal');
+            }, delayMs);
+            return;
           }
           this.measureIndexInCycle = 0;
         }
@@ -280,28 +333,40 @@ class MetronomeController {
   }
 
   updateCircleUI(phase) {
-    const buttons = [
-      { btn: document.getElementById('metroCircleBtn'), icn: document.getElementById('metroCircleIcon') },
-      { btn: document.getElementById('playMetroCircleBtn'), icn: document.getElementById('playMetroCircleIcon') }
-    ];
+    const labBtn = document.getElementById('metroCircleBtn');
+    const labIcn = document.getElementById('metroCircleIcon');
+    const playBtn = document.getElementById('playMetroCircleBtn');
+    const playIcn = document.getElementById('playMetroCircleIcon');
 
-    buttons.forEach(({ btn, icn }) => {
-      if (!btn || !icn) return;
-      btn.className = btn.classList.contains('play-metro-circle')
-        ? 'metro-circle-btn play-metro-circle'
-        : 'metro-circle-btn';
-
+    // Tlačítko v Laboratoři
+    if (labBtn && labIcn) {
+      labBtn.className = 'metro-circle-btn';
       if (phase === 'idle') {
-        btn.classList.add('circle-idle');
-        icn.innerText = '▶';
+        labBtn.classList.add('circle-idle');
+        labIcn.innerText = '▶';
       } else if (phase === 'leadin') {
-        btn.classList.add('circle-leadin');
-        icn.innerText = '⏸';
+        labBtn.classList.add('circle-leadin');
+        labIcn.innerText = '⏸';
+      } else if (phase === 'goal') {
+        labBtn.classList.add('circle-playing');
+        labIcn.innerText = '🏆';
       } else {
-        btn.classList.add('circle-playing');
-        icn.innerText = phase === 'goal' ? '🏆' : '⏸';
+        labBtn.classList.add('circle-playing');
+        labIcn.innerText = '⏸';
       }
-    });
+    }
+
+    // Tlačítko v Hraní (prostý start/stop)
+    if (playBtn && playIcn) {
+      playBtn.className = 'metro-circle-btn play-metro-circle';
+      if (this.isRunning && this.activeMode === 'play') {
+        playBtn.classList.add('circle-playing');
+        playIcn.innerText = '⏸';
+      } else {
+        playBtn.classList.add('circle-idle');
+        playIcn.innerText = '▶';
+      }
+    }
   }
 
   renderBeatLight(beatIdx, totalBeats, phase) {

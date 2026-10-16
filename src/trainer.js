@@ -245,8 +245,16 @@ class GuitarTrainer {
   resetMetronomeTempo() { this.metronome.resetTempo(); }
   stopMetronome() { this.metronome.stop(); }
   promptSetBpm() {
-    const val = window.prompt('Zadejte tempo (BPM):', this.metronome.currentBpm);
-    if (val && !isNaN(val)) this.metronome.setBpm(Number(val));
+    const isLab = document.getElementById('labView')?.style.display === 'flex';
+    const current = isLab ? this.metronome.labStartBpm : this.metronome.playBpm;
+    const val = window.prompt('Zadejte tempo (BPM):', current);
+    if (val && !isNaN(val)) {
+      if (isLab) {
+        this.metronome.onStartBpmInput(Number(val));
+      } else {
+        this.metronome.setPlayBpm(Number(val));
+      }
+    }
   }
 
   updateHeaderTitle() {
