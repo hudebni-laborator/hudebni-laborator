@@ -83,9 +83,12 @@
   touch-action: none !important;
 }
 
+/* Původně: box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); */
 .lab-viewport canvas {
   display: block;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: none !important; /* <--- Zde odstraněn stín kolem taktu */
+  max-width: none !important;
+  max-height: none !important;
 }
 
 /* EDITAČNÍ LIŠTA V LABORATOŘI */

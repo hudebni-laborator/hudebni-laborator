@@ -72,48 +72,46 @@ async function processAndEnhancePhoto(file, maxDim = 2400) {
   });
 }
 
-// Analýza notové linky a ohraničení taktu
-// Robustnější detekce osnovy a taktových čar s podporou dvojčar a konců řádků
 function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   const width = sourceCanvas.width;
   const height = sourceCanvas.height;
   const ctx = sourceCanvas.getContext('2d');
 
-  // Vertikální výřez kolem kliknutí (dostatečný pro zachycení celé osnovy)
-  const scanTop = Math.max(0, Math.floor(clickY - 260));
-  const scanH = Math.min(height - scanTop, 520);
+  // 1. Záchyt širšího okolí kliknutí pro zachycení i sousedních osnov (nahoře i dole)
+  const scanTop = Math.max(0, Math.floor(clickY - 450));
+  const scanH = Math.min(height - scanTop, 900);
   const imgData = ctx.getImageData(0, scanTop, width, scanH);
   const data = imgData.data;
 
-  // 1. Zjištění lokálního jasu papíru v okolí kliknutí
+  // Průměrný jas papíru v okolí klepnutí
   let sumB = 0, countSample = 0;
-  for (let y = 0; y < scanH; y += 6) {
-    for (let x = Math.max(0, clickX - 150); x < Math.min(width, clickX + 150); x += 6) {
+  for (let y = 0; y < scanH; y += 8) {
+    for (let x = Math.max(0, clickX - 140); x < Math.min(width, clickX + 140); x += 8) {
       const idx = (y * width + Math.floor(x)) * 4;
       sumB += (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
       countSample++;
     }
   }
   const bgBright = countSample > 0 ? (sumB / countSample) : 235;
-  const darkThreshold = Math.min(150, Math.max(60, bgBright * 0.72));
+  const darkThreshold = Math.min(145, Math.max(65, bgBright * 0.72));
 
-  const isDarkRel = (x, localY) => {
+  const isDark = (x, localY) => {
     if (x < 0 || x >= width || localY < 0 || localY >= scanH) return false;
     const idx = (localY * width + Math.floor(x)) * 4;
     return ((data[idx] + data[idx + 1] + data[idx + 2]) / 3) < darkThreshold;
   };
 
-  // 2. Nalezení 5 linek notové osnovy v daném řádku
+  // 2. Nalezení všech linek notových osnov v celém prohledávaném vertikálním pásu
   const sampleLeft = Math.max(0, Math.floor(clickX - 180));
   const sampleRight = Math.min(width, Math.floor(clickX + 180));
-  const minLineFill = (sampleRight - sampleLeft) * 0.32;
+  const minLineFill = (sampleRight - sampleLeft) * 0.35;
 
   const lineBlocks = [];
   let currentBlock = [];
   for (let y = 0; y < scanH; y++) {
     let darkCount = 0;
     for (let x = sampleLeft; x < sampleRight; x++) {
-      if (isDarkRel(x, y)) darkCount++;
+      if (isDark(x, y)) darkCount++;
     }
     if (darkCount >= minLineFill) {
       currentBlock.push(y);
@@ -129,9 +127,11 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   }
 
   const lineRows = lineBlocks.map(y => y + scanTop);
-  let currentStaff = null;
 
-  for (let i = 0; i <= lineRows.length - 5; i++) {
+  // 3. Rekonstrukce všech osnov (skupin po 5 linkách)
+  const allStaffs = [];
+  let i = 0;
+  while (i <= lineRows.length - 5) {
     const group = lineRows.slice(i, i + 5);
     const spacings = [
       group[1] - group[0],
@@ -142,110 +142,179 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
     const avgSpacing = spacings.reduce((a, b) => a + b) / 4;
     const isUniform = spacings.every(s => Math.abs(s - avgSpacing) <= 6 && s >= 4 && s <= 45);
 
-    if (isUniform && clickY >= group[0] - 50 && clickY <= group[4] + 50) {
-      currentStaff = {
+    if (isUniform) {
+      allStaffs.push({
         top: group[0],
         bottom: group[4],
-        height: group[4] - group[0],
         lines: group,
         spacing: avgSpacing
-      };
+      });
+      i += 5; // Posun na další osnovu
+    } else {
+      i++;
+    }
+  }
+
+  // Najdeme aktuální osnovu, do které uživatel klepl
+  let curIndex = -1;
+  for (let idx = 0; idx < allStaffs.length; idx++) {
+    const s = allStaffs[idx];
+    if (clickY >= s.top - 60 && clickY <= s.bottom + 60) {
+      curIndex = idx;
       break;
     }
   }
 
-  // Fallback, pokud osnova nebyla spolehlivě zachycena
+  // Pokud jsme nenašli osnovu přesným rozsahem, zvolíme nejbližší podle středu
+  if (curIndex === -1 && allStaffs.length > 0) {
+    let minD = Infinity;
+    allStaffs.forEach((s, idx) => {
+      const mid = (s.top + s.bottom) / 2;
+      const d = Math.abs(clickY - mid);
+      if (d < minD) { minD = d; curIndex = idx; }
+    });
+  }
+
+  const currentStaff = curIndex !== -1 ? allStaffs[curIndex] : null;
+
   if (!currentStaff) {
     return {
       isBarLine: () => false,
       box: {
-        left: Math.max(0, Math.floor(clickX - 80)),
+        left: Math.max(0, Math.floor(clickX - 90)),
         top: Math.max(0, Math.floor(clickY - 50)),
-        width: 160,
+        width: 180,
         height: 100
       }
     };
   }
 
-  const staffTopRel = currentStaff.top - scanTop;
-  const staffBottomRel = currentStaff.bottom - scanTop;
-  const spacing = currentStaff.spacing;
-  const staffH = currentStaff.height;
+  // 4. Výpočet horního a dolního okraje přesně do poloviny mezer mezi osnovami
+  const prevStaff = curIndex > 0 ? allStaffs[curIndex - 1] : null;
+  const nextStaff = curIndex < allStaffs.length - 1 ? allStaffs[curIndex + 1] : null;
 
-  // 3. Robustní funkce pro ověření taktové čáry na sloupci col
-  const isBarLine = (col) => {
-    if (col < 2 || col >= width - 2) return false;
+  let topY, bottomY;
 
-    // Spočítáme vertikální pokrytí uvnitř osnovy (s tolerancí +/- 1 px do šířky)
-    let darkPixelsInside = 0;
-    for (let y = staffTopRel; y <= staffBottomRel; y++) {
-      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) {
-        darkPixelsInside++;
+  // Horní mezera
+  if (prevStaff) {
+    // Polovina mezery mezi spodní linkou předchozí osnovy a horní linkou aktuální osnovy
+    topY = Math.round((prevStaff.bottom + currentStaff.top) / 2);
+  } else if (nextStaff) {
+    // Pokud je to první osnova stránky, použijeme stejnou výšku jako má mezera dolů
+    const gapBelow = nextStaff.top - currentStaff.bottom;
+    topY = Math.max(0, Math.round(currentStaff.top - gapBelow / 2));
+  } else {
+    // Jediná osnova na stránce (fallback)
+    const fallbackMargin = Math.round(currentStaff.spacing * 3.5);
+    topY = Math.max(0, currentStaff.top - fallbackMargin);
+  }
+
+  // Dolní mezera
+  if (nextStaff) {
+    // Polovina mezery mezi spodní linkou aktuální osnovy a horní linkou následující osnovy
+    bottomY = Math.round((currentStaff.bottom + nextStaff.top) / 2);
+  } else if (prevStaff) {
+    // Poslední osnova na stránce -> použijeme stejnou mezeru jako nahoru
+    const gapAbove = currentStaff.top - prevStaff.bottom;
+    bottomY = Math.min(height, Math.round(currentStaff.bottom + gapAbove / 2));
+  } else {
+    const fallbackMargin = Math.round(currentStaff.spacing * 3.5);
+    bottomY = Math.min(height, currentStaff.bottom + fallbackMargin);
+  }
+
+  const lRel = currentStaff.lines.map(y => y - scanTop);
+  const sp = currentStaff.spacing;
+  const staffHeightRel = lRel[4] - lRel[0];
+
+  // 5. Test taktové čáry se skórováním
+  const scoreColumnAsBarline = (col) => {
+    if (col < 2 || col >= width - 2) return 0;
+
+    let gapChecksPassed = 0;
+    for (let i = 0; i < 4; i++) {
+      const yA = Math.round(lRel[i] + sp * 0.2);
+      const yMid = Math.round((lRel[i] + lRel[i + 1]) / 2);
+      const yB = Math.round(lRel[i + 1] - sp * 0.2);
+
+      const hasDark = (isDark(col, yA) || isDark(col - 1, yA) || isDark(col + 1, yA)) &&
+                      (isDark(col, yMid) || isDark(col - 1, yMid) || isDark(col + 1, yMid)) &&
+                      (isDark(col, yB) || isDark(col - 1, yB) || isDark(col + 1, yB));
+
+      if (hasDark) gapChecksPassed++;
+    }
+    if (gapChecksPassed < 4) return 0;
+
+    let darkCount = 0;
+    for (let y = lRel[0]; y <= lRel[4]; y++) {
+      if (isDark(col, y) || isDark(col - 1, y) || isDark(col + 1, y)) darkCount++;
+    }
+    const fillRatio = darkCount / (staffHeightRel + 1);
+    if (fillRatio < 0.82) return 0;
+
+    let overshootUp = 0;
+    for (let y = lRel[0] - 2; y >= Math.max(0, lRel[0] - Math.round(sp * 2.0)); y--) {
+      if (isDark(col, y) || isDark(col - 1, y) || isDark(col + 1, y)) overshootUp++;
+    }
+    if (overshootUp > sp * 0.35) return 0;
+
+    let overshootDown = 0;
+    for (let y = lRel[4] + 2; y <= Math.min(scanH - 1, lRel[4] + Math.round(sp * 2.0)); y++) {
+      if (isDark(col, y) || isDark(col - 1, y) || isDark(col + 1, y)) overshootDown++;
+    }
+    if (overshootDown > sp * 0.35) return 0;
+
+    let sideNoise = 0;
+    const testOffsets = [-Math.round(sp * 0.7), Math.round(sp * 0.7)];
+    for (const off of testOffsets) {
+      for (let i = 0; i < 4; i++) {
+        const midY = Math.round((lRel[i] + lRel[i + 1]) / 2);
+        if (isDark(col + off, midY)) sideNoise++;
       }
     }
-    const coverageInside = darkPixelsInside / (staffH + 1);
-    if (coverageInside < 0.70) return false; // Musí pokrývat alespoň 70 % výšky osnovy
 
-    // Ověření přesahu nahoru a dolů (nožičky not a ligatury přesahují výrazně, taktová čára ne)
-    const maxOvershoot = Math.max(4, Math.floor(spacing * 0.75));
-    let oUp = 0;
-    for (let y = staffTopRel - 1; y >= Math.max(0, staffTopRel - spacing * 2.5); y--) {
-      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) oUp++;
-      else break;
-    }
-    if (oUp > maxOvershoot) return false;
-
-    let oDown = 0;
-    for (let y = staffBottomRel + 1; y <= Math.min(scanH - 1, staffBottomRel + spacing * 2.5); y++) {
-      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) oDown++;
-      else break;
-    }
-    if (oDown > maxOvershoot) return false;
-
-    return true;
+    return (fillRatio * 100) - (sideNoise * 15);
   };
 
-  // 4. Hledání levé taktové čáry směrem doleva od kliknutí
-  let leftX = Math.floor(clickX) - 5;
-  let foundLeft = false;
-  for (let x = leftX; x >= Math.max(0, clickX - spacing * 25); x--) {
-    if (isBarLine(x)) {
-      // Pokud jde o dvojčáru, posuneme se až na její vnější hranu
-      while (x > 0 && isBarLine(x - 1)) x--;
-      leftX = x;
-      foundLeft = true;
+  // 6. Hledání taktových čar vlevo a vpravo
+  const minClearance = Math.round(sp * 2.2);
+  const maxRange = Math.round(sp * 34);
+
+  let bestLeftX = null;
+  let bestLeftScore = 0;
+  for (let x = Math.floor(clickX) - minClearance; x >= Math.max(0, clickX - maxRange); x--) {
+    const score = scoreColumnAsBarline(x);
+    if (score > 60 && score > bestLeftScore) {
+      let edgeX = x;
+      while (edgeX > 0 && scoreColumnAsBarline(edgeX - 1) > 40) edgeX--;
+      bestLeftScore = score;
+      bestLeftX = edgeX;
       break;
     }
   }
 
-  // 5. Hledání pravé taktové čáry směrem doprava od kliknutí
-  let rightX = Math.floor(clickX) + 5;
-  let foundRight = false;
-  for (let x = rightX; x <= Math.min(width, clickX + spacing * 25); x++) {
-    if (isBarLine(x)) {
-      while (x < width - 1 && isBarLine(x + 1)) x++;
-      rightX = x;
-      foundRight = true;
+  let bestRightX = null;
+  let bestRightScore = 0;
+  for (let x = Math.floor(clickX) + minClearance; x <= Math.min(width - 1, clickX + maxRange); x++) {
+    const score = scoreColumnAsBarline(x);
+    if (score > 60 && score > bestRightScore) {
+      let edgeX = x;
+      while (edgeX < width - 1 && scoreColumnAsBarline(edgeX + 1) > 40) edgeX++;
+      bestRightScore = score;
+      bestRightX = edgeX;
       break;
     }
   }
 
-  // Bezpečné výchozí šířky, pokud nebyla nalezena některá čára
-  if (!foundLeft) leftX = Math.max(0, Math.floor(clickX - spacing * 8));
-  if (!foundRight) rightX = Math.min(width, Math.floor(clickX + spacing * 8));
-
-  // Odsazení nahoru a dolů, aby se do taktu vešly i prstoklady a ligatury nad/pod osnovou
-  const verticalMargin = Math.round(currentStaff.height * 0.65);
-  const topY = Math.max(0, currentStaff.top - verticalMargin);
-  const bottomY = Math.min(height, currentStaff.bottom + verticalMargin);
+  const leftX = bestLeftX !== null ? bestLeftX : Math.max(0, Math.floor(clickX - sp * 10));
+  const rightX = bestRightX !== null ? bestRightX : Math.min(width, Math.floor(clickX + sp * 10));
 
   return {
-    isBarLine,
+    isBarLine: (col) => scoreColumnAsBarline(col) > 60,
     box: {
       left: leftX,
       top: topY,
-      width: Math.max(35, rightX - leftX),
-      height: Math.max(35, bottomY - topY)
+      width: Math.max(40, rightX - leftX),
+      height: Math.max(40, bottomY - topY)
     }
   };
 }
