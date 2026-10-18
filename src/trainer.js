@@ -82,6 +82,11 @@ class GuitarTrainer {
     popup.style.display = (popup.style.display === 'none') ? 'block' : 'none';
   }
 
+  toggleLabMetroPopup() {
+    const el = document.getElementById('dockedMetronome');
+    if (el) el.classList.toggle('open-landscape-panel');
+  }
+
   showAddPagePrompt() {
     const banner = document.getElementById('addPagePromptBanner');
     const text = document.getElementById('addPagePromptText');
@@ -611,7 +616,6 @@ class GuitarTrainer {
     this.updateViewportTransform();
   }
 
-  // --- OŘEZ PAPÍRU (SPUSTIT / PROVÉST / ZRUŠIT) ---
   startPaperCrop() {
     if (!this.currentScore || this.currentScore.isPdf) return;
     this.resetActiveSelection();
@@ -723,7 +727,6 @@ class GuitarTrainer {
     this.renderScoreView();
   }
 
-  // --- DOTYKOVÝ ENGINE V HRANÍ A EDITU ---
   initTouchEngine() {
     const box = this.canvasBox;
     if (!box) return;
@@ -746,7 +749,6 @@ class GuitarTrainer {
 
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      // 1. Ořez papíru
       if (this.isCropMode && this.cropEditor) {
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
         const act = this.cropEditor.hitTest(c.x, c.y);
@@ -763,7 +765,6 @@ class GuitarTrainer {
 
       if (!this.isMarkingMode && e.target.classList.contains('page-turn-zone')) return;
 
-      // 2. Guma
       if (this.isMarkingMode && this.editTool === 'eraser' && ongoingTouches.size === 1) {
         this.isErasingStroke = true;
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
@@ -772,7 +773,6 @@ class GuitarTrainer {
         return;
       }
 
-      // 3. Kreslení tužkou
       if (this.isMarkingMode && this.editTool === 'pen' && ongoingTouches.size === 1) {
         this.isDrawingStroke = true;
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
@@ -785,7 +785,6 @@ class GuitarTrainer {
         return;
       }
 
-      // 4. Posun, zoom a úprava rámečku
       if (ongoingTouches.size === 1) {
         startPoint = { x: e.clientX, y: e.clientY };
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
@@ -871,7 +870,7 @@ class GuitarTrainer {
       } else if (ongoingTouches.size === 1) {
         if (isDrag && this.activeEditor) {
           const c = this.screenToCanvasCoords(e.clientX, e.clientY);
-          this.activeEditor.moveDrag(c.x, c.y, e.clientX, e.clientY);
+          this.activeEditor.moveDrag(c.x, c.y);
         } else if (isPan) {
           this.panX += dx;
           this.panY += dy;
@@ -1348,6 +1347,7 @@ class GuitarTrainer {
         this.labCurrentIndex = m.indexOf(x); 
         this.renderLabQueue(); 
         this.showMeasureInLab(this.labCurrentIndex); 
+        if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
       };
       wrap.appendChild(b);
     });
@@ -1359,6 +1359,7 @@ class GuitarTrainer {
     this.labCurrentIndex = (this.labCurrentIndex + 1) % m.length;
     this.renderLabQueue();
     this.showMeasureInLab(this.labCurrentIndex, true);
+    if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
   }
 
   prevLabMeasure() {
@@ -1367,6 +1368,7 @@ class GuitarTrainer {
     this.labCurrentIndex = (this.labCurrentIndex - 1 + m.length) % m.length;
     this.renderLabQueue();
     this.showMeasureInLab(this.labCurrentIndex, true);
+    if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
   }
 
   enhanceMeasurePixels(ctx, width, height) {
@@ -1476,11 +1478,10 @@ class GuitarTrainer {
     const lensH = lens ? lens.clientHeight : 300;
     const dpr = Math.max(1, window.devicePixelRatio || 1);
 
-    // 1. Získání původního snímku pro dynamické vzorkování barvy
+    // 1. Zjištění dynamické barvy papíru
     const curImg = await this.getPageImage(curM.page || 1);
     const paperColor = this.samplePaperColorFromImage(curImg, curM.box);
 
-    // Sjednocení pozadí čočky i rámečku
     if (lens) lens.style.backgroundColor = paperColor;
     if (container) container.style.backgroundColor = paperColor;
 
@@ -1636,6 +1637,7 @@ class GuitarTrainer {
       this.renderLabQueue();
       this.showMeasureInLab(this.labCurrentIndex);
       this.renderScoreView();
+      if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
     }
   }
 

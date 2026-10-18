@@ -190,7 +190,6 @@
 
     <!-- VYSOUVACÍ PANEL TEMPA A AKCELERACE PRO HRANÍ -->
     <div class="play-tempo-popup" id="playTempoPopup" style="display:none;">
-      <!-- Řádek 1: Aktuální / Start tempo -->
       <div class="metro-slider-line" style="margin-bottom: 6px;">
         <span class="slider-lbl">Start: <b id="playStartVal">60</b></span>
         <button class="step-btn-mini" onclick="window.app.metronome.changePlayBpm(-5)">−5</button>
@@ -198,7 +197,6 @@
         <button class="step-btn-mini" onclick="window.app.metronome.changePlayBpm(5)">+5</button>
       </div>
 
-      <!-- Řádek 2: Cílové tempo -->
       <div class="metro-slider-line" style="margin-bottom: 8px;">
         <span class="slider-lbl">Cíl: <b id="playTargetVal">60</b></span>
         <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(-5)">−5</button>
@@ -206,7 +204,6 @@
         <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(5)">+5</button>
       </div>
 
-      <!-- Řádek 3: Krok zrychlení a interval taktů -->
       <div class="metro-controls-row" style="padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08);">
         <div class="metro-input-group">
           <span class="metro-lbl">+Krok</span>
@@ -229,9 +226,9 @@
   <!-- 3. ZÁLOŽKA: LABORATOŘ S EDITAČNÍMI PRVKY -->
   <div class="view-panel practice-panel" id="labView" style="display:none; padding:8px 6px;">
     
-    <!-- Společná plocha: Horní řádek s klíčem a frontou taktů vedle sebe + lupa pod nimi -->
+    <!-- Společná plocha: Klíč a fronta taktů na stejném řádku + lupa pod nimi -->
     <div class="lab-main-area" id="labMainArea">
-      <!-- Horní řádek: Zvětšený výřez klíče a fronta taktů na stejném řádku -->
+      <!-- Horní řádek: Zvětšený klíč a fronta taktů na stejném řádku -->
       <div class="lab-top-row" id="labTopRow">
         <div class="lab-clef-box" id="labClefWrap" style="display:none;">
           <canvas id="labClefCanvas"></canvas>
@@ -290,19 +287,16 @@
 
     <!-- POHODLNÁ AKČNÍ LIŠTA: Šipky uprostřed a větší, Zvládnuto vpravo -->
     <div class="lab-action-bar">
-      <!-- Levý prostor pro vyvážení středu -->
       <div class="lab-action-side">
         <button class="btn btn-sm" onclick="window.app.fitLabCanvas()" title="Přizpůsobit velikost do okénka" style="padding: 6px 8px;">🔍 1:1</button>
       </div>
 
-      <!-- Středové přepínání taktů -->
       <div class="lab-nav-center">
         <button class="lab-nav-btn" onclick="window.app.prevLabMeasure()" title="Předchozí takt">◀</button>
         <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
         <button class="lab-nav-btn" onclick="window.app.nextLabMeasure()" title="Další takt">▶</button>
       </div>
 
-      <!-- Pravá strana -->
       <div class="lab-action-side" style="justify-content: flex-end;">
         <button class="btn btn-accent btn-sm lab-resolve-btn" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">
           ✔ Zvládnuto
@@ -313,7 +307,7 @@
 
   <!-- DOKOVACÍ METRONOM V LABORATOŘI S POSUVNÍKY -->
   <div class="docked-metronome" id="dockedMetronome" style="display:none;">
-    <!-- Horní řádek: Ukazatel dob vlevo, tempo uprostřed, spouštěcí tlačítko vpravo -->
+    <!-- Horní řádek: Diody vlevo, tempo uprostřed, tlačítko nastavení a kruhové tlačítko vpravo -->
     <div class="metro-header-row">
       <div class="metro-beat-lights" id="metroBeatLights">
         <div class="beat-light"></div>
@@ -328,42 +322,46 @@
         <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
       </div>
 
+      <!-- Tlačítko pro vyjetí ovládání v landscape režimu -->
+      <button class="metro-settings-btn" id="labMetroSettingsBtn" onclick="window.app.toggleLabMetroPopup()" title="Nastavení metronomu">🎛</button>
+
+      <!-- Spouštěcí kruhové tlačítko -->
       <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
         <span class="circle-icon" id="metroCircleIcon">▶</span>
       </button>
     </div>
 
-    <!-- Řádek: POSUVNÍK START TEMPO -->
-    <div class="metro-slider-line">
-      <span class="slider-lbl">Start: <b id="metroStartVal">60</b></span>
-      <button class="step-btn-mini" onclick="window.app.metronome.adjustStartBpm(-5)">−5</button>
-      <input type="range" id="metroStartBpm" min="30" max="240" value="60" class="metro-range-slider" oninput="window.app.metronome.onStartBpmInput(this.value)">
-      <button class="step-btn-mini" onclick="window.app.metronome.adjustStartBpm(5)">+5</button>
-    </div>
+    <!-- Tělo s posuvníky (v portraitu běžně pod lištou, v landscape vyjíždí jako panel) -->
+    <div class="metro-body-panel" id="metroBodyPanel">
+      <div class="metro-slider-line">
+        <span class="slider-lbl">Start: <b id="metroStartVal">60</b></span>
+        <button class="step-btn-mini" onclick="window.app.metronome.adjustStartBpm(-5)">−5</button>
+        <input type="range" id="metroStartBpm" min="30" max="240" value="60" class="metro-range-slider" oninput="window.app.metronome.onStartBpmInput(this.value)">
+        <button class="step-btn-mini" onclick="window.app.metronome.adjustStartBpm(5)">+5</button>
+      </div>
 
-    <!-- Řádek: POSUVNÍK CÍL TEMPO -->
-    <div class="metro-slider-line">
-      <span class="slider-lbl">Cíl: <b id="metroTargetVal">100</b></span>
-      <button class="step-btn-mini" onclick="window.app.metronome.adjustTargetBpm(-5)">−5</button>
-      <input type="range" id="metroTargetBpm" min="30" max="240" value="100" class="metro-range-slider" oninput="window.app.metronome.onTargetBpmInput(this.value)">
-      <button class="step-btn-mini" onclick="window.app.metronome.adjustTargetBpm(5)">+5</button>
-    </div>
+      <div class="metro-slider-line">
+        <span class="slider-lbl">Cíl: <b id="metroTargetVal">100</b></span>
+        <button class="step-btn-mini" onclick="window.app.metronome.adjustTargetBpm(-5)">−5</button>
+        <input type="range" id="metroTargetBpm" min="30" max="240" value="100" class="metro-range-slider" oninput="window.app.metronome.onTargetBpmInput(this.value)">
+        <button class="step-btn-mini" onclick="window.app.metronome.adjustTargetBpm(5)">+5</button>
+      </div>
 
-    <!-- Doplňkové parametry v jednom kompaktním řádku -->
-    <div class="metro-controls-row">
-      <div class="metro-input-group">
-        <span class="metro-lbl">+Krok</span>
-        <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input">
+      <div class="metro-controls-row">
+        <div class="metro-input-group">
+          <span class="metro-lbl">+Krok</span>
+          <input type="number" id="metroStepBpm" value="2" min="1" max="20" class="metro-input">
+        </div>
+        <div class="metro-input-group">
+          <span class="metro-lbl">Taktů</span>
+          <input type="number" id="metroBarsCount" value="1" min="1" max="64" class="metro-input">
+        </div>
+        <div class="metro-input-group">
+          <span class="metro-lbl">Doby</span>
+          <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input" onchange="window.app.metronome.setBeats(this.value)">
+        </div>
+        <button class="btn btn-danger btn-sm metro-reset-btn" onclick="window.app.resetMetronomeTempo()">↺ Reset</button>
       </div>
-      <div class="metro-input-group">
-        <span class="metro-lbl">Taktů</span>
-        <input type="number" id="metroBarsCount" value="1" min="1" max="64" class="metro-input">
-      </div>
-      <div class="metro-input-group">
-        <span class="metro-lbl">Doby</span>
-        <input type="number" id="metroBeatsPerBar" value="4" min="1" max="12" class="metro-input" onchange="window.app.metronome.setBeats(this.value)">
-      </div>
-      <button class="btn btn-danger btn-sm metro-reset-btn" onclick="window.app.resetMetronomeTempo()">↺ Reset</button>
     </div>
   </div>
 

@@ -70,7 +70,7 @@
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); 
 }
 
-/* FIXNÍ VÝŠKA OKNA TAKTU */
+/* KARTA TAKTU V LABORATOŘI – FIXNÍ VÝŠKA */
 .rect-loupe-container {
   width: 100%;
   height: clamp(220px, 32vh, 310px);
@@ -229,7 +229,7 @@
     gap: 3px !important;
   }
 
-  /* V landscape jsou Klíč a Lupa vedle sebe na celou výšku */
+  /* V landscape jsou Klíč a Lupa vedle sebe na výšku */
   .lab-main-area {
     flex-direction: row !important;
     align-items: stretch !important;
@@ -247,9 +247,10 @@
     display: none !important;
   }
 
+  /* V LANDSCAPE ZŮSTÁVÁ KLÍČ STEJNĚ VELKÝ JAKO V PORTRAIT (56px) */
   .lab-clef-box {
-    height: 100% !important;
-    max-height: 100% !important;
+    height: 56px !important;
+    max-height: 56px !important;
     align-self: center !important;
   }
 
@@ -264,10 +265,10 @@
     margin-top: 2px !important;
   }
 
-  /* REZERVA PROTI PŘEKRYTÍ: Akční lišta má pravé odsazení před plovoucím metronomem */
+  /* REZERVA PROTI PŘEKRYTÍ: Akční lišta končí před tlačítky metronomu (110px) */
   .lab-action-bar {
     padding: 2px 8px !important;
-    padding-right: 68px !important; /* Prostor pro plovoucí tlačítko metronomu vpravo dole */
+    padding-right: 110px !important;
     margin-top: 2px !important;
   }
 

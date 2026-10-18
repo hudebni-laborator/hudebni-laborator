@@ -8,7 +8,7 @@ class MetronomeController {
     // SAMOSTATNÉ PARAMETRY PRO REŽIM HRANÍ
     // ==========================================================
     this.playStartBpm = 60;
-    this.playTargetBpm = 60; // Pokud je rovno StartBpm, běží bez zrychlování
+    this.playTargetBpm = 60;
     this.playCurrentBpm = 60;
     this.playStepBpm = 2;
     this.playBarsCount = 4;
@@ -121,14 +121,12 @@ class MetronomeController {
     this.measureIndexInCycle = 0;
 
     if (this.activeMode === 'play') {
-      // START PRO REŽIM HRANÍ
       this.playCurrentBpm = this.playStartBpm;
       this.currentBpm = this.playCurrentBpm;
       this.beatsPerBar = this.playBeats;
-      this.phase = (this.playTargetBpm > this.playStartBpm) ? 'playing' : 'playing';
+      this.phase = 'playing';
       this.updatePlayTempoUI();
     } else {
-      // START PRO REŽIM LABORATOŘ
       const startSlider = document.getElementById('metroStartBpm');
       if (startSlider) this.labStartBpm = Number(startSlider.value) || this.labStartBpm;
 
@@ -169,7 +167,6 @@ class MetronomeController {
     this.playStartBpm = Math.max(30, Math.min(260, Number(val) || 60));
     if (!this.isRunning || this.activeMode !== 'play') {
       this.playCurrentBpm = this.playStartBpm;
-      // Pokud byl Cíl dříve svázán, držíme ho
       if (this.playTargetBpm < this.playStartBpm) {
         this.playTargetBpm = this.playStartBpm;
       }
@@ -240,7 +237,6 @@ class MetronomeController {
     if (targetLbl) targetLbl.innerText = this.playTargetBpm;
   }
 
-  // Zpětná kompatibilita
   setBpm(val) { this.setPlayBpm(val); }
   changeBpm(delta) { this.changePlayBpm(delta); }
   setBeats(val) { this.setPlayBeats(val); }
@@ -300,6 +296,24 @@ class MetronomeController {
     this.updateLabTempoUI(startVal);
   }
 
+  // AUTOMATICKÝ RESET METRONOMU NA ZVOLENÝ START PŘI PŘEPNUTÍ TAKTU V LABORATOŘI
+  resetLabDrill() {
+    this.currentBpm = this.labStartBpm;
+    this.measureIndexInCycle = 0;
+    this.beatIndex = 0;
+    if (this.isRunning && this.detectCurrentMode() === 'lab') {
+      this.phase = 'leadin';
+      this.nextBeatTime = this.audioCtx ? this.audioCtx.currentTime + 0.05 : 0;
+      this.updateLabTempoUI(this.currentBpm);
+      this.updateCircleUI('leadin');
+    } else {
+      this.phase = 'idle';
+      this.updateLabTempoUI(this.currentBpm);
+      this.updateCircleUI('idle');
+      this.clearBeatLights();
+    }
+  }
+
   // ==========================================================
   // PLÁNOVAČ A SMYČKA DOB
   // ==========================================================
@@ -344,14 +358,12 @@ class MetronomeController {
   advanceBeat() {
     const beats = this.beatsPerBar;
 
-    // 1. REŽIM HRANÍ:
     if (this.activeMode === 'play') {
       this.nextBeatTime += (60.0 / this.currentBpm);
       this.beatIndex++;
 
       if (this.beatIndex >= beats) {
         this.beatIndex = 0;
-        // Pokud je nastaven cíl vyšší než aktuální tempo, zrychlujeme
         if (this.playTargetBpm > this.currentBpm) {
           this.measureIndexInCycle++;
           if (this.measureIndexInCycle >= this.playBarsCount) {
@@ -363,7 +375,6 @@ class MetronomeController {
       return;
     }
 
-    // 2. REŽIM LABORATOŘ:
     const targetBpm = this.labTargetBpm;
     const step = Number(document.getElementById('metroStepBpm')?.value) || this.labStepBpm;
     const bars = Number(document.getElementById('metroBarsCount')?.value) || this.labBarsCount;
@@ -383,7 +394,6 @@ class MetronomeController {
             this.currentBpm = Math.min(targetBpm, this.currentBpm + step);
             this.phase = 'leadin';
           } else {
-            // Dosažení cíle v Laboratoři: Fanfára a zastavení
             const finishTime = this.nextBeatTime;
             const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
 
