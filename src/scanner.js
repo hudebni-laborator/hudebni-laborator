@@ -73,48 +73,48 @@ async function processAndEnhancePhoto(file, maxDim = 2400) {
 }
 
 // Analýza notové linky a ohraničení taktu
+// Robustnější detekce osnovy a taktových čar s podporou dvojčar a konců řádků
 function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
   const width = sourceCanvas.width;
   const height = sourceCanvas.height;
   const ctx = sourceCanvas.getContext('2d');
-  const scanTop = Math.max(0, Math.floor(clickY - 250));
-  const scanH = Math.min(height - scanTop, 500);
+
+  // Vertikální výřez kolem kliknutí (dostatečný pro zachycení celé osnovy)
+  const scanTop = Math.max(0, Math.floor(clickY - 260));
+  const scanH = Math.min(height - scanTop, 520);
   const imgData = ctx.getImageData(0, scanTop, width, scanH);
   const data = imgData.data;
 
+  // 1. Zjištění lokálního jasu papíru v okolí kliknutí
   let sumB = 0, countSample = 0;
-  for (let y = 0; y < scanH; y += 8) {
-    for (let x = Math.max(0, clickX - 120); x < Math.min(width, clickX + 120); x += 8) {
+  for (let y = 0; y < scanH; y += 6) {
+    for (let x = Math.max(0, clickX - 150); x < Math.min(width, clickX + 150); x += 6) {
       const idx = (y * width + Math.floor(x)) * 4;
       sumB += (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
       countSample++;
     }
   }
-  const bgBright = countSample > 0 ? (sumB / countSample) : 240;
-  const darkThreshold = Math.min(145, Math.max(65, bgBright * 0.70));
+  const bgBright = countSample > 0 ? (sumB / countSample) : 235;
+  const darkThreshold = Math.min(150, Math.max(60, bgBright * 0.72));
 
   const isDarkRel = (x, localY) => {
     if (x < 0 || x >= width || localY < 0 || localY >= scanH) return false;
     const idx = (localY * width + Math.floor(x)) * 4;
-    return (data[idx] + data[idx + 1] + data[idx + 2]) / 3 < darkThreshold;
+    return ((data[idx] + data[idx + 1] + data[idx + 2]) / 3) < darkThreshold;
   };
 
-  const getHWidth = (x, localY, maxDist = 35) => {
-    if (!isDarkRel(x, localY)) return 0;
-    let l = 0; while (l < maxDist && isDarkRel(x - l - 1, localY)) l++;
-    let r = 0; while (r < maxDist && isDarkRel(x + r + 1, localY)) r++;
-    return l + r + 1;
-  };
-
-  const sampleLeft = Math.max(0, Math.floor(clickX - 160));
-  const sampleRight = Math.min(width, Math.floor(clickX + 160));
-  const minLineFill = (sampleRight - sampleLeft) * 0.35;
+  // 2. Nalezení 5 linek notové osnovy v daném řádku
+  const sampleLeft = Math.max(0, Math.floor(clickX - 180));
+  const sampleRight = Math.min(width, Math.floor(clickX + 180));
+  const minLineFill = (sampleRight - sampleLeft) * 0.32;
 
   const lineBlocks = [];
   let currentBlock = [];
   for (let y = 0; y < scanH; y++) {
     let darkCount = 0;
-    for (let x = sampleLeft; x < sampleRight; x++) { if (isDarkRel(x, y)) darkCount++; }
+    for (let x = sampleLeft; x < sampleRight; x++) {
+      if (isDarkRel(x, y)) darkCount++;
+    }
     if (darkCount >= minLineFill) {
       currentBlock.push(y);
     } else {
@@ -124,75 +124,128 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
       }
     }
   }
-  if (currentBlock.length > 0) lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+  if (currentBlock.length > 0) {
+    lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+  }
 
   const lineRows = lineBlocks.map(y => y + scanTop);
   let currentStaff = null;
+
   for (let i = 0; i <= lineRows.length - 5; i++) {
     const group = lineRows.slice(i, i + 5);
-    const spacings = [group[1] - group[0], group[2] - group[1], group[3] - group[2], group[4] - group[3]];
+    const spacings = [
+      group[1] - group[0],
+      group[2] - group[1],
+      group[3] - group[2],
+      group[4] - group[3]
+    ];
     const avgSpacing = spacings.reduce((a, b) => a + b) / 4;
-    const isUniform = spacings.every(s => Math.abs(s - avgSpacing) <= 5 && s >= 4 && s <= 45);
-    if (isUniform && clickY >= group[0] - 45 && clickY <= group[4] + 45) {
-      currentStaff = { top: group[0], bottom: group[4], height: group[4] - group[0], lines: group, spacing: avgSpacing };
+    const isUniform = spacings.every(s => Math.abs(s - avgSpacing) <= 6 && s >= 4 && s <= 45);
+
+    if (isUniform && clickY >= group[0] - 50 && clickY <= group[4] + 50) {
+      currentStaff = {
+        top: group[0],
+        bottom: group[4],
+        height: group[4] - group[0],
+        lines: group,
+        spacing: avgSpacing
+      };
       break;
     }
   }
 
+  // Fallback, pokud osnova nebyla spolehlivě zachycena
   if (!currentStaff) {
     return {
       isBarLine: () => false,
-      box: { left: Math.max(0, Math.floor(clickX - 80)), top: Math.max(0, Math.floor(clickY - 50)), width: 160, height: 100 }
+      box: {
+        left: Math.max(0, Math.floor(clickX - 80)),
+        top: Math.max(0, Math.floor(clickY - 50)),
+        width: 160,
+        height: 100
+      }
     };
   }
 
   const staffTopRel = currentStaff.top - scanTop;
   const staffBottomRel = currentStaff.bottom - scanTop;
-  const linesRel = currentStaff.lines.map(y => y - scanTop);
   const spacing = currentStaff.spacing;
+  const staffH = currentStaff.height;
 
+  // 3. Robustní funkce pro ověření taktové čáry na sloupci col
   const isBarLine = (col) => {
-    let gapsPassed = 0;
-    for (let i = 0; i < 4; i++) {
-      let gapDark = 0, gapH = linesRel[i + 1] - linesRel[i] + 1;
-      for (let y = linesRel[i]; y <= linesRel[i + 1]; y++) {
-        if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) gapDark++;
-      }
-      if (gapDark / gapH >= 0.60) gapsPassed++;
-    }
-    if (gapsPassed < 4) return false;
+    if (col < 2 || col >= width - 2) return false;
 
-    const maxOvershoot = Math.max(4, Math.floor(spacing * 0.70));
-    let oUp = 0; for (let y = staffTopRel - 1; y >= Math.max(0, staffTopRel - spacing * 2.5); y--) { if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) oUp++; else break; }
+    // Spočítáme vertikální pokrytí uvnitř osnovy (s tolerancí +/- 1 px do šířky)
+    let darkPixelsInside = 0;
+    for (let y = staffTopRel; y <= staffBottomRel; y++) {
+      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) {
+        darkPixelsInside++;
+      }
+    }
+    const coverageInside = darkPixelsInside / (staffH + 1);
+    if (coverageInside < 0.70) return false; // Musí pokrývat alespoň 70 % výšky osnovy
+
+    // Ověření přesahu nahoru a dolů (nožičky not a ligatury přesahují výrazně, taktová čára ne)
+    const maxOvershoot = Math.max(4, Math.floor(spacing * 0.75));
+    let oUp = 0;
+    for (let y = staffTopRel - 1; y >= Math.max(0, staffTopRel - spacing * 2.5); y--) {
+      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) oUp++;
+      else break;
+    }
     if (oUp > maxOvershoot) return false;
 
-    let oDown = 0; for (let y = staffBottomRel + 1; y <= Math.min(scanH - 1, staffBottomRel + spacing * 2.5); y++) { if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) oDown++; else break; }
+    let oDown = 0;
+    for (let y = staffBottomRel + 1; y <= Math.min(scanH - 1, staffBottomRel + spacing * 2.5); y++) {
+      if (isDarkRel(col, y) || isDarkRel(col - 1, y) || isDarkRel(col + 1, y)) oDown++;
+      else break;
+    }
     if (oDown > maxOvershoot) return false;
 
-    const minW = Math.max(6, Math.floor(spacing * 0.65));
-    for (const testY of [Math.round(staffTopRel + spacing * 0.45), Math.round(linesRel[1] + spacing * 0.5), Math.round(linesRel[2] + spacing * 0.5), Math.round(staffBottomRel - spacing * 0.45)]) {
-      if (getHWidth(col, testY) >= minW) return false;
-    }
     return true;
   };
 
+  // 4. Hledání levé taktové čáry směrem doleva od kliknutí
   let leftX = Math.floor(clickX) - 5;
-  for (let x = leftX; x >= Math.max(0, clickX - spacing * 18); x--) {
-    if (isBarLine(x)) { leftX = x; break; }
-  }
-  let rightX = Math.floor(clickX) + 5;
-  for (let x = rightX; x <= Math.min(width, clickX + spacing * 18); x++) {
-    if (isBarLine(x)) { rightX = x; break; }
+  let foundLeft = false;
+  for (let x = leftX; x >= Math.max(0, clickX - spacing * 25); x--) {
+    if (isBarLine(x)) {
+      // Pokud jde o dvojčáru, posuneme se až na její vnější hranu
+      while (x > 0 && isBarLine(x - 1)) x--;
+      leftX = x;
+      foundLeft = true;
+      break;
+    }
   }
 
-  const gapMargin = Math.round(currentStaff.height * 0.65);
+  // 5. Hledání pravé taktové čáry směrem doprava od kliknutí
+  let rightX = Math.floor(clickX) + 5;
+  let foundRight = false;
+  for (let x = rightX; x <= Math.min(width, clickX + spacing * 25); x++) {
+    if (isBarLine(x)) {
+      while (x < width - 1 && isBarLine(x + 1)) x++;
+      rightX = x;
+      foundRight = true;
+      break;
+    }
+  }
+
+  // Bezpečné výchozí šířky, pokud nebyla nalezena některá čára
+  if (!foundLeft) leftX = Math.max(0, Math.floor(clickX - spacing * 8));
+  if (!foundRight) rightX = Math.min(width, Math.floor(clickX + spacing * 8));
+
+  // Odsazení nahoru a dolů, aby se do taktu vešly i prstoklady a ligatury nad/pod osnovou
+  const verticalMargin = Math.round(currentStaff.height * 0.65);
+  const topY = Math.max(0, currentStaff.top - verticalMargin);
+  const bottomY = Math.min(height, currentStaff.bottom + verticalMargin);
+
   return {
     isBarLine,
     box: {
       left: leftX,
-      top: Math.max(0, currentStaff.top - gapMargin),
-      width: Math.max(30, rightX - leftX),
-      height: Math.max(30, (currentStaff.bottom + gapMargin) - Math.max(0, currentStaff.top - gapMargin))
+      top: topY,
+      width: Math.max(35, rightX - leftX),
+      height: Math.max(35, bottomY - topY)
     }
   };
 }
