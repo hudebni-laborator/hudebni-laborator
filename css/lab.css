@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 56px;
+  min-height: 68px;
 }
 
 /* ZVĚTŠENÝ VÝŘEZ KLÍČE A PŘEDZNAMENÁNÍ */
@@ -29,7 +29,7 @@
   justify-content: center;
   flex-shrink: 0;
   box-shadow: none !important;
-  height: 56px;
+  height: 68px;
   box-sizing: border-box;
 }
 .lab-clef-box canvas {
@@ -249,8 +249,8 @@
 
   /* V landscape zůstává klíč stejně velký jako v portrait (56px) */
   .lab-clef-box {
-    height: 56px !important;
-    max-height: 56px !important;
+    height: 68px !important;
+    max-height: 68px !important;
     align-self: center !important;
   }
 
