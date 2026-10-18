@@ -54,7 +54,7 @@
   <!-- 2. ZÁLOŽKA: HRANÍ & ZNAČKOVÁNÍ -->
   <div class="view-panel play-fullscreen-panel" id="editView" style="display:none; padding:0;">
     
-    <!-- Plovoucí banner po vyfocení: spolehlivě otevírá fotoaparát pro další stranu -->
+    <!-- Plovoucí banner po vyfocení strany -->
     <div class="add-page-prompt-banner" id="addPagePromptBanner" style="display:none;">
       <span class="prompt-text" id="addPagePromptText">Strana 1 uložena.</span>
       <div style="display:flex; gap:6px; align-items:center;">
@@ -98,7 +98,7 @@
         <canvas id="scoreCanvas"></canvas>
       </div>
 
-      <!-- PLOVOUCÍ TLAČÍTKO CELÁ OBRAZOVKA VPRAVO NAHOŘE -->
+      <!-- Plovoucí tlačítko celá obrazovka vpravo nahoře -->
       <button class="floating-fs-btn" id="floatingFsBtn" onclick="window.app.toggleFullscreen()" title="Celá obrazovka">
         ⛶
       </button>
@@ -144,20 +144,17 @@
         <button class="draw-tool-btn" id="toggleDrawingsBtn" onclick="window.app.toggleDrawingsVisibility()" title="Zobrazit/Skrýt kresby">👁️</button>
         <button class="draw-tool-btn" onclick="window.app.undoLastDrawing()" title="Zpět poslední tah">↩</button>
         
-        <!-- Tlačítko pro přifocení další strany -->
         <label class="draw-tool-btn" id="addPageLabel" title="Vyfotit a přidat další stranu">
           📷 +Str
           <input type="file" id="addPageInput" class="file-input" accept="image/*" capture="environment">
         </label>
 
-        <!-- Tlačítko ořezu -->
         <button class="draw-tool-btn" id="cropPaperBtn" onclick="window.app.startPaperCrop()" title="Oříznout okraje papíru">
           ✂
         </button>
       </div>
     </div>
 
-    <!-- PŘILEPENÁ SPODNÍ LIŠTA V HRANÍ -->
     <!-- PŘILEPENÁ SPODNÍ LIŠTA V HRANÍ -->
     <div class="docked-play-bar" id="dockedPlayBar">
       <button class="btn btn-accent btn-sm fixed-mode-btn" id="toggleInteractionBtn" onclick="window.app.toggleInteractionMode()">
@@ -176,11 +173,11 @@
           <span class="circle-icon" id="playMetroCircleIcon">▶</span>
         </button>
         <div class="play-metro-tempo-ctrl">
-          <button class="tempo-step-btn" onclick="window.app.metronome.changeBpm(-2)">−</button>
+          <button class="tempo-step-btn" onclick="window.app.metronome.changePlayBpm(-2)">−</button>
           <span class="play-metro-bpm-val" id="playMetroBpmText" onclick="window.app.togglePlayTempoPopup()" title="Klepnutím otevřete posuvník">60</span>
-          <button class="tempo-step-btn" onclick="window.app.metronome.changeBpm(2)">+</button>
+          <button class="tempo-step-btn" onclick="window.app.metronome.changePlayBpm(2)">+</button>
         </div>
-        <select class="play-metro-beats-select" id="playMetroBeatsSelect" onchange="window.app.metronome.setBeats(this.value)">
+        <select class="play-metro-beats-select" id="playMetroBeatsSelect" onchange="window.app.metronome.setPlayBeats(this.value)">
           <option value="2">2/4</option>
           <option value="3">3/4</option>
           <option value="4" selected>4/4</option>
@@ -191,7 +188,6 @@
       </div>
     </div>
 
-    <!-- VYSOUVACÍ RYCHLÝ POSUVNÍK PRO HRANÍ -->
     <!-- VYSOUVACÍ PANEL TEMPA A AKCELERACE PRO HRANÍ -->
     <div class="play-tempo-popup" id="playTempoPopup" style="display:none;">
       <!-- Řádek 1: Aktuální / Start tempo -->
@@ -210,7 +206,7 @@
         <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(5)">+5</button>
       </div>
 
-      <!-- Řádek 3: Krok zrychlení a po kolika taktech -->
+      <!-- Řádek 3: Krok zrychlení a interval taktů -->
       <div class="metro-controls-row" style="padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08);">
         <div class="metro-input-group">
           <span class="metro-lbl">+Krok</span>
@@ -229,19 +225,20 @@
       </div>
     </div>
   </div>
+
   <!-- 3. ZÁLOŽKA: LABORATOŘ S EDITAČNÍMI PRVKY -->
   <div class="view-panel practice-panel" id="labView" style="display:none; padding:8px 6px;">
     
-    <!-- Fronta označených taktů -->
-    <div class="lab-queue-wrap" id="labQueueWrap">
-      <div class="lab-queue-pills" id="labQueuePills"></div>
-    </div>
-
-    <!-- Hlavní cvičební plocha -->
-    <div class="lab-main-display" id="labMainDisplay">
-      <!-- Čistý výřez klíče a předznamenání -->
-      <div class="lab-clef-box" id="labClefWrap" style="display:none;">
-        <canvas id="labClefCanvas"></canvas>
+    <!-- Společná plocha: Horní řádek s klíčem a frontou taktů vedle sebe + lupa pod nimi -->
+    <div class="lab-main-area" id="labMainArea">
+      <!-- Horní řádek: Zvětšený výřez klíče a fronta taktů na stejném řádku -->
+      <div class="lab-top-row" id="labTopRow">
+        <div class="lab-clef-box" id="labClefWrap" style="display:none;">
+          <canvas id="labClefCanvas"></canvas>
+        </div>
+        <div class="lab-queue-wrap" id="labQueueWrap">
+          <div class="lab-queue-pills" id="labQueuePills"></div>
+        </div>
       </div>
 
       <!-- Karta taktu s fixní výškou a podporou přiblížení (zoom/pan) -->
@@ -314,27 +311,26 @@
     </div>
   </div>
 
-  <!-- METRONOM (VYSOUVACÍ NEBO DOKOVANÝ) -->
   <!-- DOKOVACÍ METRONOM V LABORATOŘI S POSUVNÍKY -->
   <div class="docked-metronome" id="dockedMetronome" style="display:none;">
-    <!-- Horní řádek se stavem a kruhem -->
+    <!-- Horní řádek: Ukazatel dob vlevo, tempo uprostřed, spouštěcí tlačítko vpravo -->
     <div class="metro-header-row">
-      <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
-        <span class="circle-icon" id="metroCircleIcon">▶</span>
-      </button>
-      
-      <div class="metro-tempo-display">
-        <span class="tempo-current" id="metroCurrentBpmText">60</span>
-        <span class="tempo-unit">BPM</span>
-        <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
-      </div>
-
       <div class="metro-beat-lights" id="metroBeatLights">
         <div class="beat-light"></div>
         <div class="beat-light"></div>
         <div class="beat-light"></div>
         <div class="beat-light"></div>
       </div>
+
+      <div class="metro-tempo-display">
+        <span class="tempo-current" id="metroCurrentBpmText">60</span>
+        <span class="tempo-unit">BPM</span>
+        <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
+      </div>
+
+      <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
+        <span class="circle-icon" id="metroCircleIcon">▶</span>
+      </button>
     </div>
 
     <!-- Řádek: POSUVNÍK START TEMPO -->

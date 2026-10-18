@@ -1,5 +1,5 @@
 /* ======================================================== */
-/* PŘILEPENÝ DOKOVACÍ METRONOM (STUDIO DOCK)               */
+/* PŘILEPENÝ DOKOVACÍ METRONOM (STUDIO DOCK)                */
 /* ======================================================== */
 .docked-metronome {
   position: fixed;
@@ -24,11 +24,13 @@
   border-top-right-radius: var(--radius-lg);
 }
 
+/* HORNÍ ŘÁDEK V PORTRAIT: DIODY VLEVO, TEMPO UPROSTŘED, TLAČÍTKO VPRAVO */
 .metro-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .metro-circle-btn {
@@ -46,7 +48,9 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
   position: relative;
 }
-.metro-circle-btn:active { transform: scale(0.92); }
+.metro-circle-btn:active { 
+  transform: scale(0.92); 
+}
 
 .circle-icon {
   font-size: 1.15rem;
@@ -78,7 +82,9 @@
 .metro-tempo-display {
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 4px;
+  flex: 1;
 }
 
 .tempo-current {
@@ -128,6 +134,74 @@
   box-shadow: 0 0 8px #10b981;
 }
 
+/* POSUVNÍKY START A CÍL */
+.metro-slider-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.slider-lbl {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  min-width: 65px;
+  white-space: nowrap;
+}
+.slider-lbl b {
+  color: #ffffff;
+  font-size: 0.88rem;
+}
+
+.metro-range-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+}
+.metro-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+.metro-range-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+.step-btn-mini {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.step-btn-mini:active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* ŘÁDEK DOPLŇKOVÝCH PARAMETRŮ */
 .metro-controls-row {
   display: flex;
   align-items: flex-end;
@@ -143,7 +217,7 @@
   gap: 2px;
   flex: 1 1 0;
   min-width: 36px;
-  max-width: 46px;
+  max-width: 48px;
 }
 
 .metro-lbl {
@@ -192,115 +266,7 @@
   align-self: flex-end;
 }
 
-/* ======================================================== */
-/* LANDSCAPE REŽIM METRONOMU (POUZE PLOVOUCÍ TLAČÍTKO)      */
-/* ======================================================== */
-@media (orientation: landscape) and (max-height: 520px) {
-  .docked-metronome {
-    left: auto !important;
-    right: 14px !important;
-    bottom: 14px !important;
-    width: auto !important;
-    max-width: none !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    z-index: 500;
-  }
-
-  /* Skryjeme veškerá číselná pole, tempo i světýlka dob */
-  .metro-controls-row,
-  .metro-tempo-display,
-  .metro-beat-lights {
-    display: none !important;
-  }
-
-  .metro-header-row {
-    justify-content: flex-end;
-  }
-
-  /* Plovoucí kruhové tlačítko start/stop v pravém dolním rohu */
-  .metro-circle-btn {
-    width: 48px !important;
-    height: 48px !important;
-    min-width: 48px !important;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8) !important;
-  }
-}
-
-/* Posuvníkové řádky v Laboratoři */
-.metro-slider-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.slider-lbl {
-  font-size: 0.76rem;
-  color: var(--text-dim);
-  font-weight: 700;
-  min-width: 65px;
-  white-space: nowrap;
-}
-.slider-lbl b {
-  color: #ffffff;
-  font-size: 0.88rem;
-}
-
-/* Styl posuvníku pro pohodlné tažení prstem */
-.metro-range-slider {
-  flex: 1;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-full);
-  outline: none;
-  cursor: pointer;
-}
-.metro-range-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #3b82f6;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  cursor: pointer;
-}
-.metro-range-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #3b82f6;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  cursor: pointer;
-}
-
-/* Malá krokovací tlačítka ±5 */
-.step-btn-mini {
-  background: var(--surface-elevated);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  border-radius: 4px;
-  padding: 2px 6px;
-  cursor: pointer;
-  line-height: 1.2;
-}
-.step-btn-mini:active {
-  background: var(--primary);
-  color: #ffffff;
-}
-
-/* Vysouvací rychlý posuvník pro Hraní (přilepený nad spodní lištou) */
+/* VYSOUVACÍ RYCHLÝ PANEL PRO REŽIM HRANÍ */
 .play-tempo-popup {
   position: fixed;
   bottom: 56px;
@@ -321,4 +287,45 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* ======================================================== */
+/* LANDSCAPE REŽIM METRONOMU (ČISTÉ PLOVOUCÍ TLAČÍTKO)      */
+/* ======================================================== */
+@media (orientation: landscape) and (max-height: 520px) {
+  .docked-metronome {
+    left: auto !important;
+    right: 12px !important;
+    bottom: 6px !important;
+    width: auto !important;
+    max-width: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    z-index: 500 !important;
+  }
+
+  /* SKRYJEME VEŠKERÉ POSUVNÍKY, ČÍSLA A SVĚTLA V LANDSCAPE */
+  .metro-slider-line,
+  .metro-controls-row,
+  .metro-tempo-display,
+  .metro-beat-lights {
+    display: none !important;
+  }
+
+  .metro-header-row {
+    justify-content: flex-end !important;
+    width: auto !important;
+  }
+
+  /* Plovoucí kruhové tlačítko metronomu v pravém dolním rohu */
+  .metro-circle-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8) !important;
+  }
 }
