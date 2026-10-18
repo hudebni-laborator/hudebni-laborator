@@ -43,6 +43,8 @@ class GuitarTrainer {
     this.labPanX = 0;
     this.labPanY = 0;
 
+    this.librarySort = 'recent'; // 'recent' | 'name'
+
     this.metronome = new MetronomeController();
 
     this.initLibrary();
@@ -273,13 +275,65 @@ class GuitarTrainer {
     }
   }
 
+  setLibrarySort(sortType) {
+    this.librarySort = sortType;
+    document.getElementById('sortRecentBtn')?.classList.toggle('active', sortType === 'recent');
+    document.getElementById('sortAlphaBtn')?.classList.toggle('active', sortType === 'name');
+    this.initLibrary();
+  }
+
+  toggleItemMenu(id, e) {
+    if (e) e.stopPropagation();
+
+    document.querySelectorAll('.library-item').forEach(item => item.classList.remove('has-open-menu'));
+    document.querySelectorAll('.item-dropdown-menu').forEach(el => {
+      if (el.id !== `menu_${id}`) el.remove();
+    });
+
+    const existing = document.getElementById(`menu_${id}`);
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    const targetItem = e.currentTarget.closest('.library-item');
+    if (!targetItem) return;
+
+    targetItem.classList.add('has-open-menu');
+
+    const menu = document.createElement('div');
+    menu.className = 'item-dropdown-menu';
+    menu.id = `menu_${id}`;
+    menu.innerHTML = `
+      <button class="item-dropdown-btn" onclick="window.app.renameScore('${id}', event)">✏ Přejmenovat</button>
+      <button class="item-dropdown-btn btn-drop-danger" onclick="window.app.deleteScoreFromLibrary('${id}', event)">🗑 Smazat</button>
+    `;
+
+    const rect = targetItem.getBoundingClientRect();
+    if (window.innerHeight - rect.bottom < 110) {
+      menu.style.top = 'auto';
+      menu.style.bottom = 'calc(100% + 4px)';
+    }
+
+    targetItem.appendChild(menu);
+
+    const closeListener = (ev) => {
+      if (!menu.contains(ev.target) && ev.target !== e.currentTarget) {
+        menu.remove();
+        targetItem.classList.remove('has-open-menu');
+        document.removeEventListener('click', closeListener);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeListener), 20);
+  }
+
   async initLibrary() {
     try {
       const all = await window.scoreDB.getAllScores();
       const span = document.getElementById('libCountSpan');
       if (span) span.innerText = all.length;
       this.renderLibraryList(all);
-      if (all.length > 0) {
+      if (all.length > 0 && !this.currentScore) {
         all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         await this.loadScore(all[0].id, false);
       }
@@ -294,7 +348,13 @@ class GuitarTrainer {
       listEl.innerHTML = '<div style="color:var(--text-muted); padding:16px; text-align:center;">V zařízení zatím nemáte žádné noty. Vyfoťte je ze stojanu nebo nahrajte soubor.</div>';
       return;
     }
-    all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    if (this.librarySort === 'name') {
+      all.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs', { sensitivity: 'base' }));
+    } else {
+      all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    }
+
     all.forEach(s => {
       const item = document.createElement('div');
       item.className = 'library-item' + (this.currentScore?.id === s.id ? ' active' : '');
@@ -307,10 +367,7 @@ class GuitarTrainer {
           <div class="library-name">${s.name}</div>
           <div class="library-meta">${pg} • Taktů: ${takty} • Klíčů: ${klice}</div>
         </div>
-        <div class="library-actions">
-          <button class="btn btn-sm" onclick="window.app.renameScore('${s.id}', event)">✏ Přejmenovat</button>
-          <button class="btn btn-danger btn-sm" onclick="window.app.deleteScoreFromLibrary('${s.id}', event)">Smazat</button>
-        </div>
+        <button class="item-menu-btn" onclick="window.app.toggleItemMenu('${s.id}', event)" title="Možnosti">⋮</button>
       `;
       listEl.appendChild(item);
     });
@@ -378,6 +435,9 @@ class GuitarTrainer {
 
   async deleteScoreFromLibrary(id, e) {
     if (e) e.stopPropagation();
+    document.querySelectorAll('.item-dropdown-menu').forEach(el => el.remove());
+    document.querySelectorAll('.library-item').forEach(item => item.classList.remove('has-open-menu'));
+
     if (confirm('Opravdu smazat skladbu?')) {
       await window.scoreDB.deleteScore(id);
       const all = await window.scoreDB.getAllScores();
@@ -399,6 +459,9 @@ class GuitarTrainer {
 
   async renameScore(id, e) {
     if (e) e.stopPropagation();
+    document.querySelectorAll('.item-dropdown-menu').forEach(el => el.remove());
+    document.querySelectorAll('.library-item').forEach(item => item.classList.remove('has-open-menu'));
+
     const score = await window.scoreDB.getScore(id);
     if (!score) return;
     const currentName = score.name || 'Skladba';
@@ -600,7 +663,7 @@ class GuitarTrainer {
 
     this.zoomScale = Math.min(scaleX, scaleY);
     this.panX = Math.round((w - this.scoreCanvas.width * this.zoomScale) / 2);
-    this.panY = 0; // Přilepeno k hornímu okraji
+    this.panY = 0;
 
     this.hasUserAdjustedView = false;
     this.updateViewportTransform();
@@ -870,7 +933,7 @@ class GuitarTrainer {
       } else if (ongoingTouches.size === 1) {
         if (isDrag && this.activeEditor) {
           const c = this.screenToCanvasCoords(e.clientX, e.clientY);
-          this.activeEditor.moveDrag(c.x, c.y);
+          this.activeEditor.moveDrag(c.x, c.y, e.clientX, e.clientY);
         } else if (isPan) {
           this.panX += dx;
           this.panY += dy;
@@ -1347,7 +1410,7 @@ class GuitarTrainer {
         this.labCurrentIndex = m.indexOf(x); 
         this.renderLabQueue(); 
         this.showMeasureInLab(this.labCurrentIndex); 
-        if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
+        if (this.metronome) this.metronome.resetLabDrill();
       };
       wrap.appendChild(b);
     });
@@ -1359,7 +1422,7 @@ class GuitarTrainer {
     this.labCurrentIndex = (this.labCurrentIndex + 1) % m.length;
     this.renderLabQueue();
     this.showMeasureInLab(this.labCurrentIndex, true);
-    if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
+    if (this.metronome) this.metronome.resetLabDrill();
   }
 
   prevLabMeasure() {
@@ -1368,7 +1431,7 @@ class GuitarTrainer {
     this.labCurrentIndex = (this.labCurrentIndex - 1 + m.length) % m.length;
     this.renderLabQueue();
     this.showMeasureInLab(this.labCurrentIndex, true);
-    if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
+    if (this.metronome) this.metronome.resetLabDrill();
   }
 
   enhanceMeasurePixels(ctx, width, height) {
@@ -1478,14 +1541,13 @@ class GuitarTrainer {
     const lensH = lens ? lens.clientHeight : 300;
     const dpr = Math.max(1, window.devicePixelRatio || 1);
 
-    // 1. Zjištění dynamické barvy papíru
     const curImg = await this.getPageImage(curM.page || 1);
     const paperColor = this.samplePaperColorFromImage(curImg, curM.box);
 
     if (lens) lens.style.backgroundColor = paperColor;
     if (container) container.style.backgroundColor = paperColor;
 
-    // 2. KLÍČ & PŘEDZNAMENÁNÍ (Ostré vektorové vykreslení pro PDF)
+    // 1. KLÍČ & PŘEDZNAMENÁNÍ
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
       if (this.currentScore?.isPdf && this.pdfDoc) {
@@ -1530,7 +1592,7 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 3. TAKT: Vykreslení podle typu zdroje (PDF vs Foto)
+    // 2. TAKT: VEKTOROVÝ VÝŘEZ PRO PDF NEBO 1:1 FOTO
     if (!this.labCanvas || !this.labCtx) return;
 
     if (this.currentScore?.isPdf && this.pdfDoc) {
@@ -1590,7 +1652,7 @@ class GuitarTrainer {
       );
     }
 
-    // 4. VYKRESLENÍ PŘIPSANÝCH ZNAČEK
+    // 3. VYKRESLENÍ PŘIPSANÝCH ZNAČEK
     const ratio = this.labScaleRatio || 1.0;
     if (this.showAnnotations && this.currentScore?.drawings) {
       const pageKey = `page_${curM.page || 1}`;
@@ -1637,7 +1699,7 @@ class GuitarTrainer {
       this.renderLabQueue();
       this.showMeasureInLab(this.labCurrentIndex);
       this.renderScoreView();
-      if (this.metronome) this.metronome.resetLabDrill(); // Automatický reset metronomu
+      if (this.metronome) this.metronome.resetLabDrill();
     }
   }
 

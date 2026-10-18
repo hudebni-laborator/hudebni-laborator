@@ -287,6 +287,8 @@ class MetronomeController {
   updateLabTempoUI(bpm) {
     const d1 = document.getElementById('metroCurrentBpmText');
     if (d1) d1.innerText = bpm;
+    const d2 = document.getElementById('labMetroBpmDisplay');
+    if (d2) d2.innerText = bpm;
   }
 
   resetTempo() {
@@ -296,7 +298,6 @@ class MetronomeController {
     this.updateLabTempoUI(startVal);
   }
 
-  // AUTOMATICKÝ RESET METRONOMU NA ZVOLENÝ START PŘI PŘEPNUTÍ TAKTU V LABORATOŘI
   resetLabDrill() {
     this.currentBpm = this.labStartBpm;
     this.measureIndexInCycle = 0;

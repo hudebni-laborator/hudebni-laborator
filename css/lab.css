@@ -29,7 +29,7 @@
   justify-content: center;
   flex-shrink: 0;
   box-shadow: none !important;
-  height: 56px; /* Zvětšeno z původních 38px na 56px */
+  height: 56px;
   box-sizing: border-box;
 }
 .lab-clef-box canvas {
@@ -229,7 +229,7 @@
     gap: 3px !important;
   }
 
-  /* V landscape jsou Klíč a Lupa vedle sebe na výšku */
+  /* V landscape jsou Klíč a Lupa vedle sebe na celou výšku */
   .lab-main-area {
     flex-direction: row !important;
     align-items: stretch !important;
@@ -247,7 +247,7 @@
     display: none !important;
   }
 
-  /* V LANDSCAPE ZŮSTÁVÁ KLÍČ STEJNĚ VELKÝ JAKO V PORTRAIT (56px) */
+  /* V landscape zůstává klíč stejně velký jako v portrait (56px) */
   .lab-clef-box {
     height: 56px !important;
     max-height: 56px !important;
@@ -265,7 +265,7 @@
     margin-top: 2px !important;
   }
 
-  /* REZERVA PROTI PŘEKRYTÍ: Akční lišta končí před tlačítky metronomu (110px) */
+  /* Rezerva proti překrytí: akční lišta končí bezpečně před metronomem */
   .lab-action-bar {
     padding: 2px 8px !important;
     padding-right: 110px !important;

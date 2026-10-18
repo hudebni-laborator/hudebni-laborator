@@ -35,17 +35,36 @@
 
   <!-- 1. ZÁLOŽKA: KNIHOVNA -->
   <div class="view-panel" id="libraryView">
-    <div class="toolbar" style="width:100%;">
-      <label class="btn btn-primary">📷 Fotit noty <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment"></label>
-      <label class="btn">📁 PDF/Obrázek <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf"></label>
-      <button class="btn" onclick="window.app.exportBackupJSON()">💾 Export zálohy</button>
-      <label class="btn">
-        📥 Obnovit ze zálohy
-        <input type="file" id="importBackupInput" class="file-input" accept=".json,application/json" onchange="window.app.importBackupJSON(event)">
+    <!-- Hlavní akční tlačítka pro vložení not -->
+    <div class="library-action-grid">
+      <label class="btn btn-primary lib-big-btn">
+        📷 Fotit noty
+        <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
+      </label>
+      <label class="btn btn-primary lib-big-btn lib-big-secondary">
+        📁 PDF / Obrázek
+        <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
       </label>
     </div>
 
-    <div class="library-container" style="margin-top:10px;">
+    <!-- Řazení a správa záloh -->
+    <div class="library-subtoolbar">
+      <div class="lib-sort-group">
+        <span class="lib-sort-lbl">Řadit:</span>
+        <button class="btn btn-sm lib-sort-btn active" id="sortRecentBtn" onclick="window.app.setLibrarySort('recent')">🕒 Naposledy</button>
+        <button class="btn btn-sm lib-sort-btn" id="sortAlphaBtn" onclick="window.app.setLibrarySort('name')">🔤 Názvu</button>
+      </div>
+
+      <div class="lib-backup-group">
+        <button class="btn btn-sm" onclick="window.app.exportBackupJSON()" title="Uložit zálohu do souboru">💾 Záloha</button>
+        <label class="btn btn-sm" title="Nahrát zálohu ze souboru">
+          📥 Obnovit
+          <input type="file" id="importBackupInput" class="file-input" accept=".json,application/json" onchange="window.app.importBackupJSON(event)">
+        </label>
+      </div>
+    </div>
+
+    <div class="library-container">
       <div class="library-header">Uložené skladby (<span id="libCountSpan">0</span>)</div>
       <div class="library-list" id="libraryList"></div>
     </div>
@@ -226,7 +245,6 @@
   <!-- 3. ZÁLOŽKA: LABORATOŘ S EDITAČNÍMI PRVKY -->
   <div class="view-panel practice-panel" id="labView" style="display:none; padding:8px 6px;">
     
-    <!-- Společná plocha: Klíč a fronta taktů na stejném řádku + lupa pod nimi -->
     <div class="lab-main-area" id="labMainArea">
       <!-- Horní řádek: Zvětšený klíč a fronta taktů na stejném řádku -->
       <div class="lab-top-row" id="labTopRow">
@@ -307,7 +325,6 @@
 
   <!-- DOKOVACÍ METRONOM V LABORATOŘI S POSUVNÍKY -->
   <div class="docked-metronome" id="dockedMetronome" style="display:none;">
-    <!-- Horní řádek: Diody vlevo, tempo uprostřed, tlačítko nastavení a kruhové tlačítko vpravo -->
     <div class="metro-header-row">
       <div class="metro-beat-lights" id="metroBeatLights">
         <div class="beat-light"></div>
@@ -322,8 +339,11 @@
         <span class="tempo-target" id="metroTargetBpmText">➔ Cíl: 100</span>
       </div>
 
-      <!-- Tlačítko pro vyjetí ovládání v landscape režimu -->
-      <button class="metro-settings-btn" id="labMetroSettingsBtn" onclick="window.app.toggleLabMetroPopup()" title="Nastavení metronomu">🎛</button>
+      <!-- Kruhové tlačítko s aktuálním tempem pro otevření nastavení v landscape -->
+      <button class="metro-circle-btn metro-tempo-btn" id="labMetroSettingsBtn" onclick="window.app.toggleLabMetroPopup()" title="Nastavení tempa a metronomu">
+        <span class="tempo-btn-val" id="labMetroBpmDisplay">60</span>
+        <span class="tempo-btn-sub">BPM</span>
+      </button>
 
       <!-- Spouštěcí kruhové tlačítko -->
       <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
@@ -331,7 +351,7 @@
       </button>
     </div>
 
-    <!-- Tělo s posuvníky (v portraitu běžně pod lištou, v landscape vyjíždí jako panel) -->
+    <!-- Tělo metronomu s posuvníky -->
     <div class="metro-body-panel" id="metroBodyPanel">
       <div class="metro-slider-line">
         <span class="slider-lbl">Start: <b id="metroStartVal">60</b></span>

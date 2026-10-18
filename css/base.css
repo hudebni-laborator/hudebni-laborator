@@ -67,24 +67,6 @@ header {
   z-index: 50;
 }
 
-/* Název skladby vedle loga aplikace (v 1 až 2 řádcích) */
-.header-song-title {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: #93c5fd;
-  line-height: 1.15;
-  max-width: 170px;
-  max-height: 2.3em;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  text-overflow: ellipsis;
-  margin-left: 8px;
-  padding-left: 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-}
-
 .brand {
   display: flex;
   align-items: center;
@@ -105,6 +87,23 @@ header {
   background: linear-gradient(135deg, #ffffff 30%, #a1a1aa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.header-song-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #93c5fd;
+  line-height: 1.15;
+  max-width: 170px;
+  max-height: 2.3em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .nav-tabs {
@@ -157,20 +156,6 @@ header {
 /* ======================================================== */
 /* SPOLEČNÉ PRVKY A TLAČÍTKA                                */
 /* ======================================================== */
-.active-file-banner {
-  background: rgba(24, 24, 27, 0.6);
-  border-bottom: 1px solid var(--border);
-  padding: 5px 12px;
-  font-size: 0.78rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  overflow-x: auto;
-}
-.active-file-banner span.label { color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; }
-.active-file-banner span.name { font-weight: 700; color: #f4f4f5; }
-
 .btn {
   background: var(--surface-elevated);
   color: var(--text);
@@ -182,6 +167,7 @@ header {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition: all 0.15s ease;
   user-select: none;
@@ -195,7 +181,6 @@ header {
 .btn-gold { background: linear-gradient(135deg, #d97706, #b45309); border-color: #fde047; color: #ffffff; font-weight: 700; box-shadow: 0 2px 8px var(--accent-gold-glow); }
 .btn-danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
 .btn-danger:active { background: #ef4444; color: #fff; }
-.btn-subtle-danger { background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 0.78rem; padding: 6px 14px; }
 .btn-fit { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.3); color: #93c5fd; font-weight: 600; padding: 4px 8px; font-size: 0.78rem; }
 .file-input { display: none; }
 
@@ -212,8 +197,69 @@ header {
 .practice-panel { padding-bottom: calc(125px + env(safe-area-inset-bottom, 0px)); }
 
 /* ======================================================== */
-/* 1. KNIHOVNA                                              */
+/* 1. KNIHOVNA – NOVÉ PŘEHLEDNÉ USPOŘÁDÁNÍ                 */
 /* ======================================================== */
+.library-action-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.lib-big-btn {
+  height: 48px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+}
+.lib-big-secondary {
+  background: var(--surface-elevated);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.library-subtoolbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: rgba(18, 18, 22, 0.6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+}
+
+.lib-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lib-sort-lbl {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  margin-right: 2px;
+}
+.lib-sort-btn {
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+}
+.lib-sort-btn.active {
+  background: var(--surface-elevated);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+  font-weight: 700;
+}
+
+.lib-backup-group {
+  display: flex;
+  gap: 4px;
+}
+
 .library-container {
   width: 100%;
   background: var(--surface-solid);
@@ -223,40 +269,132 @@ header {
   box-shadow: var(--shadow-sm);
 }
 .library-header {
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: var(--surface-elevated);
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border);
 }
 .library-list {
-  padding: 8px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 70vh;
+  max-height: 65vh;
   overflow-y: auto;
+  padding-bottom: 70px;
 }
+
+/* POLOŽKA SKLADBY: VYLOUČENÍ NECHTĚNÉHO VÝBĚRU TEXTU NA MOBILU */
 .library-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: rgba(255, 255, 255, 0.02);
-  padding: 10px 14px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: all 0.15s ease;
-  gap: 12px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  gap: 8px;
+  position: relative;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
 }
 .library-item:hover, .library-item.active {
   background: rgba(59, 130, 246, 0.08);
   border-color: rgba(59, 130, 246, 0.4);
 }
-.library-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; overflow: hidden; }
-.library-name { font-weight: 700; font-size: 0.92rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.library-meta { font-size: 0.74rem; color: var(--text-dim); }
-.library-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.library-item.has-open-menu {
+  z-index: 100 !important;
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.library-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.library-name {
+  font-weight: 700;
+  font-size: 0.94rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+.library-meta {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Tlačítko se třemi tečkami ⋮ */
+.item-menu-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: 1.25rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+}
+.item-menu-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Rozbalovací akční nabídka */
+.item-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 6px;
+  z-index: 250 !important;
+  background: #1e1e26 !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: var(--radius-md);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.95) !important;
+  min-width: 145px;
+}
+.item-dropdown-btn {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.item-dropdown-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.item-dropdown-btn.btn-drop-danger { color: #fca5a5; }
+.item-dropdown-btn.btn-drop-danger:hover { background: rgba(239, 68, 68, 0.25); }

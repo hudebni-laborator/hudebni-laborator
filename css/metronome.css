@@ -134,9 +134,33 @@
   box-shadow: 0 0 8px #10b981;
 }
 
-/* Tlačítko nastavení pro landscape (v portraitu skryté) */
-.metro-settings-btn {
+/* KRUHOVÉ TLAČÍTKO TEMPA PRO LANDSCAPE (V PORTRAIT JE SKRYTÉ) */
+.metro-tempo-btn {
   display: none;
+  background: var(--surface-elevated);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  color: #ffffff;
+}
+.metro-tempo-btn:active {
+  transform: scale(0.92);
+  background: rgba(59, 130, 246, 0.25);
+  border-color: var(--primary);
+}
+.tempo-btn-val {
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.tempo-btn-sub {
+  font-size: 0.52rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  line-height: 1;
 }
 
 /* TĚLO METRONOMU S POSUVNÍKY */
@@ -303,7 +327,7 @@
 }
 
 /* ======================================================== */
-/* LANDSCAPE REŽIM METRONOMU (S OVLÁDÁNÍM V POPUPU)         */
+/* LANDSCAPE REŽIM METRONOMU (KRUHOVÁ TLAČÍTKA + POPUP)     */
 /* ======================================================== */
 @media (orientation: landscape) and (max-height: 520px) {
   .docked-metronome {
@@ -324,37 +348,24 @@
   .metro-header-row {
     justify-content: flex-end !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
     width: auto !important;
   }
 
-  /* V landscape skryjeme diody i text tempa */
   .metro-beat-lights,
   .metro-tempo-display {
     display: none !important;
   }
 
-  /* TLAČÍTKO 🎛 MEZI ZVLÁDNUTO A METRONOMEM */
-  .metro-settings-btn {
+  /* Kruhové tlačítko tempa v landscape */
+  .metro-tempo-btn {
     display: flex !important;
-    width: 38px !important;
-    height: 38px !important;
-    background: var(--surface-elevated);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: var(--radius-sm);
-    color: #f4f4f5;
-    font-size: 1.15rem;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
-  }
-  .metro-settings-btn:active {
-    transform: scale(0.92);
-    background: var(--primary);
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8) !important;
   }
 
-  /* Plovoucí kruhové tlačítko metronomu vpravo dole */
   .metro-circle-btn {
     width: 44px !important;
     height: 44px !important;
@@ -362,12 +373,12 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8) !important;
   }
 
-  /* TĚLO S POSUVNÍKY: Ve výchozím stavu skryté */
+  /* Skrytí posuvníků ve výchozím stavu */
   .docked-metronome:not(.open-landscape-panel) .metro-body-panel {
     display: none !important;
   }
 
-  /* PO STISKU 🎛 VYJEDE PLOVOUCÍ OVLÁDACÍ PANEL */
+  /* Vyjetí posuvníků po stisku kruhového tlačítka tempa */
   .docked-metronome.open-landscape-panel .metro-body-panel {
     display: flex !important;
     flex-direction: column !important;
