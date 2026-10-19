@@ -8,7 +8,7 @@ class MetronomeController {
     // SAMOSTATNÉ PARAMETRY PRO REŽIM HRANÍ
     // ==========================================================
     this.playStartBpm = 60;
-    this.playTargetBpm = 60;
+    this.playTargetBpm = 60; // Výchozí: Cíl = Start (rovnoměrný běh)
     this.playCurrentBpm = 60;
     this.playStepBpm = 2;
     this.playBarsCount = 4;
@@ -165,13 +165,16 @@ class MetronomeController {
   // ==========================================================
   setPlayBpm(val) {
     this.playStartBpm = Math.max(30, Math.min(260, Number(val) || 60));
-    if (!this.isRunning || this.activeMode !== 'play') {
-      this.playCurrentBpm = this.playStartBpm;
-      if (this.playTargetBpm < this.playStartBpm) {
-        this.playTargetBpm = this.playStartBpm;
-      }
-    } else {
+    
+    // Pokud byl Cíl dříve svázán se Startem (rovnoměrný režim), držíme Cíl = Start
+    if (this.playTargetBpm <= this.playStartBpm) {
+      this.playTargetBpm = this.playStartBpm;
+    }
+
+    if (this.isRunning && this.activeMode === 'play') {
       this.currentBpm = this.playStartBpm;
+    } else {
+      this.playCurrentBpm = this.playStartBpm;
     }
     this.updatePlayTempoUI();
   }
@@ -200,6 +203,12 @@ class MetronomeController {
     if (slider) slider.value = this.playTargetBpm;
     const lbl = document.getElementById('playTargetVal');
     if (lbl) lbl.innerText = this.playTargetBpm;
+
+    const btn = document.getElementById('playMatchTargetBtn');
+    if (btn) {
+      btn.innerText = '✔ Rovnoměrně aktivní';
+      setTimeout(() => { btn.innerText = 'Rovnoměrně'; }, 1500);
+    }
   }
 
   setPlayStep(val) {
@@ -236,10 +245,6 @@ class MetronomeController {
     const targetLbl = document.getElementById('playTargetVal');
     if (targetLbl) targetLbl.innerText = this.playTargetBpm;
   }
-
-  setBpm(val) { this.setPlayBpm(val); }
-  changeBpm(delta) { this.changePlayBpm(delta); }
-  setBeats(val) { this.setPlayBeats(val); }
 
   // ==========================================================
   // METODY REŽIMU LABORATOŘ (Nezávislé na Hraní)
@@ -359,23 +364,34 @@ class MetronomeController {
   advanceBeat() {
     const beats = this.beatsPerBar;
 
+    // 1. REŽIM HRANÍ:
     if (this.activeMode === 'play') {
       this.nextBeatTime += (60.0 / this.currentBpm);
       this.beatIndex++;
 
       if (this.beatIndex >= beats) {
         this.beatIndex = 0;
-        if (this.playTargetBpm > this.currentBpm) {
-          this.measureIndexInCycle++;
-          if (this.measureIndexInCycle >= this.playBarsCount) {
-            this.currentBpm = Math.min(this.playTargetBpm, this.currentBpm + this.playStepBpm);
-            this.measureIndexInCycle = 0;
+        // Zrychlovat pouze pokud je Cíl striktně větší než Startovní tempo
+        if (this.playTargetBpm > this.playStartBpm) {
+          if (this.currentBpm < this.playTargetBpm) {
+            this.measureIndexInCycle++;
+            if (this.measureIndexInCycle >= this.playBarsCount) {
+              this.currentBpm = Math.min(this.playTargetBpm, this.currentBpm + this.playStepBpm);
+              this.measureIndexInCycle = 0;
+              const tText = document.getElementById('playMetroBpmText');
+              if (tText) tText.innerText = this.currentBpm;
+            }
           }
+        } else {
+          // Rovnoměrný běh: drží stále stejné tempo bez počítání cyklů
+          this.currentBpm = this.playStartBpm;
+          this.measureIndexInCycle = 0;
         }
       }
       return;
     }
 
+    // 2. REŽIM LABORATOŘ:
     const targetBpm = this.labTargetBpm;
     const step = Number(document.getElementById('metroStepBpm')?.value) || this.labStepBpm;
     const bars = Number(document.getElementById('metroBarsCount')?.value) || this.labBarsCount;
@@ -440,7 +456,7 @@ class MetronomeController {
     }
 
     if (playBtn && playIcn) {
-      playBtn.className = 'metro-circle-btn play-metro-circle';
+      playBtn.className = 'metro-circle-btn';
       if (this.isRunning && this.activeMode === 'play') {
         playBtn.classList.add('circle-playing');
         playIcn.innerText = '⏸';

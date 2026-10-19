@@ -134,9 +134,9 @@
   box-shadow: 0 0 8px #10b981;
 }
 
-/* KRUHOVÉ TLAČÍTKO TEMPA PRO LANDSCAPE (V PORTRAIT JE SKRYTÉ) */
+/* KRUHOVÉ TLAČÍTKO TEMPA (PRO HRANÍ I LANDSCAPE V LABORATOŘI) */
 .metro-tempo-btn {
-  display: none;
+  display: flex !important;
   background: var(--surface-elevated);
   border: 1.5px solid rgba(255, 255, 255, 0.22);
   flex-direction: column;

@@ -430,3 +430,49 @@ body.is-fullscreen .floating-fs-btn {
   justify-content: space-between;
   width: auto !important;
 }
+
+/* PŘILEPENÁ SPODNÍ LIŠTA V HRANÍ */
+.docked-play-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 54px;
+  background: rgba(18, 18, 24, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  z-index: 100;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.6);
+}
+
+/* DVOJICE KRUHOVÝCH TLAČÍTEK V LIŠTĚ HRANÍ */
+.play-metro-circles-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.play-metro-circles-group .metro-circle-btn {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+}
+
+.play-metro-beats-select {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: #93c5fd;
+  font-size: 0.8rem;
+  font-weight: 800;
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  height: 28px;
+  cursor: pointer;
+  outline: none;
+}
