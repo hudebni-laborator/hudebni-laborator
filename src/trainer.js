@@ -24,6 +24,15 @@ class GuitarTrainer {
     this.labCurrentIndex = 0;
     this.isMarkingMode = false;
 
+    // Přepínače hudební návaznosti v Laboratoři (1 doba před / za)
+    this.labShowBefore = false;
+    this.labShowAfter = false;
+    this.currentContextInfo = null;
+
+    // Manuální doladění offsetu výřezu
+    this.ctxOffsetX = 0;
+    this.ctxOffsetY = 0;
+
     this.editTool = 'pen';
     this.penColor = '#ef4444';
     this.penWidth = 2;
@@ -43,7 +52,7 @@ class GuitarTrainer {
     this.labPanX = 0;
     this.labPanY = 0;
 
-    this.librarySort = 'recent'; // 'recent' | 'name'
+    this.librarySort = 'recent';
 
     this.metronome = new MetronomeController();
 
@@ -76,6 +85,29 @@ class GuitarTrainer {
         else this.resetActiveSelection();
       }
     });
+  }
+
+  toggleLabContext(type) {
+    if (type === 'before') {
+      this.labShowBefore = !this.labShowBefore;
+      document.getElementById('labCtxBeforeBtn')?.classList.toggle('active', this.labShowBefore);
+    } else if (type === 'after') {
+      this.labShowAfter = !this.labShowAfter;
+      document.getElementById('labCtxAfterBtn')?.classList.toggle('active', this.labShowAfter);
+    }
+
+    const nudgeGroup = document.getElementById('labCtxNudgeGroup');
+    if (nudgeGroup) {
+      nudgeGroup.style.display = (this.labShowBefore || this.labShowAfter) ? 'inline-flex' : 'none';
+    }
+
+    this.showMeasureInLab(this.labCurrentIndex, true);
+  }
+
+  nudgeLabContext(axis, delta) {
+    if (axis === 'x') this.ctxOffsetX += delta;
+    if (axis === 'y') this.ctxOffsetY += delta;
+    this.showMeasureInLab(this.labCurrentIndex, false);
   }
 
   togglePlayTempoPopup() {
@@ -251,18 +283,6 @@ class GuitarTrainer {
   toggleIncrementalMetronome() { this.metronome.toggle(); }
   resetMetronomeTempo() { this.metronome.resetTempo(); }
   stopMetronome() { this.metronome.stop(); }
-  promptSetBpm() {
-    const isLab = document.getElementById('labView')?.style.display === 'flex';
-    const current = isLab ? this.metronome.labStartBpm : this.metronome.playStartBpm;
-    const val = window.prompt('Zadejte tempo (BPM):', current);
-    if (val && !isNaN(val)) {
-      if (isLab) {
-        this.metronome.onStartBpmInput(Number(val));
-      } else {
-        this.metronome.setPlayBpm(Number(val));
-      }
-    }
-  }
 
   updateHeaderTitle() {
     const headerTitle = document.getElementById('headerSongTitle');
@@ -379,11 +399,15 @@ class GuitarTrainer {
     this.stopMetronome();
     this.currentScore = score;
     if (!this.currentScore.drawings) this.currentScore.drawings = {};
+    if (!this.currentScore.measures) this.currentScore.measures = [];
+    if (!this.currentScore.keySignatures) this.currentScore.keySignatures = [];
     this.currentPage = 1;
     this.hasUserAdjustedView = false;
     this.pageCache.clear();
     this.resetActiveSelection();
     this.dismissAddPagePrompt();
+    this.ctxOffsetX = 0;
+    this.ctxOffsetY = 0;
 
     if (score.isPdf && score.pdfData) {
       try {
@@ -1193,200 +1217,6 @@ class GuitarTrainer {
     return sigs[0];
   }
 
-  updateLabTransform() {
-    const vp = document.getElementById('labViewport');
-    if (vp) {
-      vp.style.transform = `translate(${this.labPanX}px, ${this.labPanY}px) scale(${this.labZoomScale})`;
-    }
-  }
-
-  fitLabCanvas() {
-    const lens = document.getElementById('rectLoupeLens');
-    if (!lens || !this.labCanvas || this.labCanvas.width === 0 || this.labCanvas.height === 0) return;
-
-    const lensRect = lens.getBoundingClientRect();
-    const w = lensRect.width > 0 ? lensRect.width : lens.clientWidth;
-    const h = lensRect.height > 0 ? lensRect.height : lens.clientHeight;
-
-    if (w <= 0 || h <= 0) return;
-
-    const scaleX = w / this.labCanvas.width;
-    const scaleY = h / this.labCanvas.height;
-
-    this.labZoomScale = Math.min(scaleX, scaleY);
-    this.labPanX = Math.round((w - this.labCanvas.width * this.labZoomScale) / 2);
-    this.labPanY = Math.round((h - this.labCanvas.height * this.labZoomScale) / 2);
-
-    this.updateLabTransform();
-  }
-
-  initLabTouchEngine() {
-    const lens = document.getElementById('rectLoupeLens');
-    if (!lens || !this.labCanvas) return;
-
-    let ongoingTouches = new Map();
-    let initialPinchDist = null;
-    let initialPinchScale = 1.0;
-    let isLabDrawing = false;
-    let isLabErasing = false;
-    let isLabPanning = false;
-    let currentLabStroke = null;
-
-    lens.addEventListener('touchstart', e => {
-      if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
-
-    lens.addEventListener('touchmove', e => {
-      e.preventDefault();
-    }, { passive: false });
-
-    lens.addEventListener('pointerdown', e => {
-      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
-      if (!curM) return;
-
-      ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (ongoingTouches.size === 1) {
-        lens.setPointerCapture(e.pointerId);
-        const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
-
-        if (this.editTool === 'eraser') {
-          if (pageCoords) {
-            isLabErasing = true;
-            this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
-            this.showMeasureInLab(this.labCurrentIndex, false);
-          }
-        } else if (this.editTool === 'pen') {
-          if (pageCoords) {
-            isLabDrawing = true;
-            currentLabStroke = {
-              color: this.penColor,
-              width: this.penWidth,
-              points: [{ x: pageCoords.x, y: pageCoords.y }]
-            };
-          }
-        } else {
-          isLabPanning = true;
-        }
-      } else if (ongoingTouches.size === 2) {
-        isLabDrawing = isLabErasing = isLabPanning = false;
-        const t = Array.from(ongoingTouches.values());
-        initialPinchDist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
-        initialPinchScale = this.labZoomScale;
-      }
-    });
-
-    lens.addEventListener('pointermove', e => {
-      if (!ongoingTouches.has(e.pointerId)) return;
-      const prev = ongoingTouches.get(e.pointerId);
-      const dx = e.clientX - prev.x;
-      const dy = e.clientY - prev.y;
-      ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
-      if (!curM) return;
-
-      if (ongoingTouches.size === 2) {
-        const t = Array.from(ongoingTouches.values());
-        const dist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
-        const rect = lens.getBoundingClientRect();
-        const cx = (t[0].x + t[1].x) / 2 - rect.left;
-        const cy = (t[0].y + t[1].y) / 2 - rect.top;
-
-        if (initialPinchDist > 0) {
-          const newScale = Math.max(0.2, Math.min(5.0, initialPinchScale * (dist / initialPinchDist)));
-          const f = newScale / this.labZoomScale;
-          this.labPanX = cx - (cx - this.labPanX) * f;
-          this.labPanY = cy - (cy - this.labPanY) * f;
-          this.labZoomScale = newScale;
-        }
-        this.labPanX += dx / 2;
-        this.labPanY += dy / 2;
-        this.updateLabTransform();
-        return;
-      }
-
-      if (ongoingTouches.size === 1) {
-        if (isLabPanning) {
-          this.labPanX += dx;
-          this.labPanY += dy;
-          this.updateLabTransform();
-          return;
-        }
-
-        const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
-        if (!pageCoords) return;
-
-        if (isLabErasing) {
-          this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
-          this.showMeasureInLab(this.labCurrentIndex, false);
-          return;
-        }
-
-        if (isLabDrawing && currentLabStroke) {
-          currentLabStroke.points.push({ x: pageCoords.x, y: pageCoords.y });
-
-          if (this.labCtx) {
-            const ratio = this.labScaleRatio || 1.0;
-            this.labCtx.save();
-            this.labCtx.strokeStyle = currentLabStroke.color;
-            this.labCtx.lineWidth = currentLabStroke.width * ratio;
-            this.labCtx.lineCap = 'round';
-            this.labCtx.lineJoin = 'round';
-            this.labCtx.scale(ratio, ratio);
-            this.labCtx.translate(-curM.box.left, -curM.box.top);
-
-            const pts = currentLabStroke.points;
-            if (pts.length >= 2) {
-              this.labCtx.beginPath();
-              this.labCtx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
-              this.labCtx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-              this.labCtx.stroke();
-            }
-            this.labCtx.restore();
-          }
-        }
-      }
-    });
-
-    const finishLabPointer = async () => {
-      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
-      if (isLabDrawing && currentLabStroke && curM) {
-        isLabDrawing = false;
-        if (currentLabStroke.points.length > 1 && this.currentScore) {
-          const key = `page_${curM.page || 1}`;
-          if (!this.currentScore.drawings) this.currentScore.drawings = {};
-          if (!this.currentScore.drawings[key]) this.currentScore.drawings[key] = [];
-          this.currentScore.drawings[key].push(currentLabStroke);
-          await this.persistCurrentScore();
-        }
-        currentLabStroke = null;
-        this.showMeasureInLab(this.labCurrentIndex, false);
-      }
-      isLabErasing = false;
-      isLabPanning = false;
-      ongoingTouches.clear();
-    };
-
-    lens.addEventListener('pointerup', finishLabPointer);
-    lens.addEventListener('pointercancel', finishLabPointer);
-  }
-
-  labCanvasToPageCoords(clientX, clientY, curM) {
-    const lens = document.getElementById('rectLoupeLens');
-    if (!lens || !this.labCanvas) return null;
-    const rect = lens.getBoundingClientRect();
-    const ratio = this.labScaleRatio || 1.0;
-
-    const localX = (clientX - rect.left - this.labPanX) / (this.labZoomScale * ratio);
-    const localY = (clientY - rect.top - this.labPanY) / (this.labZoomScale * ratio);
-
-    return {
-      x: Math.round(curM.box.left + localX),
-      y: Math.round(curM.box.top + localY)
-    };
-  }
-
   updateLabBadge() {
     const c = (this.currentScore?.measures || []).length;
     const b = document.getElementById('labBadgeCount');
@@ -1432,39 +1262,6 @@ class GuitarTrainer {
     this.renderLabQueue();
     this.showMeasureInLab(this.labCurrentIndex, true);
     if (this.metronome) this.metronome.resetLabDrill();
-  }
-
-  enhanceMeasurePixels(ctx, width, height) {
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const src = imgData.data;
-    const copy = new Uint8ClampedArray(src);
-    const strength = 0.40;
-
-    for (let y = 1; y < height - 1; y++) {
-      const rowOffset = y * width;
-      for (let x = 1; x < width - 1; x++) {
-        const idx = (rowOffset + x) * 4;
-
-        for (let c = 0; c < 3; c++) {
-          const center = copy[idx + c];
-          const up = copy[((y - 1) * width + x) * 4 + c];
-          const down = copy[((y + 1) * width + x) * 4 + c];
-          const left = copy[(rowOffset + x - 1) * 4 + c];
-          const right = copy[(rowOffset + x + 1) * 4 + c];
-
-          let val = center + strength * (4 * center - up - down - left - right);
-
-          if (val < 135) {
-            val = Math.max(12, val * 0.82);
-          } else if (val > 195) {
-            val = Math.min(255, val * 1.04);
-          }
-
-          src[idx + c] = val;
-        }
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
   }
 
   samplePaperColorFromImage(sourceCanvas, box) {
@@ -1519,6 +1316,76 @@ class GuitarTrainer {
     return defaultColor;
   }
 
+  // ==========================================================
+  // VÝPOČET HUDEBNÍ NÁVAZNOSTI (PŘED / ZA) S MANUÁLNÍM DOLADĚNÍM
+  // ==========================================================
+  async getSurroundingContextBoxes(curM) {
+    const pageNum = curM.page || 1;
+    const curPageImg = await this.getPageImage(pageNum);
+    if (!curPageImg) return { before: null, after: null };
+
+    const pageW = curPageImg.width;
+    const ctxW = Math.max(35, Math.round(curM.box.width * 0.32)); // cca 1 doba
+
+    const allMeasures = this.currentScore?.measures || [];
+    const curIdx = allMeasures.findIndex(m => m.id === curM.id);
+
+    const isStartOfRow = (curM.box.left < pageW * 0.18);
+    const isEndOfRow = (curM.box.left + curM.box.width > pageW * 0.82);
+
+    // 1. Kontext PŘED
+    let beforeBox = null;
+    if (this.labShowBefore) {
+      if (!isStartOfRow) {
+        beforeBox = {
+          page: pageNum,
+          left: Math.max(0, curM.box.left - ctxW + this.ctxOffsetX),
+          top: curM.box.top + this.ctxOffsetY,
+          width: ctxW,
+          height: curM.box.height,
+          isLineBreak: false
+        };
+      } else if (curIdx > 0) {
+        const prevM = allMeasures[curIdx - 1];
+        beforeBox = {
+          page: prevM.page || pageNum,
+          left: Math.max(0, prevM.box.left + prevM.box.width - ctxW + this.ctxOffsetX),
+          top: prevM.box.top + this.ctxOffsetY,
+          width: ctxW,
+          height: curM.box.height,
+          isLineBreak: true
+        };
+      }
+    }
+
+    // 2. Kontext ZA
+    let afterBox = null;
+    if (this.labShowAfter) {
+      if (!isEndOfRow) {
+        afterBox = {
+          page: pageNum,
+          left: Math.min(pageW - ctxW, curM.box.left + curM.box.width + this.ctxOffsetX),
+          top: curM.box.top + this.ctxOffsetY,
+          width: ctxW,
+          height: curM.box.height,
+          isLineBreak: false
+        };
+      } else if (curIdx !== -1 && curIdx < allMeasures.length - 1) {
+        const nextM = allMeasures[curIdx + 1];
+        afterBox = {
+          page: nextM.page || pageNum,
+          left: Math.min(pageW - ctxW, nextM.box.left + this.ctxOffsetX),
+          top: nextM.box.top + this.ctxOffsetY,
+          width: ctxW,
+          height: curM.box.height,
+          isLineBreak: true
+        };
+      }
+    }
+
+    return { before: beforeBox, after: afterBox };
+  }
+
   async showMeasureInLab(idx, autoFit = true) {
     const measures = this.currentScore?.measures || [];
     const clefWrap = document.getElementById('labClefWrap');
@@ -1537,9 +1404,6 @@ class GuitarTrainer {
 
     const lens = document.getElementById('rectLoupeLens');
     const container = document.querySelector('.rect-loupe-container');
-    const lensW = lens ? lens.clientWidth : 800;
-    const lensH = lens ? lens.clientHeight : 300;
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
 
     const curImg = await this.getPageImage(curM.page || 1);
     const paperColor = this.samplePaperColorFromImage(curImg, curM.box);
@@ -1547,113 +1411,111 @@ class GuitarTrainer {
     if (lens) lens.style.backgroundColor = paperColor;
     if (container) container.style.backgroundColor = paperColor;
 
-    // 1. KLÍČ & PŘEDZNAMENÁNÍ
+    // Klíč & předznamenání
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
-      if (this.currentScore?.isPdf && this.pdfDoc) {
-        try {
-          const keyPage = await this.pdfDoc.getPage(keySig.page || 1);
-          const kScale = Math.min(8.0, 2.0 * dpr * 1.5);
-          const kRatio = kScale / 2.0;
-          const kW = Math.round(keySig.box.width * kRatio);
-          const kH = Math.round(keySig.box.height * kRatio);
-          const kX = Math.round(keySig.box.left * kRatio);
-          const kY = Math.round(keySig.box.top * kRatio);
-
-          this.labClefCanvas.width = kW;
-          this.labClefCanvas.height = kH;
-          this.labClefCtx.fillStyle = paperColor;
-          this.labClefCtx.fillRect(0, 0, kW, kH);
-
-          const kViewport = keyPage.getViewport({ scale: kScale });
-          await keyPage.render({
-            canvasContext: this.labClefCtx,
-            viewport: kViewport,
-            transform: [1, 0, 0, 1, -kX, -kY]
-          }).promise;
-          if (clefWrap) clefWrap.style.display = 'inline-flex';
-        } catch (_) {}
-      } else {
-        const keyImg = await this.getPageImage(keySig.page || 1);
-        if (keyImg) {
-          if (clefWrap) clefWrap.style.display = 'inline-flex';
-          this.labClefCanvas.width = keySig.box.width;
-          this.labClefCanvas.height = keySig.box.height;
-          this.labClefCtx.fillStyle = paperColor;
-          this.labClefCtx.fillRect(0, 0, keySig.box.width, keySig.box.height);
-          this.labClefCtx.drawImage(
-            keyImg,
-            keySig.box.left, keySig.box.top, keySig.box.width, keySig.box.height,
-            0, 0, keySig.box.width, keySig.box.height
-          );
-        }
+      const keyImg = await this.getPageImage(keySig.page || 1);
+      if (keyImg) {
+        if (clefWrap) clefWrap.style.display = 'inline-flex';
+        this.labClefCanvas.width = keySig.box.width;
+        this.labClefCanvas.height = keySig.box.height;
+        this.labClefCtx.fillStyle = paperColor;
+        this.labClefCtx.fillRect(0, 0, keySig.box.width, keySig.box.height);
+        this.labClefCtx.drawImage(
+          keyImg,
+          keySig.box.left, keySig.box.top, keySig.box.width, keySig.box.height,
+          0, 0, keySig.box.width, keySig.box.height
+        );
       }
     } else {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. TAKT: VEKTOROVÝ VÝŘEZ PRO PDF NEBO 1:1 FOTO
-    if (!this.labCanvas || !this.labCtx) return;
+    // Výpočet hudební návaznosti
+    const ctxBoxes = await this.getSurroundingContextBoxes(curM);
+    const useBefore = this.labShowBefore && ctxBoxes.before;
+    const useAfter = this.labShowAfter && ctxBoxes.after;
 
-    if (this.currentScore?.isPdf && this.pdfDoc) {
-      const pageNum = curM.page || 1;
-      const page = await this.pdfDoc.getPage(pageNum);
+    const beforeW = useBefore ? ctxBoxes.before.width : 0;
+    const afterW = useAfter ? ctxBoxes.after.width : 0;
+    const totalW = beforeW + curM.box.width + afterW;
 
-      const fitScale = Math.min(lensW / curM.box.width, lensH / curM.box.height);
-      const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
-      const ratio = targetScale / 2.0;
+    this.currentContextInfo = {
+      offsetX: beforeW,
+      beforeBox: useBefore ? ctxBoxes.before : null,
+      afterBox: useAfter ? ctxBoxes.after : null
+    };
 
-      const cropW = Math.round(curM.box.width * ratio);
-      const cropH = Math.round(curM.box.height * ratio);
-      const cropX = Math.round(curM.box.left * ratio);
-      const cropY = Math.round(curM.box.top * ratio);
+    this.labScaleRatio = 1.0;
+    this.labCanvas.width = totalW;
+    this.labCanvas.height = curM.box.height;
 
-      this.labCanvas.width = cropW;
-      this.labCanvas.height = cropH;
-      this.labScaleRatio = ratio;
+    this.labCtx.fillStyle = paperColor;
+    this.labCtx.fillRect(0, 0, totalW, curM.box.height);
 
-      this.labCtx.fillStyle = paperColor;
-      this.labCtx.fillRect(0, 0, cropW, cropH);
-
-      const viewport = page.getViewport({ scale: targetScale });
-
-      if (this.labRenderTask) {
-        try { this.labRenderTask.cancel(); } catch (_) {}
-        this.labRenderTask = null;
+    // Vykreslení: doba PŘED
+    if (useBefore) {
+      const bImg = await this.getPageImage(ctxBoxes.before.page);
+      if (bImg) {
+        this.labCtx.drawImage(
+          bImg,
+          ctxBoxes.before.left, ctxBoxes.before.top, ctxBoxes.before.width, ctxBoxes.before.height,
+          0, 0, ctxBoxes.before.width, curM.box.height
+        );
       }
-
-      const renderTask = page.render({
-        canvasContext: this.labCtx,
-        viewport: viewport,
-        transform: [1, 0, 0, 1, -cropX, -cropY]
-      });
-      this.labRenderTask = renderTask;
-
-      try {
-        await renderTask.promise;
-      } catch (err) {
-        if (err.name === 'RenderingCancelledException') return;
+      this.labCtx.save();
+      this.labCtx.setLineDash([4, 4]);
+      this.labCtx.strokeStyle = 'rgba(139, 92, 246, 0.8)';
+      this.labCtx.lineWidth = 1.5;
+      this.labCtx.beginPath();
+      this.labCtx.moveTo(beforeW, 0);
+      this.labCtx.lineTo(beforeW, curM.box.height);
+      this.labCtx.stroke();
+      if (ctxBoxes.before.isLineBreak) {
+        this.labCtx.fillStyle = '#8b5cf6';
+        this.labCtx.font = 'bold 12px sans-serif';
+        this.labCtx.fillText('⮑', 4, 16);
       }
-    } else {
-      if (!curImg) return;
+      this.labCtx.restore();
+    }
 
-      this.labScaleRatio = 1.0;
-      this.labCanvas.width = curM.box.width;
-      this.labCanvas.height = curM.box.height;
-
-      this.labCtx.fillStyle = paperColor;
-      this.labCtx.fillRect(0, 0, this.labCanvas.width, this.labCanvas.height);
-      this.labCtx.imageSmoothingEnabled = true;
-      this.labCtx.imageSmoothingQuality = 'high';
+    // Vykreslení: HLAVNÍ CVIČENÝ TAKT
+    if (curImg) {
       this.labCtx.drawImage(
         curImg,
         curM.box.left, curM.box.top, curM.box.width, curM.box.height,
-        0, 0, curM.box.width, curM.box.height
+        beforeW, 0, curM.box.width, curM.box.height
       );
     }
 
-    // 3. VYKRESLENÍ PŘIPSANÝCH ZNAČEK
-    const ratio = this.labScaleRatio || 1.0;
+    // Vykreslení: doba ZA
+    if (useAfter) {
+      const aX = beforeW + curM.box.width;
+      const aImg = await this.getPageImage(ctxBoxes.after.page);
+      if (aImg) {
+        this.labCtx.drawImage(
+          aImg,
+          ctxBoxes.after.left, ctxBoxes.after.top, ctxBoxes.after.width, ctxBoxes.after.height,
+          aX, 0, ctxBoxes.after.width, curM.box.height
+        );
+      }
+      this.labCtx.save();
+      this.labCtx.setLineDash([4, 4]);
+      this.labCtx.strokeStyle = 'rgba(139, 92, 246, 0.8)';
+      this.labCtx.lineWidth = 1.5;
+      this.labCtx.beginPath();
+      this.labCtx.moveTo(aX, 0);
+      this.labCtx.lineTo(aX, curM.box.height);
+      this.labCtx.stroke();
+      if (ctxBoxes.after.isLineBreak) {
+        this.labCtx.fillStyle = '#8b5cf6';
+        this.labCtx.font = 'bold 12px sans-serif';
+        this.labCtx.fillText('⏎', aX + 4, 16);
+      }
+      this.labCtx.restore();
+    }
+
+    // Kresby
     if (this.showAnnotations && this.currentScore?.drawings) {
       const pageKey = `page_${curM.page || 1}`;
       const strokes = this.currentScore.drawings[pageKey] || [];
@@ -1661,8 +1523,7 @@ class GuitarTrainer {
         this.labCtx.save();
         this.labCtx.lineCap = 'round';
         this.labCtx.lineJoin = 'round';
-        this.labCtx.scale(ratio, ratio);
-        this.labCtx.translate(-curM.box.left, -curM.box.top);
+        this.labCtx.translate(beforeW - curM.box.left, -curM.box.top);
         strokes.forEach(stroke => {
           if (!stroke.points || stroke.points.length < 2) return;
           this.labCtx.strokeStyle = stroke.color || '#ef4444';
