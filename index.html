@@ -64,7 +64,7 @@
         <button class="btn btn-sm" onclick="window.app.exportBackupJSON()" title="Uložit zálohu do souboru">💾 Záloha</button>
         <label class="btn btn-sm" title="Nahrát zálohu ze souboru">
           📥 Obnovit
-          <input type="file" id="importBackupInput" class="file-input" accept=".json,application/json" onchange="window.app.importBackupJSON(event)">
+          <input type="file" id="importBackupInput" class="file-input" accept=".json,application/json,text/plain,*/*" onclick="this.value=null" onchange="window.app.importBackupJSON(event)">
         </label>
       </div>
     </div>

@@ -513,28 +513,43 @@ class GuitarTrainer {
   }
 
   async importBackupJSON(e) {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
+
     try {
-      const text = await file.text();
+      // FileReader je na mobilních zařízeních spolehlivější než file.text()
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Nepodařilo se přečíst soubor.'));
+        reader.readAsText(file);
+      });
+
       const importedScores = JSON.parse(text);
-      if (!Array.isArray(importedScores)) throw new Error('Neplatný formát záložního souboru.');
+      const scoresArray = Array.isArray(importedScores) ? importedScores : [importedScores];
+
+      if (!scoresArray || scoresArray.length === 0 || !scoresArray[0].id) {
+        throw new Error('Soubor neobsahuje platná data skladeb.');
+      }
 
       let count = 0;
-      for (const score of importedScores) {
+      for (const score of scoresArray) {
         if (score && score.id && score.name) {
           await window.scoreDB.saveScore(score);
           count++;
         }
       }
+
       alert(`Úspěšně obnoveno ${count} skladeb.`);
       const all = await window.scoreDB.getAllScores();
       this.renderLibraryList(all);
-      document.getElementById('libCountSpan').innerText = all.length;
+      const countSpan = document.getElementById('libCountSpan');
+      if (countSpan) countSpan.innerText = all.length;
     } catch (err) {
-      alert('Chyba při importu: ' + err.message);
+      alert('Chyba při obnově zálohy: ' + err.message);
+    } finally {
+      e.target.value = '';
     }
-    e.target.value = '';
   }
 
   async persistCurrentScore() {
