@@ -9,7 +9,12 @@ function compareMusicPosition(a, b) {
   return a.box.left - b.box.left;
 }
 
-// Zpracování fotky: syté černé linky a přirozený tiskový papír bez vypálení
+// ==========================================================
+// ZPRACOVÁNÍ FOTKY S LOKÁLNÍ ELIMINACÍ STÍNŮ RUKY A TELEFONU:
+// 1. Zjistí lokální mapu osvětlení (box blur na zmenšeném obraze)
+// 2. Vydělí každý pixel lokálním pozadím (odstraní stíny i gradienty)
+// 3. Převede na přirozeně teplý bílý papír a sytě černý tisk s antialiasingem
+// ==========================================================
 async function processAndEnhancePhoto(file, maxDim = 2400) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -27,44 +32,109 @@ async function processAndEnhancePhoto(file, maxDim = 2400) {
       const ctx = cvs.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
 
-      const data = ctx.getImageData(0, 0, w, h);
-      const d = data.data;
+      const srcImg = ctx.getImageData(0, 0, w, h);
+      const d = srcImg.data;
+      const gray = new Uint8Array(w * h);
 
-      // Změříme průměrný jas scény
-      let sum = 0, c = 0;
-      for (let i = 0; i < d.length; i += 64) {
-        sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-        c++;
+      // 1. Převod na odstíny šedi (luminance)
+      for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+        gray[p] = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114);
       }
-      const avg = c > 0 ? sum / c : 195;
 
-      // Adaptivní prahy
-      const wp = Math.min(250, Math.max(185, avg * 0.98));
-      const bp = Math.min(135, Math.max(95, avg * 0.62));
-      const range = Math.max(10, wp - bp);
+      // 2. Rychlý odhad pozadí přes zmenšený box blur (downscale 1/8)
+      const downScale = 8;
+      const dw = Math.max(16, Math.floor(w / downScale));
+      const dh = Math.max(16, Math.floor(h / downScale));
+      const downGray = new Uint8Array(dw * dh);
 
-      // Přírodní papír (neagresivní bílá) a sytý tiskařský inkoust
-      const paperR = 244, paperG = 242, paperB = 236;
-      const inkR = 15, inkG = 15, inkB = 18;
-
-      for (let i = 0; i < d.length; i += 4) {
-        const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-
-        let norm;
-        if (lum <= bp) {
-          norm = 0.0;
-        } else if (lum >= wp) {
-          norm = 1.0;
-        } else {
-          norm = Math.pow((lum - bp) / range, 1.35);
+      for (let dy = 0; dy < dh; dy++) {
+        const sy = Math.min(h - 1, dy * downScale);
+        for (let dx = 0; dx < dw; dx++) {
+          const sx = Math.min(w - 1, dx * downScale);
+          downGray[dy * dw + dx] = gray[sy * w + sx];
         }
-
-        d[i]     = Math.round(inkR + norm * (paperR - inkR));
-        d[i + 1] = Math.round(inkG + norm * (paperG - inkG));
-        d[i + 2] = Math.round(inkB + norm * (paperB - inkB));
       }
 
-      ctx.putImageData(data, 0, 0);
+      const blurR = 12; // odpovídá cca 100px v plném rozlišení
+      const blurHoriz = new Uint8Array(dw * dh);
+      const bgDown = new Uint8Array(dw * dh);
+
+      // Horizontální rozostření pozadí
+      for (let y = 0; y < dh; y++) {
+        let sum = 0, count = 0;
+        for (let x = 0; x < dw; x++) {
+          if (x === 0) {
+            for (let k = -blurR; k <= blurR; k++) {
+              const px = Math.min(dw - 1, Math.max(0, k));
+              sum += downGray[y * dw + px];
+              count++;
+            }
+          } else {
+            const addX = Math.min(dw - 1, x + blurR);
+            const remX = Math.max(0, x - blurR - 1);
+            sum += downGray[y * dw + addX] - downGray[y * dw + remX];
+          }
+          blurHoriz[y * dw + x] = Math.round(sum / count);
+        }
+      }
+
+      // Vertikální rozostření pozadí
+      for (let x = 0; x < dw; x++) {
+        let sum = 0, count = 0;
+        for (let y = 0; y < dh; y++) {
+          if (y === 0) {
+            for (let k = -blurR; k <= blurR; k++) {
+              const py = Math.min(dh - 1, Math.max(0, k));
+              sum += blurHoriz[py * dw + x];
+              count++;
+            }
+          } else {
+            const addY = Math.min(dh - 1, y + blurR);
+            const remY = Math.max(0, y - blurR - 1);
+            sum += blurHoriz[addY * dw + x] - blurHoriz[remY * dw + x];
+          }
+          bgDown[y * dw + x] = Math.round(sum / count);
+        }
+      }
+
+      // 3. Normalizace pixelů: příjemný hudební papír a sytý tiskařský inkoust
+      const paperR = 246, paperG = 244, paperB = 238;
+      const inkR = 18, inkG = 18, inkB = 20;
+
+      for (let y = 0; y < h; y++) {
+        const dy = Math.min(dh - 1, Math.floor(y / downScale));
+        const rowOffset = y * w;
+        const bgRowOffset = dy * dw;
+
+        for (let x = 0; x < w; x++) {
+          const dx = Math.min(dw - 1, Math.floor(x / downScale));
+          const localBg = bgDown[bgRowOffset + dx] || 200;
+          const pixelVal = gray[rowOffset + x];
+
+          // Kontrastní poměr vůči stínu/osvětlení v tomto konkrétním bodě
+          const ratio = pixelVal / Math.max(1, localBg);
+
+          // Plynulý přechod:
+          // - nad 0.86 je čistý papír (stín telefonu zmizí)
+          // - pod 0.65 je plná čerň not
+          // - mezi tím je jemný antialiasing
+          let inkWeight = 0;
+          if (ratio < 0.65) {
+            inkWeight = 1.0;
+          } else if (ratio < 0.86) {
+            const t = (0.86 - ratio) / (0.86 - 0.65);
+            inkWeight = t * t * (3 - 2 * t);
+          }
+
+          const idx = (rowOffset + x) * 4;
+          d[idx]     = Math.round(paperR + (inkR - paperR) * inkWeight);
+          d[idx + 1] = Math.round(paperG + (inkG - paperG) * inkWeight);
+          d[idx + 2] = Math.round(paperB + (inkB - paperB) * inkWeight);
+          d[idx + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(srcImg, 0, 0);
       resolve(cvs.toDataURL('image/jpeg', 0.90));
     };
     img.onerror = reject;
@@ -197,24 +267,19 @@ function scanStaffAndBarlinesFromCanvas(sourceCanvas, clickX, clickY) {
 
   // Horní mezera
   if (prevStaff) {
-    // Polovina mezery mezi spodní linkou předchozí osnovy a horní linkou aktuální osnovy
     topY = Math.round((prevStaff.bottom + currentStaff.top) / 2);
   } else if (nextStaff) {
-    // Pokud je to první osnova stránky, použijeme stejnou výšku jako má mezera dolů
     const gapBelow = nextStaff.top - currentStaff.bottom;
     topY = Math.max(0, Math.round(currentStaff.top - gapBelow / 2));
   } else {
-    // Jediná osnova na stránce (fallback)
     const fallbackMargin = Math.round(currentStaff.spacing * 3.5);
     topY = Math.max(0, currentStaff.top - fallbackMargin);
   }
 
   // Dolní mezera
   if (nextStaff) {
-    // Polovina mezery mezi spodní linkou aktuální osnovy a horní linkou následující osnovy
     bottomY = Math.round((currentStaff.bottom + nextStaff.top) / 2);
   } else if (prevStaff) {
-    // Poslední osnova na stránce -> použijeme stejnou mezeru jako nahoru
     const gapAbove = currentStaff.top - prevStaff.bottom;
     bottomY = Math.min(height, Math.round(currentStaff.bottom + gapAbove / 2));
   } else {
