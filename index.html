@@ -25,7 +25,7 @@
       <div class="app-title">Notový Trenažér</div>
       <div class="header-song-title" id="headerSongTitle" style="display:none;"></div>
     </div>
-
+    
     <div class="nav-tabs">
       <button class="tab-btn tab-lib active" id="tabLibrary" onclick="switchMode('library')">Knihovna</button>
       <button class="tab-btn tab-edit" id="tabEdit" onclick="switchMode('edit')">Hraní</button>
@@ -44,8 +44,8 @@
       <label class="btn btn-primary lib-big-btn lib-big-secondary">
         📁 PDF / Obrázek
         <input type="file" id="fileInput" class="file-input" accept="image/*,application/pdf">
-          </label>
-        </div>
+      </label>
+    </div>
 
     <!-- Řazení a správa záloh -->
     <div class="library-subtoolbar">
@@ -66,7 +66,7 @@
 
     <div class="library-container">
       <div class="library-header">Uložené skladby (<span id="libCountSpan">0</span>)</div>
-    <div class="library-list" id="libraryList"></div>
+      <div class="library-list" id="libraryList"></div>
     </div>
   </div>
 
@@ -184,7 +184,7 @@
         <button class="page-btn" id="prevPageBtn" onclick="window.app.changePage(-1)">◀</button>
         <span class="page-indicator" id="pageIndicator">1/1</span>
         <button class="page-btn" id="nextPageBtn" onclick="window.app.changePage(1)">▶</button>
-    </div>
+      </div>
 
       <select class="play-metro-beats-select" id="playMetroBeatsSelect" onchange="window.app.metronome.setPlayBeats(this.value)">
         <option value="2">2/4</option>
@@ -226,7 +226,7 @@
         <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(-5)">−5</button>
         <input type="range" id="playTargetBpmSlider" min="30" max="240" value="60" class="metro-range-slider" oninput="window.app.metronome.onPlayTargetInput(this.value)">
         <button class="step-btn-mini" onclick="window.app.metronome.adjustPlayTargetBpm(5)">+5</button>
-    </div>
+      </div>
 
       <!-- Řádek 3: Krok a interval taktů -->
       <div class="metro-controls-row" style="padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08);">
@@ -317,7 +317,7 @@
 
       <div class="lab-nav-center">
         <button class="lab-nav-btn" onclick="window.app.prevLabMeasure()" title="Předchozí takt">◀</button>
-          <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
+        <span class="lab-measure-indicator" id="labMeasureIndicator">Takt #1</span>
         <button class="lab-nav-btn" onclick="window.app.nextLabMeasure()" title="Další takt">▶</button>
       </div>
 
