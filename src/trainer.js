@@ -1,38 +1,49 @@
 /**
- * Rychle zjistí polohu první linky a průměrnou rozteč osnovy uvnitř oříznutého taktu.
+ * Najde přesnou vertikální polohu osnovy (střední linky) uvnitř vybraného rámečku taktu.
+ * Využívá fakt, že linky osnovy jsou souvislé vodorovné linie přes celou šířku taktu.
  */
-function detectStaffMetricsInBox(img, box) {
+function getStaffCenterYInBox(img, box) {
   const canvas = document.createElement('canvas');
-  const w = Math.min(box.width, 300);
-  const h = box.height;
-  canvas.width = w;
-  canvas.height = h;
+  // Zkoumáme vnitřní šířku taktu (vynecháme krajní taktové čáry 10 % zleva a zprava)
+  const sampleX = Math.round(box.left + box.width * 0.12);
+  const sampleW = Math.max(20, Math.round(box.width * 0.76));
+  const sampleH = box.height;
+
+  canvas.width = sampleW;
+  canvas.height = sampleH;
 
   const ctx = canvas.getContext('2d');
-  const startX = box.left + Math.floor(box.width * 0.2);
-  ctx.drawImage(img, startX, box.top, w, h, 0, 0, w, h);
+  ctx.drawImage(img, sampleX, box.top, sampleW, sampleH, 0, 0, sampleW, sampleH);
 
-  const imgData = ctx.getImageData(0, 0, w, h).data;
-  const rowDarkness = new Float32Array(h);
+  const imgData = ctx.getImageData(0, 0, sampleW, sampleH).data;
+  const rowDarkness = new Float32Array(sampleH);
 
-  for (let y = 0; y < h; y++) {
-    let dark = 0;
-    for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 4;
+  // Spočítáme hustotu tmavých pixelů v každém řádku
+  for (let y = 0; y < sampleH; y++) {
+    let darkCount = 0;
+    for (let x = 0; x < sampleW; x++) {
+      const idx = (y * sampleW + x) * 4;
       const lum = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
-      if (lum < 160) dark++;
+      if (lum < 165) darkCount++;
     }
-    rowDarkness[y] = dark / w;
+    rowDarkness[y] = darkCount / sampleW;
   }
 
+  // Najdeme lokální špičky jasu (linky)
   const peaks = [];
-  for (let y = 2; y < h - 2; y++) {
-    if (rowDarkness[y] > 0.22 &&
-        rowDarkness[y] > rowDarkness[y - 1] &&
-        rowDarkness[y] >= rowDarkness[y + 1]) {
+  for (let y = 2; y < sampleH - 2; y++) {
+    if (rowDarkness[y] > 0.20 &&
+        rowDarkness[y] >= rowDarkness[y - 1] &&
+        rowDarkness[y] >= rowDarkness[y + 1] &&
+        rowDarkness[y] > rowDarkness[y - 2] &&
+        rowDarkness[y] > rowDarkness[y + 2]) {
       peaks.push(y);
     }
   }
+
+  // Hledáme nejlepší pětici linek s odpovídající a vyrovnanou roztečí
+  let bestStaff = null;
+  let bestScore = -Infinity;
 
   for (let i = 0; i <= peaks.length - 5; i++) {
     const d1 = peaks[i + 1] - peaks[i];
@@ -41,25 +52,32 @@ function detectStaffMetricsInBox(img, box) {
     const d4 = peaks[i + 4] - peaks[i + 3];
     const avg = (d1 + d2 + d3 + d4) / 4;
 
-    if (avg >= 5 && avg <= 45 &&
-        Math.abs(d1 - avg) <= 4 && Math.abs(d2 - avg) <= 4 &&
-        Math.abs(d3 - avg) <= 4 && Math.abs(d4 - avg) <= 4) {
-      return {
-        firstLineY: peaks[i],
-        lastLineY: peaks[i + 4],
-        spacing: avg,
-        staffHeight: peaks[i + 4] - peaks[i]
-      };
+    // Běžná rozteč v tiskovém DPI je 6 až 40 px
+    if (avg >= 6 && avg <= 42) {
+      const variance = Math.abs(d1 - avg) + Math.abs(d2 - avg) + Math.abs(d3 - avg) + Math.abs(d4 - avg);
+      if (variance <= 6) {
+        // Skóre hodnotí vyrovnanost rozteče a sytost linek
+        const fillSum = rowDarkness[peaks[i]] + rowDarkness[peaks[i+1]] + rowDarkness[peaks[i+2]] + rowDarkness[peaks[i+3]] + rowDarkness[peaks[i+4]];
+        const score = fillSum * 10 - variance;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestStaff = {
+            centerY: peaks[i + 2], // 3. linka osnovy (střed)
+            firstLineY: peaks[i],
+            spacing: avg
+          };
+        }
+      }
     }
   }
 
-  // Záložní odhad, pokud osnova nebyla jasně zřetelná
-  return {
-    firstLineY: Math.round(h * 0.35),
-    lastLineY: Math.round(h * 0.65),
-    spacing: (h * 0.30) / 4,
-    staffHeight: h * 0.30
-  };
+  if (bestStaff) {
+    return bestStaff.centerY;
+  }
+
+  // Bezpečný fallback: střed rámečku
+  return Math.round(sampleH / 2);
 }
 
 class GuitarTrainer {
@@ -1666,7 +1684,7 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. VYKRESLENÍ TAKTU (1 takt v portrait, 2 slícované takty v landscape)
+    // 2. VYKRESLENÍ TAKTU (1 v Portrait, 2 slícované v Landscape při 1:1 DPI)
     if (!this.labCanvas || !this.labCtx || !curImg) return;
 
     const isLandscape = window.innerWidth > window.innerHeight;
@@ -1700,29 +1718,25 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, 1.0);
 
     } else {
-      // REŽIM 2 TAKTŮ (Landscape): Slícování linek osnovy
+      // REŽIM 2 TAKTŮ (Landscape): 1:1 DPI, slícování na středovou linku
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
-      // Zjistíme metriku osnov (polohu linek a rozteč) u obou taktů
-      const s1 = detectStaffMetricsInBox(curImg, curM.box);
-      const s2 = detectStaffMetricsInBox(nextImg, nextM.box);
+      // Zjistíme Y souřadnici středové linky osnovy uvnitř každého rámečku
+      const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
+      const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
-      // Přepočet měřítka druhého taktu tak, aby rozteč linek přesně odpovídala prvnímu taktu
-      const scale2 = (s2.spacing > 0 && s1.spacing > 0) ? (s1.spacing / s2.spacing) : 1.0;
-      const m2ScaledW = Math.round(nextM.box.width * scale2);
-      const m2ScaledH = Math.round(nextM.box.height * scale2);
+      // Vertikální rozdíl: o kolik px musí jít takt 2 nahoru/dolů, aby osnovy lícovaly
+      const diffY = staffCenter1 - staffCenter2;
 
-      // Posun Y pro 2. takt, aby první linka osnovy byla v identické výšce jako u 1. taktu
-      const offsetY2 = s1.firstLineY - Math.round(s2.firstLineY * scale2);
-
-      const totalW = curM.box.width + m2ScaledW;
-      const minY = Math.min(0, offsetY2);
-      const maxY = Math.max(curM.box.height, offsetY2 + m2ScaledH);
+      // Výpočet horního a spodního přesahu plátna
+      const minY = Math.min(0, diffY);
+      const maxY = Math.max(curM.box.height, diffY + nextM.box.height);
       const totalH = maxY - minY;
+      const totalW = curM.box.width + nextM.box.width;
 
       const originY1 = -minY;
-      const originY2 = offsetY2 - minY;
+      const originY2 = diffY - minY;
 
       this.labLayoutMeta = {
         m1: curM,
@@ -1730,7 +1744,7 @@ class GuitarTrainer {
         originY1,
         originY2,
         x2: curM.box.width,
-        scale2
+        scale2: 1.0 // Striktně 1:1 měřítko, žádné nafukování/zmenšování not
       };
 
       this.labCanvas.width = totalW;
@@ -1738,7 +1752,7 @@ class GuitarTrainer {
       this.labCtx.fillStyle = paperColor;
       this.labCtx.fillRect(0, 0, totalW, totalH);
 
-      // Vykreslení 1. taktu
+      // 1. Takt (1:1)
       this.labCtx.drawImage(
         curImg,
         curM.box.left, curM.box.top, curM.box.width, curM.box.height,
@@ -1746,16 +1760,16 @@ class GuitarTrainer {
       );
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, originY1, 1.0);
 
-      // Vykreslení 2. taktu s přesným lícováním linek
+      // 2. Takt (1:1 se zarovnanou osnovou)
       this.labCtx.drawImage(
         nextImg,
         nextM.box.left, nextM.box.top, nextM.box.width, nextM.box.height,
-        curM.box.width, originY2, m2ScaledW, m2ScaledH
+        curM.box.width, originY2, nextM.box.width, nextM.box.height
       );
-      this.renderDrawingsForMeasure(this.labCtx, nextM, curM.box.width, originY2, scale2);
+      this.renderDrawingsForMeasure(this.labCtx, nextM, curM.box.width, originY2, 1.0);
 
-      // Oddělovací čára, pokud takty nejsou ze stejného řádku nebo strany
-      const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.45) ||
+      // Oddělovací linka mezi takty z různého řádku či strany
+      const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.40) ||
                              (curM.page || 1) !== (nextM.page || 1);
 
       if (isDifferentRow) {
