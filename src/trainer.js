@@ -1781,97 +1781,85 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, this.labLayoutMeta.ratio || 1.0);
 
     } else {
-      // --- REŽIM 2 TAKTŮ (Landscape): PŮVODNÍ LÍCOVÁNÍ PODLE 1. LINKY ---
+      // --- REŽIM 2 TAKTŮ (Landscape): VAŠE FUNGUJÍCÍ MATEMATIKA + PŘESNÉ ZAMEZENÍ PŘELITÍ KLÍČE ---
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
-      const s1 = detectStaffMetricsInBox(curImg, curM.box);
-      const s2 = detectStaffMetricsInBox(nextImg, nextM.box);
+      // Zjistíme polohu linek vaší přesnou funkcí
+      const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
+      const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
-      // Původní lícování: posun Y druhého taktu podle rozdílu první linky
-      const offsetY2 = s1.firstLineY - s2.firstLineY;
+      const diff = staffCenter1 - staffCenter2;
+      const originY1 = diff < 0 ? -diff : 0;
+      const originY2 = diff > 0 ? diff : 0;
 
-      const minY = Math.min(0, offsetY2);
-      const maxY = Math.max(curM.box.height, offsetY2 + nextM.box.height);
-      const totalH = maxY - minY;
       const totalW = curM.box.width + nextM.box.width;
-
-      const originY1 = -minY;
-      const originY2 = offsetY2 - minY;
+      const totalH = Math.max(originY1 + curM.box.height, originY2 + nextM.box.height);
 
       if (this.currentScore?.isPdf && this.pdfDoc) {
         const fitScale = Math.min(lensW / totalW, lensH / totalH);
         const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
         const ratio = targetScale / 2.0;
 
-        const m1W = Math.round(curM.box.width * ratio);
-        const m1H = Math.round(curM.box.height * ratio);
-        const m2W = Math.round(nextM.box.width * ratio);
-        const m2H = Math.round(nextM.box.height * ratio);
+        const cropW = Math.round(totalW * ratio);
+        const cropH = Math.round(totalH * ratio);
+        const splitX = Math.round(curM.box.width * ratio);
 
-        // Samostatná plátna pro oba takty (zabrání přelévání klíče)
-        const off1 = document.createElement('canvas');
-        off1.width = m1W;
-        off1.height = m1H;
-        const off1Ctx = off1.getContext('2d');
-        off1Ctx.fillStyle = paperColor;
-        off1Ctx.fillRect(0, 0, m1W, m1H);
+        this.labCanvas.width = cropW;
+        this.labCanvas.height = cropH;
 
-        const page1 = await this.pdfDoc.getPage(curM.page || 1);
-        const vp1 = page1.getViewport({ scale: targetScale });
-        const cropX1 = Math.round(curM.box.left * ratio);
-        const cropY1 = Math.round(curM.box.top * ratio);
-
-        try {
-          await page1.render({
-            canvasContext: off1Ctx,
-            viewport: vp1,
-            transform: [1, 0, 0, 1, -cropX1, -cropY1]
-          }).promise;
-        } catch (_) {}
-
-        const off2 = document.createElement('canvas');
-        off2.width = m2W;
-        off2.height = m2H;
-        const off2Ctx = off2.getContext('2d');
-        off2Ctx.fillStyle = paperColor;
-        off2Ctx.fillRect(0, 0, m2W, m2H);
-
-        const page2 = await this.pdfDoc.getPage(nextM.page || 1);
-        const vp2 = page2.getViewport({ scale: targetScale });
-        const cropX2 = Math.round(nextM.box.left * ratio);
-        const cropY2 = Math.round(nextM.box.top * ratio);
-
-        try {
-          await page2.render({
-            canvasContext: off2Ctx,
-            viewport: vp2,
-            transform: [1, 0, 0, 1, -cropX2, -cropY2]
-          }).promise;
-        } catch (_) {}
-
-        const totalW_px = Math.round(totalW * ratio);
-        const totalH_px = Math.round(totalH * ratio);
-        const posY1 = Math.round(originY1 * ratio);
-        const posY2 = Math.round(originY2 * ratio);
-
-        this.labCanvas.width = totalW_px;
-        this.labCanvas.height = totalH_px;
         this.labLayoutMeta = {
           m1: curM,
           m2: nextM,
-          originY1: posY1,
-          originY2: posY2,
-          x2: m1W,
+          originY1: Math.round(originY1 * ratio),
+          originY2: Math.round(originY2 * ratio),
+          x2: splitX,
           scale2: 1.0,
           ratio
         };
 
         this.labCtx.fillStyle = paperColor;
-        this.labCtx.fillRect(0, 0, totalW_px, totalH_px);
+        this.labCtx.fillRect(0, 0, cropW, cropH);
 
-        this.labCtx.drawImage(off1, 0, posY1);
-        this.labCtx.drawImage(off2, m1W, posY2);
+        // 1. Takt: kreslíme do levé zóny (0 až splitX)
+        this.labCtx.save();
+        this.labCtx.beginPath();
+        this.labCtx.rect(0, 0, splitX, cropH);
+        this.labCtx.clip();
+
+        const page1 = await this.pdfDoc.getPage(curM.page || 1);
+        const vp1 = page1.getViewport({ scale: targetScale });
+        const cropX1 = Math.round(curM.box.left * ratio);
+        const cropY1 = Math.round(curM.box.top * ratio) - this.labLayoutMeta.originY1;
+
+        try {
+          await page1.render({
+            canvasContext: this.labCtx,
+            viewport: vp1,
+            transform: [1, 0, 0, 1, -cropX1, -cropY1]
+          }).promise;
+        } catch (_) {}
+        this.labCtx.restore();
+
+        // 2. Takt: kreslíme do pravé zóny (splitX až cropW) — klíč z nového řádku se doleva NIKDY nedostane
+        this.labCtx.save();
+        this.labCtx.beginPath();
+        this.labCtx.rect(splitX, 0, cropW - splitX, cropH);
+        this.labCtx.clip();
+
+        const page2 = await this.pdfDoc.getPage(nextM.page || 1);
+        const vp2 = page2.getViewport({ scale: targetScale });
+        const cropX2 = Math.round(nextM.box.left * ratio) - splitX;
+        const cropY2 = Math.round(nextM.box.top * ratio) - this.labLayoutMeta.originY2;
+
+        try {
+          await page2.render({
+            canvasContext: this.labCtx,
+            viewport: vp2,
+            transform: [1, 0, 0, 1, -cropX2, -cropY2]
+          }).promise;
+        } catch (_) {}
+        this.labCtx.restore();
 
       } else {
         // Rastrové vykreslení pro fotky
@@ -1911,6 +1899,7 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, this.labLayoutMeta.originY1, this.labLayoutMeta.ratio || 1.0);
       this.renderDrawingsForMeasure(this.labCtx, nextM, this.labLayoutMeta.x2, this.labLayoutMeta.originY2, this.labLayoutMeta.ratio || 1.0);
 
+      // Oddělovací linka při přechodu na nový řádek nebo stranu
       const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.40) ||
                              (curM.page || 1) !== (nextM.page || 1);
 
