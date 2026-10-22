@@ -1,6 +1,6 @@
 /**
- * Spolehlivě najde Y-souřadnici středové linky osnovy uvnitř vybraného taktu.
- * Využívá stejný adaptivní princip jako scanner.js (detekce souvislých linek).
+ * Matematicky neprůstřelné nalezení 3. linky osnovy (hřebenový filtr).
+ * Nenechá se zmást trámci not, pomocnými linkami ani různou výškou rámečku.
  */
 function getStaffCenterYInBox(sourceCanvas, box) {
   if (!sourceCanvas || !box || box.width <= 0 || box.height <= 0) {
@@ -8,82 +8,60 @@ function getStaffCenterYInBox(sourceCanvas, box) {
   }
 
   const ctx = sourceCanvas.getContext('2d');
-  const cropX = Math.max(0, Math.round(box.left + box.width * 0.15));
-  const cropW = Math.max(10, Math.round(box.width * 0.70));
+  const cropX = Math.max(0, Math.round(box.left + box.width * 0.12));
+  const cropW = Math.max(10, Math.round(box.width * 0.76));
   const cropY = Math.max(0, Math.round(box.top));
   const cropH = Math.max(10, Math.min(sourceCanvas.height - cropY, Math.round(box.height)));
 
-  const imgData = ctx.getImageData(cropX, cropY, cropW, cropH);
-  const d = imgData.data;
+  const imgData = ctx.getImageData(cropX, cropY, cropW, cropH).data;
 
-  // 1. Změříme průměrný jas papíru uvnitř taktu
-  let sumB = 0, countB = 0;
-  for (let i = 0; i < d.length; i += 16) {
-    sumB += (d[i] + d[i + 1] + d[i + 2]) / 3;
-    countB++;
-  }
-  const bgBright = countB > 0 ? (sumB / countB) : 230;
-  const darkThreshold = Math.min(150, Math.max(65, bgBright * 0.72));
-
-  // 2. Horizontální hustota tmavých pixelů pro každý řádek Y
+  // 1. Horizontální hustota tmavých pixelů pro každý řádek Y
   const rowFill = new Float32Array(cropH);
   for (let y = 0; y < cropH; y++) {
     let dark = 0;
     const rowOffset = y * cropW * 4;
     for (let x = 0; x < cropW; x++) {
       const idx = rowOffset + x * 4;
-      if (((d[idx] + d[idx + 1] + d[idx + 2]) / 3) < darkThreshold) {
-        dark++;
-      }
+      const lum = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
+      if (lum < 170) dark++;
     }
     rowFill[y] = dark / cropW;
   }
 
-  // 3. Nalezení souvislých bloků linek osnovy
-  const minLineFill = 0.30;
-  const lineBlocks = [];
-  let currentBlock = [];
+  // 2. Hřebenové vyhledání 5 linek s roztečí d (7 až 36 px)
+  let bestScore = -Infinity;
+  let bestCenter = Math.round(cropH / 2);
 
-  for (let y = 0; y < cropH; y++) {
-    if (rowFill[y] >= minLineFill) {
-      currentBlock.push(y);
-    } else {
-      if (currentBlock.length > 0) {
-        lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
-        currentBlock = [];
-      }
-    }
-  }
-  if (currentBlock.length > 0) {
-    lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
-  }
+  for (let d = 7; d <= 36; d++) {
+    const staffHeight = 4 * d;
+    for (let y = 0; y <= cropH - staffHeight; y++) {
+      // Součet tmavosti na 5 linkách
+      const lines = rowFill[y] +
+                    rowFill[y + d] +
+                    rowFill[y + 2 * d] +
+                    rowFill[y + 3 * d] +
+                    rowFill[y + 4 * d];
 
-  // 4. Hledání skupiny 5 linek s rovnoměrnou roztečí
-  let bestCenter = null;
-  let minDiff = Infinity;
+      // Tmavost v mezerách mezi linkami (musí být světlé)
+      const mid = Math.floor(d / 2);
+      const spaces = rowFill[y + mid] +
+                     rowFill[y + d + mid] +
+                     rowFill[y + 2 * d + mid] +
+                     rowFill[y + 3 * d + mid];
 
-  for (let i = 0; i <= lineBlocks.length - 5; i++) {
-    const group = lineBlocks.slice(i, i + 5);
-    const s1 = group[1] - group[0];
-    const s2 = group[2] - group[1];
-    const s3 = group[3] - group[2];
-    const s4 = group[4] - group[3];
-    const avg = (s1 + s2 + s3 + s4) / 4;
+      // Skóre: linky tmavé, mezery světlé, mírná preference středu rámečku
+      const centerY = y + 2 * d;
+      const distFromBoxMid = Math.abs(centerY - cropH / 2);
+      const score = (lines * 2.0 - spaces * 1.5) - (distFromBoxMid * 0.004);
 
-    if (avg >= 5 && avg <= 45 &&
-        Math.abs(s1 - avg) <= 5 && Math.abs(s2 - avg) <= 5 &&
-        Math.abs(s3 - avg) <= 5 && Math.abs(s4 - avg) <= 5) {
-      
-      const center = group[2]; // 3. linka
-      const distFromBoxMid = Math.abs(center - cropH / 2);
-      if (distFromBoxMid < minDiff) {
-        minDiff = distFromBoxMid;
-        bestCenter = center;
+      if (score > bestScore) {
+        bestScore = score;
+        bestCenter = centerY;
       }
     }
   }
 
-  return bestCenter !== null ? bestCenter : Math.round(cropH / 2);
+  return bestCenter;
 }
 
 class GuitarTrainer {
@@ -1781,14 +1759,15 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, this.labLayoutMeta.ratio || 1.0);
 
     } else {
-      // --- REŽIM 2 TAKTŮ (Landscape): BEZPEČNÁ IZOLOVANÁ PLÁTNA SE SLÍCOVANÝMI LINKAMI ---
+      // --- REŽIM 2 TAKTŮ (Landscape): KORELAČNÍ SLÍCOVÁNÍ + IZOLOVANÁ PLÁTNA ---
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
-      // Zjistíme středové linky osnov v obou taktech
+      // Přesný hřebenový filtr: najde 3. linku v obou taktech
       const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
       const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
+      // Posun taktu nahoru/dolů tak, aby 3. linky obou taktů ležely ve stejné výšce
       const diff = staffCenter1 - staffCenter2;
       const originY1 = diff < 0 ? -diff : 0;
       const originY2 = diff > 0 ? diff : 0;
@@ -1797,7 +1776,7 @@ class GuitarTrainer {
       const totalH = Math.max(originY1 + curM.box.height, originY2 + nextM.box.height);
 
       if (this.currentScore?.isPdf && this.pdfDoc) {
-        // Vektorové renderování přes 2 izolovaná pomocná plátna (zabraňuje přelití klíče)
+        // Vektorové ostré vykreslení PDF s izolovanými plátny
         const fitScale = Math.min(lensW / totalW, lensH / totalH);
         const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
         const ratio = targetScale / 2.0;
@@ -1828,7 +1807,7 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        // 2. Pomocné plátno pro takt 2 (klíč před tímto taktem zůstane mimo rozměr off2!)
+        // 2. Pomocné plátno pro takt 2 (klíč před tímto taktem zůstane mimo rozměr off2)
         const off2 = document.createElement('canvas');
         off2.width = m2W;
         off2.height = m2H;
@@ -1849,7 +1828,7 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        // 3. Sestavení na hlavní plátno
+        // 3. Sestavení na hlavní plátno se slícovanou výškou
         const totalW_px = Math.round(totalW * ratio);
         const totalH_px = Math.round(totalH * ratio);
         const posY1 = Math.round(originY1 * ratio);
@@ -1874,7 +1853,7 @@ class GuitarTrainer {
         this.labCtx.drawImage(off2, m1W, posY2);
 
       } else {
-        // Rastrové vykreslení pro fotky
+        // Rastrové ostré vykreslení pro fotky
         this.labLayoutMeta = {
           m1: curM,
           m2: nextM,
@@ -1911,7 +1890,7 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, this.labLayoutMeta.originY1, this.labLayoutMeta.ratio || 1.0);
       this.renderDrawingsForMeasure(this.labCtx, nextM, this.labLayoutMeta.x2, this.labLayoutMeta.originY2, this.labLayoutMeta.ratio || 1.0);
 
-      // Oddělovací linka mezi takty z různého řádku nebo strany
+      // Oddělovací linka při přechodu na nový řádek nebo stranu
       const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.40) ||
                              (curM.page || 1) !== (nextM.page || 1);
 
