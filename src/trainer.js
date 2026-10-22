@@ -1,3 +1,67 @@
+/**
+ * Rychle zjistí polohu první linky a průměrnou rozteč osnovy uvnitř oříznutého taktu.
+ */
+function detectStaffMetricsInBox(img, box) {
+  const canvas = document.createElement('canvas');
+  const w = Math.min(box.width, 300);
+  const h = box.height;
+  canvas.width = w;
+  canvas.height = h;
+
+  const ctx = canvas.getContext('2d');
+  const startX = box.left + Math.floor(box.width * 0.2);
+  ctx.drawImage(img, startX, box.top, w, h, 0, 0, w, h);
+
+  const imgData = ctx.getImageData(0, 0, w, h).data;
+  const rowDarkness = new Float32Array(h);
+
+  for (let y = 0; y < h; y++) {
+    let dark = 0;
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      const lum = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
+      if (lum < 160) dark++;
+    }
+    rowDarkness[y] = dark / w;
+  }
+
+  const peaks = [];
+  for (let y = 2; y < h - 2; y++) {
+    if (rowDarkness[y] > 0.22 &&
+        rowDarkness[y] > rowDarkness[y - 1] &&
+        rowDarkness[y] >= rowDarkness[y + 1]) {
+      peaks.push(y);
+    }
+  }
+
+  for (let i = 0; i <= peaks.length - 5; i++) {
+    const d1 = peaks[i + 1] - peaks[i];
+    const d2 = peaks[i + 2] - peaks[i + 1];
+    const d3 = peaks[i + 3] - peaks[i + 2];
+    const d4 = peaks[i + 4] - peaks[i + 3];
+    const avg = (d1 + d2 + d3 + d4) / 4;
+
+    if (avg >= 5 && avg <= 45 &&
+        Math.abs(d1 - avg) <= 4 && Math.abs(d2 - avg) <= 4 &&
+        Math.abs(d3 - avg) <= 4 && Math.abs(d4 - avg) <= 4) {
+      return {
+        firstLineY: peaks[i],
+        lastLineY: peaks[i + 4],
+        spacing: avg,
+        staffHeight: peaks[i + 4] - peaks[i]
+      };
+    }
+  }
+
+  // Záložní odhad, pokud osnova nebyla jasně zřetelná
+  return {
+    firstLineY: Math.round(h * 0.35),
+    lastLineY: Math.round(h * 0.65),
+    spacing: (h * 0.30) / 4,
+    staffHeight: h * 0.30
+  };
+}
+
 class GuitarTrainer {
   constructor() {
     this.scoreCanvas = document.getElementById('scoreCanvas');
@@ -42,6 +106,7 @@ class GuitarTrainer {
     this.labZoomScale = 1.0;
     this.labPanX = 0;
     this.labPanY = 0;
+    this.labLayoutMeta = null; // Informace o rozvržení 1 vs 2 taktů a zarovnání linek
 
     this.librarySort = 'recent'; // 'recent' | 'name'
 
@@ -505,7 +570,7 @@ class GuitarTrainer {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(all));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `noty_zaloha.json`);
+      downloadAnchor.setAttribute("download", `hudebni-laborator-zaloha-${new Date().toISOString().slice(0, 10)}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
@@ -517,7 +582,6 @@ class GuitarTrainer {
     if (!file) return;
 
     try {
-      // FileReader je na mobilních zařízeních spolehlivější než file.text()
       const text = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -1246,6 +1310,7 @@ class GuitarTrainer {
     let isLabErasing = false;
     let isLabPanning = false;
     let currentLabStroke = null;
+    let currentLabTargetPage = null;
 
     lens.addEventListener('touchstart', e => {
       if (e.touches.length > 1) e.preventDefault();
@@ -1256,28 +1321,27 @@ class GuitarTrainer {
     }, { passive: false });
 
     lens.addEventListener('pointerdown', e => {
-      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
-      if (!curM) return;
-
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (ongoingTouches.size === 1) {
         lens.setPointerCapture(e.pointerId);
-        const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
+        const hit = this.labCanvasToPageCoords(e.clientX, e.clientY);
 
         if (this.editTool === 'eraser') {
-          if (pageCoords) {
+          if (hit) {
             isLabErasing = true;
-            this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
+            currentLabTargetPage = hit.page;
+            this.eraseAt(hit.x, hit.y, hit.page);
             this.showMeasureInLab(this.labCurrentIndex, false);
           }
         } else if (this.editTool === 'pen') {
-          if (pageCoords) {
+          if (hit) {
             isLabDrawing = true;
+            currentLabTargetPage = hit.page;
             currentLabStroke = {
               color: this.penColor,
               width: this.penWidth,
-              points: [{ x: pageCoords.x, y: pageCoords.y }]
+              points: [{ x: hit.x, y: hit.y }]
             };
           }
         } else {
@@ -1297,9 +1361,6 @@ class GuitarTrainer {
       const dx = e.clientX - prev.x;
       const dy = e.clientY - prev.y;
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
-      if (!curM) return;
 
       if (ongoingTouches.size === 2) {
         const t = Array.from(ongoingTouches.values());
@@ -1329,33 +1390,44 @@ class GuitarTrainer {
           return;
         }
 
-        const pageCoords = this.labCanvasToPageCoords(e.clientX, e.clientY, curM);
-        if (!pageCoords) return;
+        const hit = this.labCanvasToPageCoords(e.clientX, e.clientY);
+        if (!hit) return;
 
         if (isLabErasing) {
-          this.eraseAt(pageCoords.x, pageCoords.y, curM.page || 1);
+          this.eraseAt(hit.x, hit.y, hit.page);
           this.showMeasureInLab(this.labCurrentIndex, false);
           return;
         }
 
         if (isLabDrawing && currentLabStroke) {
-          currentLabStroke.points.push({ x: pageCoords.x, y: pageCoords.y });
+          currentLabStroke.points.push({ x: hit.x, y: hit.y });
 
-          if (this.labCtx) {
-            const ratio = this.labScaleRatio || 1.0;
+          if (this.labCtx && this.labLayoutMeta) {
+            const isM1 = hit.page === (this.labLayoutMeta.m1.page || 1);
+            const ox = isM1 ? 0 : this.labLayoutMeta.x2;
+            const oy = isM1 ? this.labLayoutMeta.originY1 : this.labLayoutMeta.originY2;
+            const scale = isM1 ? 1.0 : (this.labLayoutMeta.scale2 || 1.0);
+            const curBox = isM1 ? this.labLayoutMeta.m1.box : this.labLayoutMeta.m2.box;
+
             this.labCtx.save();
             this.labCtx.strokeStyle = currentLabStroke.color;
-            this.labCtx.lineWidth = currentLabStroke.width * ratio;
+            this.labCtx.lineWidth = currentLabStroke.width * scale;
             this.labCtx.lineCap = 'round';
             this.labCtx.lineJoin = 'round';
-            this.labCtx.scale(ratio, ratio);
-            this.labCtx.translate(-curM.box.left, -curM.box.top);
 
             const pts = currentLabStroke.points;
             if (pts.length >= 2) {
+              const pA = pts[pts.length - 2];
+              const pB = pts[pts.length - 1];
+
+              const cAx = ox + (pA.x - curBox.left) * scale;
+              const cAy = oy + (pA.y - curBox.top) * scale;
+              const cBx = ox + (pB.x - curBox.left) * scale;
+              const cBy = oy + (pB.y - curBox.top) * scale;
+
               this.labCtx.beginPath();
-              this.labCtx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
-              this.labCtx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+              this.labCtx.moveTo(cAx, cAy);
+              this.labCtx.lineTo(cBx, cBy);
               this.labCtx.stroke();
             }
             this.labCtx.restore();
@@ -1365,17 +1437,17 @@ class GuitarTrainer {
     });
 
     const finishLabPointer = async () => {
-      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
-      if (isLabDrawing && currentLabStroke && curM) {
+      if (isLabDrawing && currentLabStroke && currentLabTargetPage) {
         isLabDrawing = false;
         if (currentLabStroke.points.length > 1 && this.currentScore) {
-          const key = `page_${curM.page || 1}`;
+          const key = `page_${currentLabTargetPage}`;
           if (!this.currentScore.drawings) this.currentScore.drawings = {};
           if (!this.currentScore.drawings[key]) this.currentScore.drawings[key] = [];
           this.currentScore.drawings[key].push(currentLabStroke);
           await this.persistCurrentScore();
         }
         currentLabStroke = null;
+        currentLabTargetPage = null;
         this.showMeasureInLab(this.labCurrentIndex, false);
       }
       isLabErasing = false;
@@ -1387,19 +1459,34 @@ class GuitarTrainer {
     lens.addEventListener('pointercancel', finishLabPointer);
   }
 
-  labCanvasToPageCoords(clientX, clientY, curM) {
+  labCanvasToPageCoords(clientX, clientY) {
     const lens = document.getElementById('rectLoupeLens');
-    if (!lens || !this.labCanvas) return null;
+    if (!lens || !this.labCanvas || !this.labLayoutMeta) return null;
     const rect = lens.getBoundingClientRect();
-    const ratio = this.labScaleRatio || 1.0;
 
-    const localX = (clientX - rect.left - this.labPanX) / (this.labZoomScale * ratio);
-    const localY = (clientY - rect.top - this.labPanY) / (this.labZoomScale * ratio);
+    const canvasX = (clientX - rect.left - this.labPanX) / this.labZoomScale;
+    const canvasY = (clientY - rect.top - this.labPanY) / this.labZoomScale;
 
-    return {
-      x: Math.round(curM.box.left + localX),
-      y: Math.round(curM.box.top + localY)
-    };
+    const meta = this.labLayoutMeta;
+
+    // Detekce, zda uživatel klepl do 1. nebo 2. taktu
+    if (meta.m2 && canvasX >= meta.x2) {
+      const localX = (canvasX - meta.x2) / meta.scale2;
+      const localY = (canvasY - meta.originY2) / meta.scale2;
+      return {
+        x: Math.round(meta.m2.box.left + localX),
+        y: Math.round(meta.m2.box.top + localY),
+        page: meta.m2.page || 1
+      };
+    } else {
+      const localX = canvasX;
+      const localY = canvasY - meta.originY1;
+      return {
+        x: Math.round(meta.m1.box.left + localX),
+        y: Math.round(meta.m1.box.top + localY),
+        page: meta.m1.page || 1
+      };
+    }
   }
 
   updateLabBadge() {
@@ -1447,39 +1534,6 @@ class GuitarTrainer {
     this.renderLabQueue();
     this.showMeasureInLab(this.labCurrentIndex, true);
     if (this.metronome) this.metronome.resetLabDrill();
-  }
-
-  enhanceMeasurePixels(ctx, width, height) {
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const src = imgData.data;
-    const copy = new Uint8ClampedArray(src);
-    const strength = 0.40;
-
-    for (let y = 1; y < height - 1; y++) {
-      const rowOffset = y * width;
-      for (let x = 1; x < width - 1; x++) {
-        const idx = (rowOffset + x) * 4;
-
-        for (let c = 0; c < 3; c++) {
-          const center = copy[idx + c];
-          const up = copy[((y - 1) * width + x) * 4 + c];
-          const down = copy[((y + 1) * width + x) * 4 + c];
-          const left = copy[(rowOffset + x - 1) * 4 + c];
-          const right = copy[(rowOffset + x + 1) * 4 + c];
-
-          let val = center + strength * (4 * center - up - down - left - right);
-
-          if (val < 135) {
-            val = Math.max(12, val * 0.82);
-          } else if (val > 195) {
-            val = Math.min(255, val * 1.04);
-          }
-
-          src[idx + c] = val;
-        }
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
   }
 
   samplePaperColorFromImage(sourceCanvas, box) {
@@ -1534,6 +1588,40 @@ class GuitarTrainer {
     return defaultColor;
   }
 
+  // Pomocná metoda pro vykreslení ručních kreseb do výřezu v laboratoři
+  renderDrawingsForMeasure(ctx, m, ox, oy, scale = 1.0) {
+    if (!this.showAnnotations || !this.currentScore?.drawings) return;
+    const pageKey = `page_${m.page || 1}`;
+    const strokes = this.currentScore.drawings[pageKey] || [];
+    if (strokes.length === 0) return;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    strokes.forEach(stroke => {
+      if (!stroke.points || stroke.points.length < 2) return;
+      ctx.strokeStyle = stroke.color || '#ef4444';
+      ctx.lineWidth = (stroke.width || 2) * scale;
+      ctx.beginPath();
+      let hasStarted = false;
+
+      stroke.points.forEach(pt => {
+        const x = ox + (pt.x - m.box.left) * scale;
+        const y = oy + (pt.y - m.box.top) * scale;
+        if (!hasStarted) {
+          ctx.moveTo(x, y);
+          hasStarted = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+    });
+
+    ctx.restore();
+  }
+
   async showMeasureInLab(idx, autoFit = true) {
     const measures = this.currentScore?.measures || [];
     const clefWrap = document.getElementById('labClefWrap');
@@ -1543,19 +1631,15 @@ class GuitarTrainer {
       if (this.labCtx && this.labCanvas) this.labCtx.clearRect(0, 0, this.labCanvas.width, this.labCanvas.height);
       if (clefWrap) clefWrap.style.display = 'none';
       if (ind) ind.innerText = 'Prázdno';
+      this.labLayoutMeta = null;
       return;
     }
 
     this.labCurrentIndex = Math.max(0, Math.min(measures.length - 1, idx));
     const curM = measures[this.labCurrentIndex];
-    if (ind) ind.innerText = `Takt #${curM.id}`;
 
     const lens = document.getElementById('rectLoupeLens');
     const container = document.querySelector('.rect-loupe-container');
-    const lensW = lens ? lens.clientWidth : 800;
-    const lensH = lens ? lens.clientHeight : 300;
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-
     const curImg = await this.getPageImage(curM.page || 1);
     const paperColor = this.samplePaperColorFromImage(curImg, curM.box);
 
@@ -1565,130 +1649,124 @@ class GuitarTrainer {
     // 1. KLÍČ & PŘEDZNAMENÁNÍ
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
-      if (this.currentScore?.isPdf && this.pdfDoc) {
-        try {
-          const keyPage = await this.pdfDoc.getPage(keySig.page || 1);
-          const kScale = Math.min(8.0, 2.0 * dpr * 1.5);
-          const kRatio = kScale / 2.0;
-          const kW = Math.round(keySig.box.width * kRatio);
-          const kH = Math.round(keySig.box.height * kRatio);
-          const kX = Math.round(keySig.box.left * kRatio);
-          const kY = Math.round(keySig.box.top * kRatio);
-
-          this.labClefCanvas.width = kW;
-          this.labClefCanvas.height = kH;
-          this.labClefCtx.fillStyle = paperColor;
-          this.labClefCtx.fillRect(0, 0, kW, kH);
-
-          const kViewport = keyPage.getViewport({ scale: kScale });
-          await keyPage.render({
-            canvasContext: this.labClefCtx,
-            viewport: kViewport,
-            transform: [1, 0, 0, 1, -kX, -kY]
-          }).promise;
-          if (clefWrap) clefWrap.style.display = 'inline-flex';
-        } catch (_) {}
-      } else {
-        const keyImg = await this.getPageImage(keySig.page || 1);
-        if (keyImg) {
-          if (clefWrap) clefWrap.style.display = 'inline-flex';
-          this.labClefCanvas.width = keySig.box.width;
-          this.labClefCanvas.height = keySig.box.height;
-          this.labClefCtx.fillStyle = paperColor;
-          this.labClefCtx.fillRect(0, 0, keySig.box.width, keySig.box.height);
-          this.labClefCtx.drawImage(
-            keyImg,
-            keySig.box.left, keySig.box.top, keySig.box.width, keySig.box.height,
-            0, 0, keySig.box.width, keySig.box.height
-          );
-        }
+      const keyImg = await this.getPageImage(keySig.page || 1);
+      if (keyImg) {
+        if (clefWrap) clefWrap.style.display = 'inline-flex';
+        this.labClefCanvas.width = keySig.box.width;
+        this.labClefCanvas.height = keySig.box.height;
+        this.labClefCtx.fillStyle = paperColor;
+        this.labClefCtx.fillRect(0, 0, keySig.box.width, keySig.box.height);
+        this.labClefCtx.drawImage(
+          keyImg,
+          keySig.box.left, keySig.box.top, keySig.box.width, keySig.box.height,
+          0, 0, keySig.box.width, keySig.box.height
+        );
       }
     } else {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. TAKT: VEKTOROVÝ VÝŘEZ PRO PDF NEBO 1:1 FOTO
-    if (!this.labCanvas || !this.labCtx) return;
+    // 2. VYKRESLENÍ TAKTU (1 takt v portrait, 2 slícované takty v landscape)
+    if (!this.labCanvas || !this.labCtx || !curImg) return;
 
-    if (this.currentScore?.isPdf && this.pdfDoc) {
-      const pageNum = curM.page || 1;
-      const page = await this.pdfDoc.getPage(pageNum);
+    const isLandscape = window.innerWidth > window.innerHeight;
+    const nextM = (isLandscape && this.labCurrentIndex + 1 < measures.length)
+      ? measures[this.labCurrentIndex + 1]
+      : null;
 
-      const fitScale = Math.min(lensW / curM.box.width, lensH / curM.box.height);
-      const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
-      const ratio = targetScale / 2.0;
+    if (!nextM) {
+      // REŽIM 1 TAKTU (Portrait nebo poslední takt)
+      if (ind) ind.innerText = `Takt #${curM.id}`;
+      this.labLayoutMeta = {
+        m1: curM,
+        m2: null,
+        originY1: 0,
+        originY2: 0,
+        x2: 0,
+        scale2: 1.0
+      };
 
-      const cropW = Math.round(curM.box.width * ratio);
-      const cropH = Math.round(curM.box.height * ratio);
-      const cropX = Math.round(curM.box.left * ratio);
-      const cropY = Math.round(curM.box.top * ratio);
-
-      this.labCanvas.width = cropW;
-      this.labCanvas.height = cropH;
-      this.labScaleRatio = ratio;
-
-      this.labCtx.fillStyle = paperColor;
-      this.labCtx.fillRect(0, 0, cropW, cropH);
-
-      const viewport = page.getViewport({ scale: targetScale });
-
-      if (this.labRenderTask) {
-        try { this.labRenderTask.cancel(); } catch (_) {}
-        this.labRenderTask = null;
-      }
-
-      const renderTask = page.render({
-        canvasContext: this.labCtx,
-        viewport: viewport,
-        transform: [1, 0, 0, 1, -cropX, -cropY]
-      });
-      this.labRenderTask = renderTask;
-
-      try {
-        await renderTask.promise;
-      } catch (err) {
-        if (err.name === 'RenderingCancelledException') return;
-      }
-    } else {
-      if (!curImg) return;
-
-      this.labScaleRatio = 1.0;
       this.labCanvas.width = curM.box.width;
       this.labCanvas.height = curM.box.height;
-
       this.labCtx.fillStyle = paperColor;
       this.labCtx.fillRect(0, 0, this.labCanvas.width, this.labCanvas.height);
-      this.labCtx.imageSmoothingEnabled = true;
-      this.labCtx.imageSmoothingQuality = 'high';
+
       this.labCtx.drawImage(
         curImg,
         curM.box.left, curM.box.top, curM.box.width, curM.box.height,
         0, 0, curM.box.width, curM.box.height
       );
-    }
 
-    // 3. VYKRESLENÍ PŘIPSANÝCH ZNAČEK
-    const ratio = this.labScaleRatio || 1.0;
-    if (this.showAnnotations && this.currentScore?.drawings) {
-      const pageKey = `page_${curM.page || 1}`;
-      const strokes = this.currentScore.drawings[pageKey] || [];
-      if (strokes.length > 0) {
+      this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, 1.0);
+
+    } else {
+      // REŽIM 2 TAKTŮ (Landscape): Slícování linek osnovy
+      if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
+      const nextImg = await this.getPageImage(nextM.page || 1);
+
+      // Zjistíme metriku osnov (polohu linek a rozteč) u obou taktů
+      const s1 = detectStaffMetricsInBox(curImg, curM.box);
+      const s2 = detectStaffMetricsInBox(nextImg, nextM.box);
+
+      // Přepočet měřítka druhého taktu tak, aby rozteč linek přesně odpovídala prvnímu taktu
+      const scale2 = (s2.spacing > 0 && s1.spacing > 0) ? (s1.spacing / s2.spacing) : 1.0;
+      const m2ScaledW = Math.round(nextM.box.width * scale2);
+      const m2ScaledH = Math.round(nextM.box.height * scale2);
+
+      // Posun Y pro 2. takt, aby první linka osnovy byla v identické výšce jako u 1. taktu
+      const offsetY2 = s1.firstLineY - Math.round(s2.firstLineY * scale2);
+
+      const totalW = curM.box.width + m2ScaledW;
+      const minY = Math.min(0, offsetY2);
+      const maxY = Math.max(curM.box.height, offsetY2 + m2ScaledH);
+      const totalH = maxY - minY;
+
+      const originY1 = -minY;
+      const originY2 = offsetY2 - minY;
+
+      this.labLayoutMeta = {
+        m1: curM,
+        m2: nextM,
+        originY1,
+        originY2,
+        x2: curM.box.width,
+        scale2
+      };
+
+      this.labCanvas.width = totalW;
+      this.labCanvas.height = totalH;
+      this.labCtx.fillStyle = paperColor;
+      this.labCtx.fillRect(0, 0, totalW, totalH);
+
+      // Vykreslení 1. taktu
+      this.labCtx.drawImage(
+        curImg,
+        curM.box.left, curM.box.top, curM.box.width, curM.box.height,
+        0, originY1, curM.box.width, curM.box.height
+      );
+      this.renderDrawingsForMeasure(this.labCtx, curM, 0, originY1, 1.0);
+
+      // Vykreslení 2. taktu s přesným lícováním linek
+      this.labCtx.drawImage(
+        nextImg,
+        nextM.box.left, nextM.box.top, nextM.box.width, nextM.box.height,
+        curM.box.width, originY2, m2ScaledW, m2ScaledH
+      );
+      this.renderDrawingsForMeasure(this.labCtx, nextM, curM.box.width, originY2, scale2);
+
+      // Oddělovací čára, pokud takty nejsou ze stejného řádku nebo strany
+      const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.45) ||
+                             (curM.page || 1) !== (nextM.page || 1);
+
+      if (isDifferentRow) {
         this.labCtx.save();
-        this.labCtx.lineCap = 'round';
-        this.labCtx.lineJoin = 'round';
-        this.labCtx.scale(ratio, ratio);
-        this.labCtx.translate(-curM.box.left, -curM.box.top);
-        strokes.forEach(stroke => {
-          if (!stroke.points || stroke.points.length < 2) return;
-          this.labCtx.strokeStyle = stroke.color || '#ef4444';
-          this.labCtx.lineWidth = stroke.width || 2;
-          this.labCtx.beginPath();
-          this.labCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          for (let i = 1; i < stroke.points.length; i++) {
-            this.labCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
-          }
-          this.labCtx.stroke();
-        });
+        this.labCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+        this.labCtx.lineWidth = 2;
+        this.labCtx.setLineDash([4, 4]);
+        this.labCtx.beginPath();
+        this.labCtx.moveTo(curM.box.width, 0);
+        this.labCtx.lineTo(curM.box.width, totalH);
+        this.labCtx.stroke();
         this.labCtx.restore();
       }
     }
