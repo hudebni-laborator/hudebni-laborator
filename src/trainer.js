@@ -62,7 +62,7 @@ function getStaffCenterYInBox(sourceCanvas, box) {
   let bestCenter = null;
   let minDiff = Infinity;
 
-  // A) Nejprve vaše původní kontrola sousedních pětic
+  // A) Kontrola sousedních pětic
   for (let i = 0; i <= lineBlocks.length - 5; i++) {
     const group = lineBlocks.slice(i, i + 5);
     const s1 = group[1] - group[0];
@@ -85,7 +85,6 @@ function getStaffCenterYInBox(sourceCanvas, box) {
   }
 
   // B) Pokud mezi linkami ležel trámec noty a sousední pětice selhala:
-  // Najdeme pětici linek s odpovídající roztečí d i přes vložené trámce
   if (bestCenter === null && lineBlocks.length >= 5) {
     for (let i = 0; i < lineBlocks.length; i++) {
       for (let j = i + 1; j < lineBlocks.length; j++) {
@@ -100,10 +99,19 @@ function getStaffCenterYInBox(sourceCanvas, box) {
         }
 
         if (matched.length === 5) {
+          const topL = matched[0];
+          const botL = matched[4];
+          const stepR = Math.round((botL - topL) / 4);
+
+          const isRealStaffBoundary = (topL - stepR >= 0 ? rowFill[topL - stepR] < 0.25 : true) &&
+                                      (botL + stepR < cropH ? rowFill[botL + stepR] < 0.25 : true);
+
           const center = matched[2];
           const distFromBoxMid = Math.abs(center - cropH / 2);
-          if (distFromBoxMid < minDiff) {
-            minDiff = distFromBoxMid;
+          let score = (isRealStaffBoundary ? 50 : 0) - distFromBoxMid * 0.1;
+
+          if (score > bestScore) {
+            bestScore = score;
             bestCenter = center;
           }
         }
@@ -140,7 +148,10 @@ class GuitarTrainer {
     this.labCurrentIndex = 0;
     this.isMarkingMode = false;
 
-    this.editTool = 'pen';
+    // Výchozí pro režim Hraní je označování taktů (box)
+    this.editTool = 'box';
+    this.labTool = 'pan'; // 'pan' | 'pen' | 'whiteout' | 'eraser'
+    this.paperColor = '#f4f2ec';
     this.penColor = '#ef4444';
     this.penWidth = 2;
     this.showAnnotations = true;
@@ -158,9 +169,9 @@ class GuitarTrainer {
     this.labZoomScale = 1.0;
     this.labPanX = 0;
     this.labPanY = 0;
-    this.labLayoutMeta = null; // Informace o rozvržení 1 vs 2 taktů a zarovnání linek
+    this.labLayoutMeta = null;
 
-    this.librarySort = 'recent'; // 'recent' | 'name'
+    this.librarySort = 'recent';
 
     this.metronome = new MetronomeController();
 
@@ -172,9 +183,7 @@ class GuitarTrainer {
       const isFull = !!document.fullscreenElement;
       document.body.classList.toggle('is-fullscreen', isFull);
       const fsBtn = document.getElementById('floatingFsBtn');
-      if (fsBtn) {
-        fsBtn.innerHTML = isFull ? '✕' : '⛶';
-      }
+      if (fsBtn) fsBtn.innerHTML = isFull ? '✕' : '⛶';
       setTimeout(() => this.fitCanvasToScreen(), 100);
     });
 
@@ -196,14 +205,101 @@ class GuitarTrainer {
   }
 
   togglePlayTempoPopup() {
-    const popup = document.getElementById('playTempoPopup');
-    if (!popup) return;
-    popup.style.display = (popup.style.display === 'none') ? 'block' : 'none';
+    this.metronome.openSheet();
   }
 
   toggleLabMetroPopup() {
-    const el = document.getElementById('dockedMetronome');
-    if (el) el.classList.toggle('open-landscape-panel');
+    this.metronome.openSheet();
+  }
+
+  toggleLabPen() {
+    this.labTool = (this.labTool === 'pen') ? 'pan' : 'pen';
+    this.updateLabToolUI();
+  }
+
+  toggleLabWhiteout() {
+    this.labTool = (this.labTool === 'whiteout') ? 'pan' : 'whiteout';
+    this.updateLabToolUI();
+  }
+
+  toggleLabEraser() {
+    this.labTool = (this.labTool === 'eraser') ? 'pan' : 'eraser';
+    this.updateLabToolUI();
+  }
+
+  updateLabToolUI() {
+    const penBtn = document.getElementById('labToolPenBtn');
+    const whiteBtn = document.getElementById('labToolWhiteoutBtn');
+    const eraserBtn = document.getElementById('labToolEraserBtn');
+    if (penBtn) penBtn.classList.toggle('active-glowing', this.labTool === 'pen');
+    if (whiteBtn) whiteBtn.classList.toggle('active-glowing', this.labTool === 'whiteout');
+    if (eraserBtn) eraserBtn.classList.toggle('active-glowing', this.labTool === 'eraser');
+  }
+
+  updateToolCursor(clientX, clientY, context = 'edit') {
+    let cursorEl = document.getElementById('toolCursor');
+    if (!cursorEl) {
+      cursorEl = document.createElement('div');
+      cursorEl.id = 'toolCursor';
+      cursorEl.className = 'tool-cursor';
+      document.body.appendChild(cursorEl);
+    }
+
+    let activeTool = null;
+    let scale = 1.0;
+    let paperColor = '#f4f2ec';
+
+    if (context === 'edit') {
+      if (!this.isMarkingMode) {
+        this.hideToolCursor();
+        return;
+      }
+      activeTool = this.editTool;
+      scale = this.zoomScale || 1.0;
+      paperColor = this.samplePaperColorFromImage(this.pageCache.get(this.currentPage), { left: 0, top: 0, width: 50, height: 50 }) || '#f4f2ec';
+    } else if (context === 'lab') {
+      activeTool = this.labTool;
+      const ratio = this.labLayoutMeta?.ratio || 1.0;
+      scale = ratio * (this.labZoomScale || 1.0);
+      const curM = this.currentScore?.measures?.[this.labCurrentIndex];
+      paperColor = this.samplePaperColorFromImage(this.pageCache.get(curM?.page || 1), curM?.box) || '#f4f2ec';
+    }
+
+    if (!activeTool || activeTool === 'box' || activeTool === 'pan') {
+      this.hideToolCursor();
+      return;
+    }
+
+    let screenDiameter = 16;
+    cursorEl.className = 'tool-cursor';
+
+    if (activeTool === 'pen') {
+      cursorEl.classList.add('tool-pen');
+      const penW = this.penWidth || 2;
+      screenDiameter = Math.max(8, Math.round(penW * scale));
+      cursorEl.style.setProperty('--cursor-color', this.penColor || '#ef4444');
+      cursorEl.style.setProperty('--cursor-fill', (this.penColor || '#ef4444') + '33');
+    } else if (activeTool === 'whiteout') {
+      cursorEl.classList.add('tool-whiteout');
+      const whiteW = Math.max(16, (this.penWidth || 2) * 4.5);
+      screenDiameter = Math.max(16, Math.round(whiteW * scale));
+      cursorEl.style.setProperty('--cursor-paper', paperColor);
+    } else if (activeTool === 'eraser') {
+      cursorEl.classList.add('tool-eraser');
+      const eraseRadius = Math.max(12, (this.penWidth || 2) * 2.5);
+      screenDiameter = Math.max(18, Math.round(eraseRadius * 2 * scale));
+    }
+
+    cursorEl.style.width = screenDiameter + 'px';
+    cursorEl.style.height = screenDiameter + 'px';
+    cursorEl.style.left = clientX + 'px';
+    cursorEl.style.top = clientY + 'px';
+    cursorEl.style.display = 'block';
+  }
+
+  hideToolCursor() {
+    const cursorEl = document.getElementById('toolCursor');
+    if (cursorEl) cursorEl.style.display = 'none';
   }
 
   showAddPagePrompt() {
@@ -250,24 +346,28 @@ class GuitarTrainer {
       if (zLeft) zLeft.style.display = 'none';
       if (zRight) zRight.style.display = 'none';
       if (drawBar) drawBar.style.display = 'flex';
+      this.setEditTool('box');
     } else {
       if (btn) {
         btn.innerText = 'Hraní';
-        btn.className = 'btn btn-accent btn-sm fixed-mode-btn';
+        btn.className = 'btn btn-primary btn-sm fixed-mode-btn';
       }
       if (zLeft) zLeft.style.display = 'block';
       if (zRight) zRight.style.display = 'block';
       if (drawBar) drawBar.style.display = 'none';
+      this.setEditTool('box');
       this.resetActiveSelection();
     }
+    this.hideToolCursor();
     this.renderScoreView();
   }
 
   setEditTool(tool) {
     this.editTool = tool;
-    ['toolBoxBtn'].forEach(id => document.getElementById(id)?.classList.toggle('active', tool === 'box'));
-    ['toolPenBtn', 'labToolPenBtn'].forEach(id => document.getElementById(id)?.classList.toggle('active', tool === 'pen'));
-    ['toolEraserBtn', 'labToolEraserBtn'].forEach(id => document.getElementById(id)?.classList.toggle('active', tool === 'eraser'));
+    document.getElementById('toolBoxBtn')?.classList.toggle('active', tool === 'box');
+    document.getElementById('toolPenBtn')?.classList.toggle('active', tool === 'pen');
+    document.getElementById('toolWhiteoutBtn')?.classList.toggle('active', tool === 'whiteout');
+    document.getElementById('toolEraserBtn')?.classList.toggle('active', tool === 'eraser');
     if (tool !== 'box') this.resetActiveSelection();
   }
 
@@ -333,7 +433,7 @@ class GuitarTrainer {
     const strokes = this.currentScore.drawings?.[key];
     if (!strokes || strokes.length === 0) return false;
 
-    const radius = Math.max(6, this.penWidth * 1.5);
+    const radius = Math.max(12, (this.penWidth || 2) * 2.5);
     const rSq = radius * radius;
     let modified = false;
     const newStrokes = [];
@@ -345,7 +445,7 @@ class GuitarTrainer {
         const distSq = (pt.x - cx) ** 2 + (pt.y - cy) ** 2;
         if (distSq <= rSq) {
           modified = true;
-          if (currentRun.length > 1) {
+          if (currentRun.length > 0) {
             newStrokes.push({ ...stroke, points: currentRun });
           }
           currentRun = [];
@@ -353,7 +453,7 @@ class GuitarTrainer {
           currentRun.push(pt);
         }
       }
-      if (currentRun.length > 1) {
+      if (currentRun.length > 0) {
         newStrokes.push({ ...stroke, points: currentRun });
       }
     }
@@ -368,18 +468,6 @@ class GuitarTrainer {
   toggleIncrementalMetronome() { this.metronome.toggle(); }
   resetMetronomeTempo() { this.metronome.resetTempo(); }
   stopMetronome() { this.metronome.stop(); }
-  promptSetBpm() {
-    const isLab = document.getElementById('labView')?.style.display === 'flex';
-    const current = isLab ? this.metronome.labStartBpm : this.metronome.playStartBpm;
-    const val = window.prompt('Zadejte tempo (BPM):', current);
-    if (val && !isNaN(val)) {
-      if (isLab) {
-        this.metronome.onStartBpmInput(Number(val));
-      } else {
-        this.metronome.setPlayBpm(Number(val));
-      }
-    }
-  }
 
   updateHeaderTitle() {
     const headerTitle = document.getElementById('headerSongTitle');
@@ -719,6 +807,7 @@ class GuitarTrainer {
     return res;
   }
 
+  // Označené takty jsou v Hraní zelené (#10b981)
   renderScoreView() {
     const popup = document.getElementById('playTempoPopup');
     if (popup) popup.style.display = 'none';
@@ -749,6 +838,7 @@ class GuitarTrainer {
 
     if (!this.isMarkingMode) return;
 
+    // Klíče (zlaté)
     (this.currentScore?.keySignatures || []).forEach(k => {
       if ((k.page || 1) !== this.currentPage || (this.activeType === 'keySig' && this.editingId === k.id)) return;
       this.scoreCtx.fillStyle = 'rgba(245, 158, 11, 0.18)';
@@ -763,14 +853,15 @@ class GuitarTrainer {
       this.scoreCtx.fillText('🎼 Klíč', k.box.left + 6, k.box.top + 15);
     });
 
+    // Takty (zelené #10b981)
     (this.currentScore?.measures || []).forEach(m => {
       if ((m.page || 1) !== this.currentPage || (this.activeType === 'measure' && this.editingId === m.id)) return;
-      this.scoreCtx.fillStyle = 'rgba(239, 68, 68, 0.22)';
+      this.scoreCtx.fillStyle = 'rgba(16, 185, 129, 0.22)';
       this.scoreCtx.fillRect(m.box.left, m.box.top, m.box.width, m.box.height);
-      this.scoreCtx.strokeStyle = '#ef4444';
+      this.scoreCtx.strokeStyle = '#10b981';
       this.scoreCtx.lineWidth = 3.5;
       this.scoreCtx.strokeRect(m.box.left, m.box.top, m.box.width, m.box.height);
-      this.scoreCtx.fillStyle = '#ef4444';
+      this.scoreCtx.fillStyle = '#10b981';
       this.scoreCtx.fillRect(m.box.left, m.box.top, 30, 20);
       this.scoreCtx.fillStyle = '#ffffff';
       this.scoreCtx.font = 'bold 12px sans-serif';
@@ -963,18 +1054,25 @@ class GuitarTrainer {
         this.isErasingStroke = true;
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
         this.eraseAt(c.x, c.y);
+        this.updateToolCursor(e.clientX, e.clientY, 'edit');
         box.setPointerCapture(e.pointerId);
         return;
       }
 
-      if (this.isMarkingMode && this.editTool === 'pen' && ongoingTouches.size === 1) {
+      if (this.isMarkingMode && (this.editTool === 'pen' || this.editTool === 'whiteout') && ongoingTouches.size === 1) {
         this.isDrawingStroke = true;
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
+        const strokeColor = (this.editTool === 'whiteout')
+          ? (this.samplePaperColorFromImage(this.pageCache.get(this.currentPage), { left: Math.max(0, c.x - 20), top: Math.max(0, c.y - 20), width: 40, height: 40 }) || '#f4f2ec')
+          : this.penColor;
+        const strokeWidth = (this.editTool === 'whiteout') ? Math.max(16, this.penWidth * 4.5) : this.penWidth;
+
         this.currentStroke = {
-          color: this.penColor,
-          width: this.penWidth,
+          color: strokeColor,
+          width: strokeWidth,
           points: [{ x: c.x, y: c.y }]
         };
+        this.updateToolCursor(e.clientX, e.clientY, 'edit');
         box.setPointerCapture(e.pointerId);
         return;
       }
@@ -1024,12 +1122,14 @@ class GuitarTrainer {
       if (this.isErasingStroke) {
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
         this.eraseAt(c.x, c.y);
+        this.updateToolCursor(e.clientX, e.clientY, 'edit');
         return;
       }
 
       if (this.isDrawingStroke && this.currentStroke) {
         const c = this.screenToCanvasCoords(e.clientX, e.clientY);
         this.currentStroke.points.push({ x: c.x, y: c.y });
+        this.updateToolCursor(e.clientX, e.clientY, 'edit');
         if (this.scoreCtx) {
           this.scoreCtx.save();
           this.scoreCtx.strokeStyle = this.currentStroke.color;
@@ -1076,6 +1176,7 @@ class GuitarTrainer {
 
     const end = async (e) => {
       ongoingTouches.delete(e.pointerId);
+      this.hideToolCursor();
 
       if (this.isCropMode && this.cropEditor) {
         this.cropEditor.endDrag();
@@ -1117,6 +1218,7 @@ class GuitarTrainer {
     };
     box.addEventListener('pointerup', end);
     box.addEventListener('pointercancel', end);
+    box.addEventListener('pointerleave', () => this.hideToolCursor());
   }
 
   screenToCanvasCoords(clientX, clientY) {
@@ -1364,6 +1466,9 @@ class GuitarTrainer {
     let currentLabStroke = null;
     let currentLabTargetPage = null;
 
+    let tapStartTime = 0;
+    let tapStartPos = null;
+
     lens.addEventListener('touchstart', e => {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
@@ -1373,32 +1478,43 @@ class GuitarTrainer {
     }, { passive: false });
 
     lens.addEventListener('pointerdown', e => {
+      tapStartTime = Date.now();
+      tapStartPos = { x: e.clientX, y: e.clientY };
+
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (ongoingTouches.size === 1) {
         lens.setPointerCapture(e.pointerId);
         const hit = this.labCanvasToPageCoords(e.clientX, e.clientY);
 
-        if (this.editTool === 'eraser') {
-          if (hit) {
-            isLabErasing = true;
-            currentLabTargetPage = hit.page;
-            this.eraseAt(hit.x, hit.y, hit.page);
-            this.showMeasureInLab(this.labCurrentIndex, false);
-          }
-        } else if (this.editTool === 'pen') {
-          if (hit) {
-            isLabDrawing = true;
-            currentLabTargetPage = hit.page;
-            currentLabStroke = {
-              color: this.penColor,
-              width: this.penWidth,
-              points: [{ x: hit.x, y: hit.y }]
-            };
-          }
-        } else {
-          isLabPanning = true;
+        if (this.labTool === 'eraser' && hit) {
+          isLabErasing = true;
+          currentLabTargetPage = hit.page;
+          this.eraseAt(hit.x, hit.y, hit.page);
+          this.showMeasureInLab(this.labCurrentIndex, false);
+          this.updateToolCursor(e.clientX, e.clientY, 'lab');
+          return;
         }
+
+        if ((this.labTool === 'pen' || this.labTool === 'whiteout') && hit) {
+          isLabDrawing = true;
+          currentLabTargetPage = hit.page;
+          const curM = this.currentScore?.measures?.[this.labCurrentIndex];
+          const strokeColor = (this.labTool === 'whiteout')
+            ? (this.samplePaperColorFromImage(this.pageCache.get(hit.page), curM?.box) || '#f4f2ec')
+            : this.penColor;
+          const strokeWidth = (this.labTool === 'whiteout') ? Math.max(16, this.penWidth * 4.5) : this.penWidth;
+
+          currentLabStroke = {
+            color: strokeColor,
+            width: strokeWidth,
+            points: [{ x: hit.x, y: hit.y }]
+          };
+          this.updateToolCursor(e.clientX, e.clientY, 'lab');
+          return;
+        }
+
+        isLabPanning = true;
       } else if (ongoingTouches.size === 2) {
         isLabDrawing = isLabErasing = isLabPanning = false;
         const t = Array.from(ongoingTouches.values());
@@ -1448,22 +1564,24 @@ class GuitarTrainer {
         if (isLabErasing) {
           this.eraseAt(hit.x, hit.y, hit.page);
           this.showMeasureInLab(this.labCurrentIndex, false);
+          this.updateToolCursor(e.clientX, e.clientY, 'lab');
           return;
         }
 
         if (isLabDrawing && currentLabStroke) {
           currentLabStroke.points.push({ x: hit.x, y: hit.y });
+          this.updateToolCursor(e.clientX, e.clientY, 'lab');
 
           if (this.labCtx && this.labLayoutMeta) {
             const isM1 = hit.page === (this.labLayoutMeta.m1.page || 1);
             const ox = isM1 ? 0 : this.labLayoutMeta.x2;
             const oy = isM1 ? this.labLayoutMeta.originY1 : this.labLayoutMeta.originY2;
-            const scale = isM1 ? 1.0 : (this.labLayoutMeta.scale2 || 1.0);
+            const ratio = this.labLayoutMeta.ratio || 1.0;
             const curBox = isM1 ? this.labLayoutMeta.m1.box : this.labLayoutMeta.m2.box;
 
             this.labCtx.save();
             this.labCtx.strokeStyle = currentLabStroke.color;
-            this.labCtx.lineWidth = currentLabStroke.width * scale;
+            this.labCtx.lineWidth = currentLabStroke.width * ratio;
             this.labCtx.lineCap = 'round';
             this.labCtx.lineJoin = 'round';
 
@@ -1472,10 +1590,10 @@ class GuitarTrainer {
               const pA = pts[pts.length - 2];
               const pB = pts[pts.length - 1];
 
-              const cAx = ox + (pA.x - curBox.left) * scale;
-              const cAy = oy + (pA.y - curBox.top) * scale;
-              const cBx = ox + (pB.x - curBox.left) * scale;
-              const cBy = oy + (pB.y - curBox.top) * scale;
+              const cAx = ox + (pA.x - curBox.left) * ratio;
+              const cAy = oy + (pA.y - curBox.top) * ratio;
+              const cBx = ox + (pB.x - curBox.left) * ratio;
+              const cBy = oy + (pB.y - curBox.top) * ratio;
 
               this.labCtx.beginPath();
               this.labCtx.moveTo(cAx, cAy);
@@ -1489,6 +1607,29 @@ class GuitarTrainer {
     });
 
     const finishLabPointer = async () => {
+      this.hideToolCursor();
+
+      if (tapStartPos && this.labTool === 'pan' && !isLabDrawing && !isLabErasing) {
+        const elapsed = Date.now() - tapStartTime;
+        const dist = Math.hypot(tapStartPos.x - tapStartPos.x, tapStartPos.y - tapStartPos.y);
+
+        if (elapsed < 320) {
+          const rect = lens.getBoundingClientRect();
+          const clickX = tapStartPos.x - rect.left;
+          if (clickX < rect.width * 0.35) {
+            this.prevLabMeasure();
+            tapStartPos = null;
+            ongoingTouches.clear();
+            return;
+          } else if (clickX > rect.width * 0.65) {
+            this.nextLabMeasure();
+            tapStartPos = null;
+            ongoingTouches.clear();
+            return;
+          }
+        }
+      }
+
       if (isLabDrawing && currentLabStroke && currentLabTargetPage) {
         isLabDrawing = false;
         if (currentLabStroke.points.length > 1 && this.currentScore) {
@@ -1505,10 +1646,12 @@ class GuitarTrainer {
       isLabErasing = false;
       isLabPanning = false;
       ongoingTouches.clear();
+      tapStartPos = null;
     };
 
     lens.addEventListener('pointerup', finishLabPointer);
     lens.addEventListener('pointercancel', finishLabPointer);
+    lens.addEventListener('pointerleave', () => this.hideToolCursor());
   }
 
   labCanvasToPageCoords(clientX, clientY) {
@@ -1523,8 +1666,8 @@ class GuitarTrainer {
     const ratio = meta.ratio || 1.0;
 
     if (meta.m2 && canvasX >= meta.x2) {
-      const localX = (canvasX - meta.x2) / (meta.scale2 * ratio);
-      const localY = (canvasY - meta.originY2) / (meta.scale2 * ratio);
+      const localX = (canvasX - meta.x2) / ratio;
+      const localY = (canvasY - meta.originY2) / ratio;
       return {
         x: Math.round(meta.m2.box.left + localX),
         y: Math.round(meta.m2.box.top + localY),
@@ -1623,7 +1766,6 @@ class GuitarTrainer {
         const avgR = Math.round(sumR / count);
         const avgG = Math.round(sumG / count);
         const avgB = Math.round(sumB / count);
-
         const brightness = 0.299 * avgR + 0.587 * avgG + 0.114 * avgB;
 
         if (brightness > bestBrightness && brightness > 140) {
@@ -1640,6 +1782,33 @@ class GuitarTrainer {
     return defaultColor;
   }
 
+  enhanceMeasurePixels(ctx, width, height) {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const src = imgData.data;
+    const copy = new Uint8ClampedArray(src);
+    const strength = 0.40;
+
+    for (let y = 1; y < height - 1; y++) {
+      const rowOffset = y * width;
+      for (let x = 1; x < width - 1; x++) {
+        const idx = (rowOffset + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          const center = copy[idx + c];
+          const up = copy[((y - 1) * width + x) * 4 + c];
+          const down = copy[((y + 1) * width + x) * 4 + c];
+          const left = copy[(rowOffset + x - 1) * 4 + c];
+          const right = copy[(rowOffset + x + 1) * 4 + c];
+
+          let val = center + strength * (4 * center - up - down - left - right);
+          if (val < 135) val = Math.max(12, val * 0.82);
+          else if (val > 195) val = Math.min(255, val * 1.04);
+          src[idx + c] = val;
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
   renderDrawingsForMeasure(ctx, m, ox, oy, scale = 1.0) {
     if (!this.showAnnotations || !this.currentScore?.drawings) return;
     const pageKey = `page_${m.page || 1}`;
@@ -1647,7 +1816,6 @@ class GuitarTrainer {
     if (strokes.length === 0) return;
 
     ctx.save();
-    // Ořízneme kreslení přesně na oblast tohoto taktu, aby nepřetékalo do sousedních taktů
     ctx.beginPath();
     ctx.rect(ox, oy, m.box.width * scale, m.box.height * scale);
     ctx.clip();
@@ -1706,7 +1874,7 @@ class GuitarTrainer {
     if (lens) lens.style.backgroundColor = paperColor;
     if (container) container.style.backgroundColor = paperColor;
 
-    // 1. KLÍČ & PŘEDZNAMENÁNÍ
+    // 1. Klíč & předznamenání
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
       if (this.currentScore?.isPdf && this.pdfDoc) {
@@ -1753,7 +1921,6 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. VYKRESLENÍ TAKTŮ
     if (!this.labCanvas || !this.labCtx || !curImg) return;
 
     const isLandscape = window.innerWidth > window.innerHeight;
@@ -1813,11 +1980,10 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, this.labLayoutMeta.ratio || 1.0);
 
     } else {
-      // --- REŽIM 2 TAKTŮ (Landscape): VAŠE FUNGUJÍCÍ MATEMATIKA + PŘESNÉ ZAMEZENÍ PŘELITÍ KLÍČE ---
+      // --- REŽIM 2 TAKTŮ (Landscape): PŘESNÉ SLÍCOVÁNÍ + IZOLOVANÁ PLÁTNA BEZ PŘELITÍ KLÍČE ---
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
-      // Zjistíme polohu linek vaší přesnou funkcí
       const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
       const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
@@ -1833,68 +1999,78 @@ class GuitarTrainer {
         const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
         const ratio = targetScale / 2.0;
 
-        const cropW = Math.round(totalW * ratio);
-        const cropH = Math.round(totalH * ratio);
-        const splitX = Math.round(curM.box.width * ratio);
+        const m1W = Math.round(curM.box.width * ratio);
+        const m1H = Math.round(curM.box.height * ratio);
+        const m2W = Math.round(nextM.box.width * ratio);
+        const m2H = Math.round(nextM.box.height * ratio);
 
-        this.labCanvas.width = cropW;
-        this.labCanvas.height = cropH;
+        // Pomocné plátno 1
+        const off1 = document.createElement('canvas');
+        off1.width = m1W;
+        off1.height = m1H;
+        const off1Ctx = off1.getContext('2d');
+        off1Ctx.fillStyle = paperColor;
+        off1Ctx.fillRect(0, 0, m1W, m1H);
 
+        const page1 = await this.pdfDoc.getPage(curM.page || 1);
+        const vp1 = page1.getViewport({ scale: targetScale });
+        const cropX1 = Math.round(curM.box.left * ratio);
+        const cropY1 = Math.round(curM.box.top * ratio);
+
+        try {
+          await page1.render({
+            canvasContext: off1Ctx,
+            viewport: vp1,
+            transform: [1, 0, 0, 1, -cropX1, -cropY1]
+          }).promise;
+        } catch (_) {}
+
+        // Pomocné plátno 2 (klíč před ním zůstane zcela odříznut)
+        const off2 = document.createElement('canvas');
+        off2.width = m2W;
+        off2.height = m2H;
+        const off2Ctx = off2.getContext('2d');
+        off2Ctx.fillStyle = paperColor;
+        off2Ctx.fillRect(0, 0, m2W, m2H);
+
+        const page2 = await this.pdfDoc.getPage(nextM.page || 1);
+        const vp2 = page2.getViewport({ scale: targetScale });
+        const cropX2 = Math.round(nextM.box.left * ratio);
+        const cropY2 = Math.round(nextM.box.top * ratio);
+
+        try {
+          await page2.render({
+            canvasContext: off2Ctx,
+            viewport: vp2,
+            transform: [1, 0, 0, 1, -cropX2, -cropY2]
+          }).promise;
+        } catch (_) {}
+
+        const totalW_px = Math.round(totalW * ratio);
+        const totalH_px = Math.round(totalH * ratio);
+        const posY1 = Math.round(originY1 * ratio);
+        const posY2 = Math.round(originY2 * ratio);
+
+        this.labCanvas.width = totalW_px;
+        this.labCanvas.height = totalH_px;
         this.labLayoutMeta = {
           m1: curM,
           m2: nextM,
-          originY1: Math.round(originY1 * ratio),
-          originY2: Math.round(originY2 * ratio),
-          x2: splitX,
+          originY1: posY1,
+          originY2: posY2,
+          x2: m1W,
           scale2: 1.0,
           ratio
         };
 
         this.labCtx.fillStyle = paperColor;
-        this.labCtx.fillRect(0, 0, cropW, cropH);
+        this.labCtx.fillRect(0, 0, totalW_px, totalH_px);
 
-        // 1. Takt: kreslíme do levé zóny (0 až splitX)
-        this.labCtx.save();
-        this.labCtx.beginPath();
-        this.labCtx.rect(0, 0, splitX, cropH);
-        this.labCtx.clip();
-
-        const page1 = await this.pdfDoc.getPage(curM.page || 1);
-        const vp1 = page1.getViewport({ scale: targetScale });
-        const cropX1 = Math.round(curM.box.left * ratio);
-        const cropY1 = Math.round(curM.box.top * ratio) - this.labLayoutMeta.originY1;
-
-        try {
-          await page1.render({
-            canvasContext: this.labCtx,
-            viewport: vp1,
-            transform: [1, 0, 0, 1, -cropX1, -cropY1]
-          }).promise;
-        } catch (_) {}
-        this.labCtx.restore();
-
-        // 2. Takt: kreslíme do pravé zóny (splitX až cropW) — klíč z nového řádku se doleva NIKDY nedostane
-        this.labCtx.save();
-        this.labCtx.beginPath();
-        this.labCtx.rect(splitX, 0, cropW - splitX, cropH);
-        this.labCtx.clip();
-
-        const page2 = await this.pdfDoc.getPage(nextM.page || 1);
-        const vp2 = page2.getViewport({ scale: targetScale });
-        const cropX2 = Math.round(nextM.box.left * ratio) - splitX;
-        const cropY2 = Math.round(nextM.box.top * ratio) - this.labLayoutMeta.originY2;
-
-        try {
-          await page2.render({
-            canvasContext: this.labCtx,
-            viewport: vp2,
-            transform: [1, 0, 0, 1, -cropX2, -cropY2]
-          }).promise;
-        } catch (_) {}
-        this.labCtx.restore();
+        this.labCtx.drawImage(off1, 0, posY1);
+        this.labCtx.drawImage(off2, m1W, posY2);
 
       } else {
-        // Rastrové vykreslení pro fotky
+        // Rastrové fotky
         this.labLayoutMeta = {
           m1: curM,
           m2: nextM,
@@ -1931,7 +2107,7 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, this.labLayoutMeta.originY1, this.labLayoutMeta.ratio || 1.0);
       this.renderDrawingsForMeasure(this.labCtx, nextM, this.labLayoutMeta.x2, this.labLayoutMeta.originY2, this.labLayoutMeta.ratio || 1.0);
 
-      // Oddělovací linka při přechodu na nový řádek nebo stranu
+      // Oddělovací linka při přechodu z jiného řádku / strany
       const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.40) ||
                              (curM.page || 1) !== (nextM.page || 1);
 
@@ -1948,11 +2124,8 @@ class GuitarTrainer {
       }
     }
 
-    if (autoFit) {
-      this.fitLabCanvas();
-    } else {
-      this.updateLabTransform();
-    }
+    if (autoFit) this.fitLabCanvas();
+    else this.updateLabTransform();
   }
 
   async resolveCurrentLabMeasure() {

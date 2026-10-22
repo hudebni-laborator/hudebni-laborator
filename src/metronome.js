@@ -5,6 +5,12 @@ class MetronomeController {
     this.activeMode = 'play'; // 'play' | 'lab'
 
     // ==========================================================
+    // VOLBA ZVUKU A AKCENTU
+    // ==========================================================
+    this.soundType = 'woodblock'; // 'woodblock', 'beep', 'click', 'rimshot'
+    this.accentEnabled = true;
+
+    // ==========================================================
     // SAMOSTATNÉ PARAMETRY PRO REŽIM HRANÍ
     // ==========================================================
     this.playStartBpm = 60;
@@ -51,21 +57,80 @@ class MetronomeController {
   playClickSound(time, isAccent, isLeadIn) {
     if (!this.audioCtx) return;
     try {
-      const osc = this.audioCtx.createOscillator();
-      const gain = this.audioCtx.createGain();
-      let freq = isLeadIn ? (isAccent ? 1600 : 1100) : (isAccent ? 1200 : 800);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, time);
-
       const st = Math.max(this.audioCtx.currentTime, time);
-      gain.gain.setValueAtTime(0.0001, st);
-      gain.gain.exponentialRampToValueAtTime(1.0, st + 0.002);
-      gain.gain.exponentialRampToValueAtTime(0.0001, st + 0.045);
+      const isAcc = isAccent && this.accentEnabled;
 
-      osc.connect(gain);
-      gain.connect(this.audioCtx.destination);
-      osc.start(st);
-      osc.stop(st + 0.05);
+      if (this.soundType === 'woodblock') {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        let freq = isLeadIn ? (isAcc ? 1400 : 1000) : (isAcc ? 1050 : 720);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, st);
+
+        gain.gain.setValueAtTime(0.0001, st);
+        gain.gain.exponentialRampToValueAtTime(isAcc ? 1.0 : 0.65, st + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, st + 0.045);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        osc.start(st);
+        osc.stop(st + 0.05);
+
+      } else if (this.soundType === 'beep') {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        let freq = isLeadIn ? (isAcc ? 1500 : 1100) : (isAcc ? 1200 : 800);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, st);
+
+        gain.gain.setValueAtTime(0.0001, st);
+        gain.gain.exponentialRampToValueAtTime(isAcc ? 0.9 : 0.55, st + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, st + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        osc.start(st);
+        osc.stop(st + 0.055);
+
+      } else if (this.soundType === 'click') {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        let freq = isLeadIn ? (isAcc ? 2600 : 2000) : (isAcc ? 2200 : 1600);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, st);
+
+        gain.gain.setValueAtTime(0.0001, st);
+        gain.gain.exponentialRampToValueAtTime(isAcc ? 0.8 : 0.45, st + 0.001);
+        gain.gain.exponentialRampToValueAtTime(0.0001, st + 0.02);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        osc.start(st);
+        osc.stop(st + 0.025);
+
+      } else if (this.soundType === 'rimshot') {
+        const bufferSize = Math.floor(this.audioCtx.sampleRate * 0.035);
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(isAcc ? 1600 : 2400, st);
+
+        const gain = this.audioCtx.createGain();
+        gain.gain.setValueAtTime(0.0001, st);
+        gain.gain.exponentialRampToValueAtTime(isAcc ? 1.0 : 0.5, st + 0.001);
+        gain.gain.exponentialRampToValueAtTime(0.0001, st + 0.035);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        noise.start(st);
+        noise.stop(st + 0.04);
+      }
     } catch (_) {}
   }
 
@@ -165,8 +230,6 @@ class MetronomeController {
   // ==========================================================
   setPlayBpm(val) {
     this.playStartBpm = Math.max(30, Math.min(260, Number(val) || 60));
-    
-    // Pokud byl Cíl dříve svázán se Startem (rovnoměrný režim), držíme Cíl = Start
     if (this.playTargetBpm <= this.playStartBpm) {
       this.playTargetBpm = this.playStartBpm;
     }
@@ -250,7 +313,7 @@ class MetronomeController {
   // METODY REŽIMU LABORATOŘ (Nezávislé na Hraní)
   // ==========================================================
   onStartBpmInput(val) {
-    this.labStartBpm = Math.max(30, Math.min(240, Number(val) || 60));
+    this.labStartBpm = Math.max(30, Math.min(260, Number(val) || 60));
     const lbl = document.getElementById('metroStartVal');
     if (lbl) lbl.innerText = this.labStartBpm;
 
@@ -268,7 +331,7 @@ class MetronomeController {
   }
 
   onTargetBpmInput(val) {
-    this.labTargetBpm = Math.max(30, Math.min(240, Number(val) || 100));
+    this.labTargetBpm = Math.max(30, Math.min(260, Number(val) || 100));
     const lbl = document.getElementById('metroTargetVal');
     if (lbl) lbl.innerText = this.labTargetBpm;
     this.updateLabTargetDisplay(this.labTargetBpm);
@@ -317,6 +380,178 @@ class MetronomeController {
       this.updateLabTempoUI(this.currentBpm);
       this.updateCircleUI('idle');
       this.clearBeatLights();
+    }
+  }
+
+  // ==========================================================
+  // OVLÁDÁNÍ VÝSUVNÉHO SPODNÍHO PANELU (BOTTOM SHEET)
+  // ==========================================================
+  openSheet() {
+    const sheet = document.getElementById('metroBottomSheet');
+    if (!sheet) return;
+    sheet.style.display = 'flex';
+
+    this.activeMode = this.detectCurrentMode();
+    const isLab = (this.activeMode === 'lab');
+
+    const startBpm = isLab ? this.labStartBpm : this.playStartBpm;
+    const targetBpm = isLab ? this.labTargetBpm : this.playTargetBpm;
+    const barsCount = isLab ? this.labBarsCount : this.playBarsCount;
+
+    const startValEl = document.getElementById('sheetStartVal');
+    if (startValEl) startValEl.innerText = startBpm;
+    const startSlider = document.getElementById('sheetStartSlider');
+    if (startSlider) startSlider.value = startBpm;
+
+    const targetValEl = document.getElementById('sheetTargetVal');
+    if (targetValEl) targetValEl.innerText = targetBpm;
+    const targetSlider = document.getElementById('sheetTargetSlider');
+    if (targetSlider) targetSlider.value = targetBpm;
+
+    const measuresValEl = document.getElementById('sheetMeasuresVal');
+    if (measuresValEl) measuresValEl.innerText = `${barsCount} ${barsCount === 1 ? 'takt' : (barsCount < 5 ? 'takty' : 'taktů')}`;
+
+    this.updateSheetSelectors();
+  }
+
+  closeSheet() {
+    const sheet = document.getElementById('metroBottomSheet');
+    if (sheet) sheet.style.display = 'none';
+  }
+
+  onSheetStartInput(val) {
+    const bpm = Math.max(30, Math.min(260, Number(val) || 60));
+    const isLab = (this.detectCurrentMode() === 'lab');
+
+    if (isLab) {
+      this.onStartBpmInput(bpm);
+    } else {
+      this.setPlayBpm(bpm);
+    }
+
+    const sheetLbl = document.getElementById('sheetStartVal');
+    if (sheetLbl) sheetLbl.innerText = bpm;
+    const sheetSlider = document.getElementById('sheetStartSlider');
+    if (sheetSlider && Number(sheetSlider.value) !== bpm) sheetSlider.value = bpm;
+  }
+
+  adjustSheetStart(delta) {
+    const isLab = (this.detectCurrentMode() === 'lab');
+    const cur = isLab ? this.labStartBpm : this.playStartBpm;
+    this.onSheetStartInput(cur + delta);
+  }
+
+  onSheetTargetInput(val) {
+    const bpm = Math.max(30, Math.min(260, Number(val) || 100));
+    const isLab = (this.detectCurrentMode() === 'lab');
+
+    if (isLab) {
+      this.onTargetBpmInput(bpm);
+    } else {
+      this.onPlayTargetInput(bpm);
+    }
+
+    const sheetLbl = document.getElementById('sheetTargetVal');
+    if (sheetLbl) sheetLbl.innerText = bpm;
+    const sheetSlider = document.getElementById('sheetTargetSlider');
+    if (sheetSlider && Number(sheetSlider.value) !== bpm) sheetSlider.value = bpm;
+  }
+
+  adjustSheetTarget(delta) {
+    const isLab = (this.detectCurrentMode() === 'lab');
+    const cur = isLab ? this.labTargetBpm : this.playTargetBpm;
+    this.onSheetTargetInput(cur + delta);
+  }
+
+  matchSheetTargetToStart() {
+    const isLab = (this.detectCurrentMode() === 'lab');
+    const startBpm = isLab ? this.labStartBpm : this.playStartBpm;
+    this.onSheetTargetInput(startBpm);
+  }
+
+  setStepBpm(step) {
+    const s = Math.max(1, Math.min(20, Number(step) || 2));
+    const isLab = (this.detectCurrentMode() === 'lab');
+    if (isLab) {
+      this.labStepBpm = s;
+      const inp = document.getElementById('metroStepBpm');
+      if (inp) inp.value = s;
+    } else {
+      this.playStepBpm = s;
+      const inp = document.getElementById('playStepBpm');
+      if (inp) inp.value = s;
+    }
+    this.updateSheetSelectors();
+  }
+
+  stepMeasures(delta) {
+    const isLab = (this.detectCurrentMode() === 'lab');
+    let bars = isLab ? this.labBarsCount : this.playBarsCount;
+    bars = Math.max(1, Math.min(64, bars + delta));
+    if (isLab) {
+      this.labBarsCount = bars;
+      const inp = document.getElementById('metroBarsCount');
+      if (inp) inp.value = bars;
+    } else {
+      this.playBarsCount = bars;
+      const inp = document.getElementById('playBarsCount');
+      if (inp) inp.value = bars;
+    }
+    const measuresValEl = document.getElementById('sheetMeasuresVal');
+    if (measuresValEl) measuresValEl.innerText = `${bars} ${bars === 1 ? 'takt' : (bars < 5 ? 'takty' : 'taktů')}`;
+  }
+
+  setBeats(count) {
+    const b = Math.max(1, Math.min(16, Number(count) || 4));
+    const isLab = (this.detectCurrentMode() === 'lab');
+    if (isLab) {
+      this.labBeats = b;
+      const inp = document.getElementById('metroBeatsPerBar');
+      if (inp) inp.value = b;
+    } else {
+      this.playBeats = b;
+      const sel = document.getElementById('playMetroBeatsSelect');
+      if (sel) sel.value = String(b);
+    }
+    if (this.isRunning) {
+      this.beatsPerBar = b;
+      this.beatIndex = 0;
+    }
+    this.updateSheetSelectors();
+  }
+
+  setSoundType(sound) {
+    this.soundType = sound;
+    this.updateSheetSelectors();
+    this.initAudio();
+    this.playClickSound(this.audioCtx.currentTime + 0.05, true, false);
+  }
+
+  toggleAccent() {
+    this.accentEnabled = !this.accentEnabled;
+    this.updateSheetSelectors();
+    this.initAudio();
+    this.playClickSound(this.audioCtx.currentTime + 0.05, this.accentEnabled, false);
+  }
+
+  updateSheetSelectors() {
+    const isLab = (this.detectCurrentMode() === 'lab');
+    const curBeats = isLab ? this.labBeats : this.playBeats;
+    const curStep = isLab ? this.labStepBpm : this.playStepBpm;
+
+    document.querySelectorAll('#beatsPillGroup .pill-btn').forEach(b => {
+      b.classList.toggle('active', b.innerText === String(curBeats));
+    });
+    document.querySelectorAll('#stepPillGroup .pill-btn').forEach(b => {
+      b.classList.toggle('active', b.innerText === `+${curStep}`);
+    });
+    document.querySelectorAll('#soundPillGroup .pill-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.sound === this.soundType);
+    });
+    const accBtn = document.getElementById('sheetAccentBtn');
+    if (accBtn) {
+      accBtn.innerText = this.accentEnabled ? '🔔 Akcent ZAP' : '🔕 Bez akcentu';
+      accBtn.classList.toggle('active', this.accentEnabled);
     }
   }
 
@@ -371,7 +606,6 @@ class MetronomeController {
 
       if (this.beatIndex >= beats) {
         this.beatIndex = 0;
-        // Zrychlovat pouze pokud je Cíl striktně větší než Startovní tempo
         if (this.playTargetBpm > this.playStartBpm) {
           if (this.currentBpm < this.playTargetBpm) {
             this.measureIndexInCycle++;
@@ -380,6 +614,24 @@ class MetronomeController {
               this.measureIndexInCycle = 0;
               const tText = document.getElementById('playMetroBpmText');
               if (tText) tText.innerText = this.currentBpm;
+            }
+          } else {
+            // Cíl splněn i v Hraní
+            this.measureIndexInCycle++;
+            if (this.measureIndexInCycle >= this.playBarsCount) {
+              const finishTime = this.nextBeatTime;
+              const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
+
+              this.isRunning = false;
+              if (this.timerId) clearInterval(this.timerId);
+              this.timerId = null;
+
+              this.playCelebratoryChord(finishTime);
+
+              setTimeout(() => {
+                this.updateCircleUI('goal');
+              }, delayMs);
+              return;
             }
           }
         } else {
@@ -393,8 +645,8 @@ class MetronomeController {
 
     // 2. REŽIM LABORATOŘ:
     const targetBpm = this.labTargetBpm;
-    const step = Number(document.getElementById('metroStepBpm')?.value) || this.labStepBpm;
-    const bars = Number(document.getElementById('metroBarsCount')?.value) || this.labBarsCount;
+    const step = this.labStepBpm;
+    const bars = this.labBarsCount;
 
     this.nextBeatTime += (60.0 / this.currentBpm);
     this.beatIndex++;
@@ -411,6 +663,7 @@ class MetronomeController {
             this.currentBpm = Math.min(targetBpm, this.currentBpm + step);
             this.phase = 'leadin';
           } else {
+            // CÍL DOSAŽEN! OSLAVA:
             const finishTime = this.nextBeatTime;
             const delayMs = Math.max(0, (finishTime - this.audioCtx.currentTime) * 1000);
 
@@ -457,7 +710,10 @@ class MetronomeController {
 
     if (playBtn && playIcn) {
       playBtn.className = 'metro-circle-btn';
-      if (this.isRunning && this.activeMode === 'play') {
+      if (phase === 'goal') {
+        playBtn.classList.add('circle-playing');
+        playIcn.innerText = '🏆';
+      } else if (this.isRunning && this.activeMode === 'play') {
         playBtn.classList.add('circle-playing');
         playIcn.innerText = '⏸';
       } else {
