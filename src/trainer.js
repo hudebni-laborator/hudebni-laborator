@@ -1,61 +1,89 @@
 /**
- * Původní detekce první linky osnovy (odpovídá první fungující verzi).
+ * Spolehlivě najde Y-souřadnici středové linky osnovy uvnitř vybraného taktu.
+ * Využívá stejný adaptivní princip jako scanner.js (detekce souvislých linek).
  */
-function detectStaffMetricsInBox(img, box) {
-  const canvas = document.createElement('canvas');
-  const w = Math.min(box.width, 300);
-  const h = box.height;
-  canvas.width = w;
-  canvas.height = h;
+function getStaffCenterYInBox(sourceCanvas, box) {
+  if (!sourceCanvas || !box || box.width <= 0 || box.height <= 0) {
+    return Math.round((box?.height || 100) / 2);
+  }
 
-  const ctx = canvas.getContext('2d');
-  const startX = box.left + Math.floor(box.width * 0.2);
-  ctx.drawImage(img, startX, box.top, w, h, 0, 0, w, h);
+  const ctx = sourceCanvas.getContext('2d');
+  const cropX = Math.max(0, Math.round(box.left + box.width * 0.15));
+  const cropW = Math.max(10, Math.round(box.width * 0.70));
+  const cropY = Math.max(0, Math.round(box.top));
+  const cropH = Math.max(10, Math.min(sourceCanvas.height - cropY, Math.round(box.height)));
 
-  const imgData = ctx.getImageData(0, 0, w, h).data;
-  const rowDarkness = new Float32Array(h);
+  const imgData = ctx.getImageData(cropX, cropY, cropW, cropH);
+  const d = imgData.data;
 
-  for (let y = 0; y < h; y++) {
+  // 1. Změříme průměrný jas papíru uvnitř taktu
+  let sumB = 0, countB = 0;
+  for (let i = 0; i < d.length; i += 16) {
+    sumB += (d[i] + d[i + 1] + d[i + 2]) / 3;
+    countB++;
+  }
+  const bgBright = countB > 0 ? (sumB / countB) : 230;
+  const darkThreshold = Math.min(150, Math.max(65, bgBright * 0.72));
+
+  // 2. Horizontální hustota tmavých pixelů pro každý řádek Y
+  const rowFill = new Float32Array(cropH);
+  for (let y = 0; y < cropH; y++) {
     let dark = 0;
-    for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 4;
-      const lum = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
-      if (lum < 160) dark++;
+    const rowOffset = y * cropW * 4;
+    for (let x = 0; x < cropW; x++) {
+      const idx = rowOffset + x * 4;
+      if (((d[idx] + d[idx + 1] + d[idx + 2]) / 3) < darkThreshold) {
+        dark++;
+      }
     }
-    rowDarkness[y] = dark / w;
+    rowFill[y] = dark / cropW;
   }
 
-  const peaks = [];
-  for (let y = 2; y < h - 2; y++) {
-    if (rowDarkness[y] > 0.25 &&
-        rowDarkness[y] > rowDarkness[y - 1] &&
-        rowDarkness[y] >= rowDarkness[y + 1]) {
-      peaks.push(y);
+  // 3. Nalezení souvislých bloků linek osnovy
+  const minLineFill = 0.30;
+  const lineBlocks = [];
+  let currentBlock = [];
+
+  for (let y = 0; y < cropH; y++) {
+    if (rowFill[y] >= minLineFill) {
+      currentBlock.push(y);
+    } else {
+      if (currentBlock.length > 0) {
+        lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+        currentBlock = [];
+      }
+    }
+  }
+  if (currentBlock.length > 0) {
+    lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+  }
+
+  // 4. Hledání skupiny 5 linek s rovnoměrnou roztečí
+  let bestCenter = null;
+  let minDiff = Infinity;
+
+  for (let i = 0; i <= lineBlocks.length - 5; i++) {
+    const group = lineBlocks.slice(i, i + 5);
+    const s1 = group[1] - group[0];
+    const s2 = group[2] - group[1];
+    const s3 = group[3] - group[2];
+    const s4 = group[4] - group[3];
+    const avg = (s1 + s2 + s3 + s4) / 4;
+
+    if (avg >= 5 && avg <= 45 &&
+        Math.abs(s1 - avg) <= 5 && Math.abs(s2 - avg) <= 5 &&
+        Math.abs(s3 - avg) <= 5 && Math.abs(s4 - avg) <= 5) {
+      
+      const center = group[2]; // 3. linka
+      const distFromBoxMid = Math.abs(center - cropH / 2);
+      if (distFromBoxMid < minDiff) {
+        minDiff = distFromBoxMid;
+        bestCenter = center;
+      }
     }
   }
 
-  for (let i = 0; i <= peaks.length - 5; i++) {
-    const d1 = peaks[i + 1] - peaks[i];
-    const d2 = peaks[i + 2] - peaks[i + 1];
-    const d3 = peaks[i + 3] - peaks[i + 2];
-    const d4 = peaks[i + 4] - peaks[i + 3];
-    const avg = (d1 + d2 + d3 + d4) / 4;
-
-    if (avg >= 5 && avg <= 35 &&
-        Math.abs(d1 - avg) <= 3 && Math.abs(d2 - avg) <= 3 &&
-        Math.abs(d3 - avg) <= 3 && Math.abs(d4 - avg) <= 3) {
-      return {
-        firstLineY: peaks[i],
-        spacing: avg
-      };
-    }
-  }
-
-  // Fallback: předpoklad první linky v horní třetině rámečku
-  return {
-    firstLineY: Math.round(h * 0.35),
-    spacing: (h * 0.30) / 4
-  };
+  return bestCenter !== null ? bestCenter : Math.round(cropH / 2);
 }
 
 class GuitarTrainer {
