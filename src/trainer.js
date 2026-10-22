@@ -1,108 +1,89 @@
 /**
- * Neprůstřelné nalezení 3. (středové) linky osnovy v jakkoliv vysokém rámečku.
- * Využívá 3 úzké svislé vzorky, které eliminují náklon stránky i nožičky not.
+ * Spolehlivě najde Y-souřadnici středové linky osnovy uvnitř vybraného taktu.
+ * Využívá stejný adaptivní princip jako scanner.js (detekce souvislých linek).
  */
-function getStaffCenterYInBox(img, box) {
-  if (!img || !box || box.width <= 0 || box.height <= 0) return Math.round((box?.height || 100) / 2);
+function getStaffCenterYInBox(sourceCanvas, box) {
+  if (!sourceCanvas || !box || box.width <= 0 || box.height <= 0) {
+    return Math.round((box?.height || 100) / 2);
+  }
 
-  const H = Math.round(box.height);
-  const W = Math.round(box.width);
+  const ctx = sourceCanvas.getContext('2d');
+  const cropX = Math.max(0, Math.round(box.left + box.width * 0.15));
+  const cropW = Math.max(10, Math.round(box.width * 0.70));
+  const cropY = Math.max(0, Math.round(box.top));
+  const cropH = Math.max(10, Math.min(sourceCanvas.height - cropY, Math.round(box.height)));
 
-  // Vytvoříme úzké plátno pro 3 svislé vzorky (šířka každého vzorku 16 px)
-  const stripW = Math.min(16, Math.max(4, Math.floor(W * 0.05)));
-  const positions = [
-    Math.round(box.left + W * 0.25),
-    Math.round(box.left + W * 0.50),
-    Math.round(box.left + W * 0.75)
-  ];
+  const imgData = ctx.getImageData(cropX, cropY, cropW, cropH);
+  const d = imgData.data;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = stripW * 3;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
+  // 1. Změříme průměrný jas papíru uvnitř taktu
+  let sumB = 0, countB = 0;
+  for (let i = 0; i < d.length; i += 16) {
+    sumB += (d[i] + d[i + 1] + d[i + 2]) / 3;
+    countB++;
+  }
+  const bgBright = countB > 0 ? (sumB / countB) : 230;
+  const darkThreshold = Math.min(150, Math.max(65, bgBright * 0.72));
 
-  positions.forEach((posX, idx) => {
-    const clX = Math.max(0, Math.min(img.width - stripW, posX));
-    ctx.drawImage(img, clX, box.top, stripW, H, idx * stripW, 0, stripW, H);
-  });
-
-  const imgData = ctx.getImageData(0, 0, canvas.width, H).data;
-  const profile = new Float32Array(H);
-
-  // Pro každý řádek Y zjistíme nejtmavší vzorek ze 3 pozic (odfiltruje nožičky not a text)
-  for (let y = 0; y < H; y++) {
-    let minLum = 255;
-    for (let s = 0; s < 3; s++) {
-      let sum = 0;
-      for (let x = 0; x < stripW; x++) {
-        const i = (y * canvas.width + (s * stripW + x)) * 4;
-        sum += 0.299 * imgData[i] + 0.587 * imgData[i + 1] + 0.114 * imgData[i + 2];
+  // 2. Horizontální hustota tmavých pixelů pro každý řádek Y
+  const rowFill = new Float32Array(cropH);
+  for (let y = 0; y < cropH; y++) {
+    let dark = 0;
+    const rowOffset = y * cropW * 4;
+    for (let x = 0; x < cropW; x++) {
+      const idx = rowOffset + x * 4;
+      if (((d[idx] + d[idx + 1] + d[idx + 2]) / 3) < darkThreshold) {
+        dark++;
       }
-      const avg = sum / stripW;
-      if (avg < minLum) minLum = avg;
     }
-    profile[y] = minLum;
+    rowFill[y] = dark / cropW;
   }
 
-  // Najdeme lokální minima jasu (potenciální linky)
-  const minima = [];
-  for (let y = 2; y < H - 2; y++) {
-    if (profile[y] < profile[y - 1] && profile[y] <= profile[y + 1] && profile[y] < 210) {
-      minima.push(y);
+  // 3. Nalezení souvislých bloků linek osnovy
+  const minLineFill = 0.30;
+  const lineBlocks = [];
+  let currentBlock = [];
+
+  for (let y = 0; y < cropH; y++) {
+    if (rowFill[y] >= minLineFill) {
+      currentBlock.push(y);
+    } else {
+      if (currentBlock.length > 0) {
+        lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+        currentBlock = [];
+      }
     }
   }
+  if (currentBlock.length > 0) {
+    lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+  }
 
-  // Hledáme skupinu 5 linek se stejnou roztečí (od 6 do 45 px) nejblíže středu rámečku
+  // 4. Hledání skupiny 5 linek s rovnoměrnou roztečí
   let bestCenter = null;
-  let bestScore = Infinity;
+  let minDiff = Infinity;
 
-  for (let i = 0; i < minima.length; i++) {
-    for (let j = i + 1; j < Math.min(i + 4, minima.length); j++) {
-      const step = minima[j] - minima[i];
-      if (step < 6 || step > 45) continue;
+  for (let i = 0; i <= lineBlocks.length - 5; i++) {
+    const group = lineBlocks.slice(i, i + 5);
+    const s1 = group[1] - group[0];
+    const s2 = group[2] - group[1];
+    const s3 = group[3] - group[2];
+    const s4 = group[4] - group[3];
+    const avg = (s1 + s2 + s3 + s4) / 4;
 
-      const expected = [
-        minima[i],
-        minima[i] + step,
-        minima[i] + step * 2,
-        minima[i] + step * 3,
-        minima[i] + step * 4
-      ];
-      if (expected[4] >= H) continue;
-
-      let matched = [];
-      let totalDev = 0;
-
-      for (const exp of expected) {
-        let bestDist = 4;
-        let bestM = -1;
-        for (const m of minima) {
-          const d = Math.abs(m - exp);
-          if (d <= 3 && d < bestDist) {
-            bestDist = d;
-            bestM = m;
-          }
-        }
-        if (bestM !== -1) {
-          matched.push(bestM);
-          totalDev += bestDist;
-        }
-      }
-
-      if (matched.length === 5) {
-        const centerY = matched[2]; // 3. linka
-        const distFromMid = Math.abs(centerY - H / 2);
-        const score = totalDev * 8 + distFromMid * 0.2;
-
-        if (score < bestScore) {
-          bestScore = score;
-          bestCenter = centerY;
-        }
+    if (avg >= 5 && avg <= 45 &&
+        Math.abs(s1 - avg) <= 5 && Math.abs(s2 - avg) <= 5 &&
+        Math.abs(s3 - avg) <= 5 && Math.abs(s4 - avg) <= 5) {
+      
+      const center = group[2]; // 3. linka
+      const distFromBoxMid = Math.abs(center - cropH / 2);
+      if (distFromBoxMid < minDiff) {
+        minDiff = distFromBoxMid;
+        bestCenter = center;
       }
     }
   }
 
-  return bestCenter !== null ? bestCenter : Math.round(H / 2);
+  return bestCenter !== null ? bestCenter : Math.round(cropH / 2);
 }
 
 class GuitarTrainer {
@@ -1693,7 +1674,7 @@ class GuitarTrainer {
     if (lens) lens.style.backgroundColor = paperColor;
     if (container) container.style.backgroundColor = paperColor;
 
-    // 1. KLÍČ & PŘEDZNAMENÁNÍ (plné vektorové rozlišení i rastr)
+    // 1. KLÍČ & PŘEDZNAMENÁNÍ (vysoké rozlišení)
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
     if (keySig && this.labClefCanvas && this.labClefCtx) {
       if (this.currentScore?.isPdf && this.pdfDoc) {
@@ -1740,7 +1721,7 @@ class GuitarTrainer {
       if (clefWrap) clefWrap.style.display = 'none';
     }
 
-    // 2. VYKRESLENÍ TAKTŮ
+    // 2. VYKRESLENÍ TAKTŮ S PLNÝM VEKTOROVÝM ROZLIŠENÍM I SLÍCOVÁNÍM
     if (!this.labCanvas || !this.labCtx || !curImg) return;
 
     const isLandscape = window.innerWidth > window.innerHeight;
@@ -1753,7 +1734,6 @@ class GuitarTrainer {
       if (ind) ind.innerText = `Takt #${curM.id}`;
 
       if (this.currentScore?.isPdf && this.pdfDoc) {
-        // Vektorové ostré vykreslení pro PDF
         const pageNum = curM.page || 1;
         const page = await this.pdfDoc.getPage(pageNum);
         const fitScale = Math.min(lensW / curM.box.width, lensH / curM.box.height);
@@ -1782,9 +1762,7 @@ class GuitarTrainer {
           transform: [1, 0, 0, 1, -cropX, -cropY]
         });
         try { await this.labRenderTask.promise; } catch (e) { if (e.name === 'RenderingCancelledException') return; }
-
       } else {
-        // Ostré rastrové vykreslení pro fotku s doostřením
         this.labLayoutMeta = { m1: curM, m2: null, originY1: 0, originY2: 0, x2: 0, scale2: 1.0, ratio: 1.0 };
         this.labCanvas.width = curM.box.width;
         this.labCanvas.height = curM.box.height;
@@ -1799,14 +1777,13 @@ class GuitarTrainer {
           curM.box.left, curM.box.top, curM.box.width, curM.box.height,
           0, 0, curM.box.width, curM.box.height
         );
-
         this.enhanceMeasurePixels(this.labCtx, this.labCanvas.width, this.labCanvas.height);
       }
 
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, this.labLayoutMeta.ratio || 1.0);
 
     } else {
-      // --- REŽIM 2 TAKTŮ (Landscape): 1:1 DPI + absolutní slícování středových linek ---
+      // --- REŽIM 2 TAKTŮ (Landscape): OSTRÉ VEKTORY I RASTER + PŘESNÉ SLÍCOVÁNÍ ---
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
@@ -1814,7 +1791,6 @@ class GuitarTrainer {
       const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
       const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
-      // Přesný posun, aby středové linky byly ve stejné výšce bez jakéhokoliv ořezu
       const diff = staffCenter1 - staffCenter2;
       const originY1 = diff < 0 ? -diff : 0;
       const originY2 = diff > 0 ? diff : 0;
@@ -1822,58 +1798,107 @@ class GuitarTrainer {
       const totalW = curM.box.width + nextM.box.width;
       const totalH = Math.max(originY1 + curM.box.height, originY2 + nextM.box.height);
 
-      this.labLayoutMeta = {
-        m1: curM,
-        m2: nextM,
-        originY1,
-        originY2,
-        x2: curM.box.width,
-        scale2: 1.0,
-        ratio: 1.0
-      };
+      if (this.currentScore?.isPdf && this.pdfDoc) {
+        // Vektorové ostré vykreslení pro PDF i v Landscape pro oba takty
+        const fitScale = Math.min(lensW / totalW, lensH / totalH);
+        const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
+        const ratio = targetScale / 2.0;
 
-      this.labCanvas.width = totalW;
-      this.labCanvas.height = totalH;
+        const cropW = Math.round(totalW * ratio);
+        const cropH = Math.round(totalH * ratio);
 
-      this.labCtx.fillStyle = paperColor;
-      this.labCtx.fillRect(0, 0, totalW, totalH);
-      this.labCtx.imageSmoothingEnabled = true;
-      this.labCtx.imageSmoothingQuality = 'high';
+        this.labCanvas.width = cropW;
+        this.labCanvas.height = cropH;
 
-      // Vykreslení 1. taktu (1:1)
-      this.labCtx.drawImage(
-        curImg,
-        curM.box.left, curM.box.top, curM.box.width, curM.box.height,
-        0, originY1, curM.box.width, curM.box.height
-      );
+        this.labLayoutMeta = {
+          m1: curM,
+          m2: nextM,
+          originY1: Math.round(originY1 * ratio),
+          originY2: Math.round(originY2 * ratio),
+          x2: Math.round(curM.box.width * ratio),
+          scale2: 1.0,
+          ratio
+        };
 
-      // Vykreslení 2. taktu (1:1, perfektně navazující linky)
-      this.labCtx.drawImage(
-        nextImg,
-        nextM.box.left, nextM.box.top, nextM.box.width, nextM.box.height,
-        curM.box.width, originY2, nextM.box.width, nextM.box.height
-      );
+        this.labCtx.fillStyle = paperColor;
+        this.labCtx.fillRect(0, 0, cropW, cropH);
 
-      // Doostření detailů pro rastrové obrázky
-      if (!this.currentScore.isPdf) {
+        // Vykreslíme 1. takt z PDF
+        const page1 = await this.pdfDoc.getPage(curM.page || 1);
+        const vp1 = page1.getViewport({ scale: targetScale });
+        const cropX1 = Math.round(curM.box.left * ratio);
+        const cropY1 = Math.round(curM.box.top * ratio) - Math.round(originY1 * ratio);
+
+        await page1.render({
+          canvasContext: this.labCtx,
+          viewport: vp1,
+          transform: [1, 0, 0, 1, -cropX1, -cropY1]
+        }).promise;
+
+        // Vykreslíme 2. takt z PDF
+        const page2 = await this.pdfDoc.getPage(nextM.page || 1);
+        const vp2 = page2.getViewport({ scale: targetScale });
+        const cropX2 = Math.round(nextM.box.left * ratio) - Math.round(curM.box.width * ratio);
+        const cropY2 = Math.round(nextM.box.top * ratio) - Math.round(originY2 * ratio);
+
+        await page2.render({
+          canvasContext: this.labCtx,
+          viewport: vp2,
+          transform: [1, 0, 0, 1, -cropX2, -cropY2]
+        }).promise;
+
+      } else {
+        // Rastrové ostré vykreslení pro fotky
+        this.labLayoutMeta = {
+          m1: curM,
+          m2: nextM,
+          originY1,
+          originY2,
+          x2: curM.box.width,
+          scale2: 1.0,
+          ratio: 1.0
+        };
+
+        this.labCanvas.width = totalW;
+        this.labCanvas.height = totalH;
+
+        this.labCtx.fillStyle = paperColor;
+        this.labCtx.fillRect(0, 0, totalW, totalH);
+        this.labCtx.imageSmoothingEnabled = true;
+        this.labCtx.imageSmoothingQuality = 'high';
+
+        // 1. Takt
+        this.labCtx.drawImage(
+          curImg,
+          curM.box.left, curM.box.top, curM.box.width, curM.box.height,
+          0, originY1, curM.box.width, curM.box.height
+        );
+
+        // 2. Takt
+        this.labCtx.drawImage(
+          nextImg,
+          nextM.box.left, nextM.box.top, nextM.box.width, nextM.box.height,
+          curM.box.width, originY2, nextM.box.width, nextM.box.height
+        );
+
         this.enhanceMeasurePixels(this.labCtx, totalW, totalH);
       }
 
-      this.renderDrawingsForMeasure(this.labCtx, curM, 0, originY1, 1.0);
-      this.renderDrawingsForMeasure(this.labCtx, nextM, curM.box.width, originY2, 1.0);
+      this.renderDrawingsForMeasure(this.labCtx, curM, 0, this.labLayoutMeta.originY1, this.labLayoutMeta.ratio || 1.0);
+      this.renderDrawingsForMeasure(this.labCtx, nextM, this.labLayoutMeta.x2, this.labLayoutMeta.originY2, this.labLayoutMeta.ratio || 1.0);
 
-      // Oddělovací linka mezi takty z různého řádku nebo strany
+      // Oddělovací linka při přechodu na nový řádek nebo stranu
       const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.40) ||
                              (curM.page || 1) !== (nextM.page || 1);
 
       if (isDifferentRow) {
         this.labCtx.save();
         this.labCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-        this.labCtx.lineWidth = 2;
+        this.labCtx.lineWidth = 2 * (this.labLayoutMeta.ratio || 1.0);
         this.labCtx.setLineDash([4, 4]);
         this.labCtx.beginPath();
-        this.labCtx.moveTo(curM.box.width, 0);
-        this.labCtx.lineTo(curM.box.width, totalH);
+        this.labCtx.moveTo(this.labLayoutMeta.x2, 0);
+        this.labCtx.lineTo(this.labLayoutMeta.x2, this.labCanvas.height);
         this.labCtx.stroke();
         this.labCtx.restore();
       }
