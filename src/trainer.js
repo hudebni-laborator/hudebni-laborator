@@ -1,41 +1,38 @@
-function getStaffCenterYInBox(img, box) {
+/**
+ * Původní detekce první linky osnovy (odpovídá první fungující verzi).
+ */
+function detectStaffMetricsInBox(img, box) {
   const canvas = document.createElement('canvas');
-  const sampleX = Math.round(box.left + box.width * 0.12);
-  const sampleW = Math.max(20, Math.round(box.width * 0.76));
-  const sampleH = box.height;
-
-  canvas.width = sampleW;
-  canvas.height = sampleH;
+  const w = Math.min(box.width, 300);
+  const h = box.height;
+  canvas.width = w;
+  canvas.height = h;
 
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, sampleX, box.top, sampleW, sampleH, 0, 0, sampleW, sampleH);
+  const startX = box.left + Math.floor(box.width * 0.2);
+  ctx.drawImage(img, startX, box.top, w, h, 0, 0, w, h);
 
-  const imgData = ctx.getImageData(0, 0, sampleW, sampleH).data;
-  const rowDarkness = new Float32Array(sampleH);
+  const imgData = ctx.getImageData(0, 0, w, h).data;
+  const rowDarkness = new Float32Array(h);
 
-  for (let y = 0; y < sampleH; y++) {
-    let darkCount = 0;
-    for (let x = 0; x < sampleW; x++) {
-      const idx = (y * sampleW + x) * 4;
+  for (let y = 0; y < h; y++) {
+    let dark = 0;
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
       const lum = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
-      if (lum < 165) darkCount++;
+      if (lum < 160) dark++;
     }
-    rowDarkness[y] = darkCount / sampleW;
+    rowDarkness[y] = dark / w;
   }
 
   const peaks = [];
-  for (let y = 2; y < sampleH - 2; y++) {
-    if (rowDarkness[y] > 0.20 &&
-        rowDarkness[y] >= rowDarkness[y - 1] &&
-        rowDarkness[y] >= rowDarkness[y + 1] &&
-        rowDarkness[y] > rowDarkness[y - 2] &&
-        rowDarkness[y] > rowDarkness[y + 2]) {
+  for (let y = 2; y < h - 2; y++) {
+    if (rowDarkness[y] > 0.25 &&
+        rowDarkness[y] > rowDarkness[y - 1] &&
+        rowDarkness[y] >= rowDarkness[y + 1]) {
       peaks.push(y);
     }
   }
-
-  let bestStaff = null;
-  let bestScore = -Infinity;
 
   for (let i = 0; i <= peaks.length - 5; i++) {
     const d1 = peaks[i + 1] - peaks[i];
@@ -44,23 +41,21 @@ function getStaffCenterYInBox(img, box) {
     const d4 = peaks[i + 4] - peaks[i + 3];
     const avg = (d1 + d2 + d3 + d4) / 4;
 
-    if (avg >= 6 && avg <= 42) {
-      const variance = Math.abs(d1 - avg) + Math.abs(d2 - avg) + Math.abs(d3 - avg) + Math.abs(d4 - avg);
-      if (variance <= 6) {
-        const fillSum = rowDarkness[peaks[i]] + rowDarkness[peaks[i+1]] + rowDarkness[peaks[i+2]] + rowDarkness[peaks[i+3]] + rowDarkness[peaks[i+4]];
-        const score = fillSum * 10 - variance;
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestStaff = {
-            centerY: peaks[i + 2]
-          };
-        }
-      }
+    if (avg >= 5 && avg <= 35 &&
+        Math.abs(d1 - avg) <= 3 && Math.abs(d2 - avg) <= 3 &&
+        Math.abs(d3 - avg) <= 3 && Math.abs(d4 - avg) <= 3) {
+      return {
+        firstLineY: peaks[i],
+        spacing: avg
+      };
     }
   }
 
-  return bestStaff ? bestStaff.centerY : Math.round(sampleH / 2);
+  // Fallback: předpoklad první linky v horní třetině rámečku
+  return {
+    firstLineY: Math.round(h * 0.35),
+    spacing: (h * 0.30) / 4
+  };
 }
 
 class GuitarTrainer {
@@ -1758,54 +1753,41 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, this.labLayoutMeta.ratio || 1.0);
 
     } else {
-      // --- REŽIM 2 TAKTŮ (Landscape): PŮVODNÍ SLÍCOVÁNÍ + BEZPEČNÝ OŘEZ PROTI KLÍČI ---
+      // --- REŽIM 2 TAKTŮ (Landscape): PŮVODNÍ LÍCOVÁNÍ PODLE 1. LINKY ---
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
-      // Původní osvědčené lícování podle středové linky
-      const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
-      const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
+      const s1 = detectStaffMetricsInBox(curImg, curM.box);
+      const s2 = detectStaffMetricsInBox(nextImg, nextM.box);
 
-      const diff = staffCenter1 - staffCenter2;
-      const originY1 = diff < 0 ? -diff : 0;
-      const originY2 = diff > 0 ? diff : 0;
+      // Původní lícování: posun Y druhého taktu podle rozdílu první linky
+      const offsetY2 = s1.firstLineY - s2.firstLineY;
 
+      const minY = Math.min(0, offsetY2);
+      const maxY = Math.max(curM.box.height, offsetY2 + nextM.box.height);
+      const totalH = maxY - minY;
       const totalW = curM.box.width + nextM.box.width;
-      const totalH = Math.max(originY1 + curM.box.height, originY2 + nextM.box.height);
+
+      const originY1 = -minY;
+      const originY2 = offsetY2 - minY;
 
       if (this.currentScore?.isPdf && this.pdfDoc) {
         const fitScale = Math.min(lensW / totalW, lensH / totalH);
         const targetScale = Math.min(10.0, Math.max(2.0, 2.0 * fitScale * dpr));
         const ratio = targetScale / 2.0;
 
-        const cropW = Math.round(totalW * ratio);
-        const cropH = Math.round(totalH * ratio);
         const m1W = Math.round(curM.box.width * ratio);
+        const m1H = Math.round(curM.box.height * ratio);
         const m2W = Math.round(nextM.box.width * ratio);
+        const m2H = Math.round(nextM.box.height * ratio);
 
-        this.labCanvas.width = cropW;
-        this.labCanvas.height = cropH;
-
-        this.labLayoutMeta = {
-          m1: curM,
-          m2: nextM,
-          originY1: Math.round(originY1 * ratio),
-          originY2: Math.round(originY2 * ratio),
-          x2: m1W,
-          scale2: 1.0,
-          ratio
-        };
-
-        this.labCtx.fillStyle = paperColor;
-        this.labCtx.fillRect(0, 0, cropW, cropH);
-
-        // 1. Takt: Vykreslíme do samostatného offscreen plátna o přesné šířce m1W
+        // Samostatná plátna pro oba takty (zabrání přelévání klíče)
         const off1 = document.createElement('canvas');
         off1.width = m1W;
-        off1.height = Math.round(curM.box.height * ratio);
+        off1.height = m1H;
         const off1Ctx = off1.getContext('2d');
         off1Ctx.fillStyle = paperColor;
-        off1Ctx.fillRect(0, 0, off1.width, off1.height);
+        off1Ctx.fillRect(0, 0, m1W, m1H);
 
         const page1 = await this.pdfDoc.getPage(curM.page || 1);
         const vp1 = page1.getViewport({ scale: targetScale });
@@ -1820,13 +1802,12 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        // 2. Takt: Vykreslíme do samostatného offscreen plátna o přesné šířce m2W (klíč před ním se fyzicky nemůže vykreslit)
         const off2 = document.createElement('canvas');
         off2.width = m2W;
-        off2.height = Math.round(nextM.box.height * ratio);
+        off2.height = m2H;
         const off2Ctx = off2.getContext('2d');
         off2Ctx.fillStyle = paperColor;
-        off2Ctx.fillRect(0, 0, off2.width, off2.height);
+        off2Ctx.fillRect(0, 0, m2W, m2H);
 
         const page2 = await this.pdfDoc.getPage(nextM.page || 1);
         const vp2 = page2.getViewport({ scale: targetScale });
@@ -1841,9 +1822,28 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        // 3. Obtiskneme obě čistá plátna se slícovanou Y výškou
-        this.labCtx.drawImage(off1, 0, this.labLayoutMeta.originY1);
-        this.labCtx.drawImage(off2, m1W, this.labLayoutMeta.originY2);
+        const totalW_px = Math.round(totalW * ratio);
+        const totalH_px = Math.round(totalH * ratio);
+        const posY1 = Math.round(originY1 * ratio);
+        const posY2 = Math.round(originY2 * ratio);
+
+        this.labCanvas.width = totalW_px;
+        this.labCanvas.height = totalH_px;
+        this.labLayoutMeta = {
+          m1: curM,
+          m2: nextM,
+          originY1: posY1,
+          originY2: posY2,
+          x2: m1W,
+          scale2: 1.0,
+          ratio
+        };
+
+        this.labCtx.fillStyle = paperColor;
+        this.labCtx.fillRect(0, 0, totalW_px, totalH_px);
+
+        this.labCtx.drawImage(off1, 0, posY1);
+        this.labCtx.drawImage(off2, m1W, posY2);
 
       } else {
         // Rastrové vykreslení pro fotky
@@ -1883,7 +1883,6 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, this.labLayoutMeta.originY1, this.labLayoutMeta.ratio || 1.0);
       this.renderDrawingsForMeasure(this.labCtx, nextM, this.labLayoutMeta.x2, this.labLayoutMeta.originY2, this.labLayoutMeta.ratio || 1.0);
 
-      // Oddělovací linka při přechodu na nový řádek nebo stranu
       const isDifferentRow = Math.abs(curM.box.top - nextM.box.top) > (curM.box.height * 0.40) ||
                              (curM.page || 1) !== (nextM.page || 1);
 
