@@ -1,6 +1,6 @@
 /**
  * Spolehlivě najde Y-souřadnici středové linky osnovy uvnitř vybraného taktu.
- * Využívá stejný adaptivní princip jako scanner.js (detekce souvislých linek).
+ * Využívá adaptivní princip jako scanner.js + imunitu vůči trámcům not.
  */
 function getStaffCenterYInBox(sourceCanvas, box) {
   if (!sourceCanvas || !box || box.width <= 0 || box.height <= 0) {
@@ -62,6 +62,7 @@ function getStaffCenterYInBox(sourceCanvas, box) {
   let bestCenter = null;
   let minDiff = Infinity;
 
+  // A) Nejprve vaše původní kontrola sousedních pětic
   for (let i = 0; i <= lineBlocks.length - 5; i++) {
     const group = lineBlocks.slice(i, i + 5);
     const s1 = group[1] - group[0];
@@ -79,6 +80,33 @@ function getStaffCenterYInBox(sourceCanvas, box) {
       if (distFromBoxMid < minDiff) {
         minDiff = distFromBoxMid;
         bestCenter = center;
+      }
+    }
+  }
+
+  // B) Pokud mezi linkami ležel trámec noty a sousední pětice selhala:
+  // Najdeme pětici linek s odpovídající roztečí d i přes vložené trámce
+  if (bestCenter === null && lineBlocks.length >= 5) {
+    for (let i = 0; i < lineBlocks.length; i++) {
+      for (let j = i + 1; j < lineBlocks.length; j++) {
+        const step = lineBlocks[j] - lineBlocks[i];
+        if (step < 6 || step > 45) continue;
+
+        const matched = [lineBlocks[i]];
+        for (let k = 1; k < 5; k++) {
+          const target = lineBlocks[i] + k * step;
+          const close = lineBlocks.find(p => Math.abs(p - target) <= 3);
+          if (close !== undefined) matched.push(close);
+        }
+
+        if (matched.length === 5) {
+          const center = matched[2];
+          const distFromBoxMid = Math.abs(center - cropH / 2);
+          if (distFromBoxMid < minDiff) {
+            minDiff = distFromBoxMid;
+            bestCenter = center;
+          }
+        }
       }
     }
   }
@@ -1492,19 +1520,19 @@ class GuitarTrainer {
     const canvasY = (clientY - rect.top - this.labPanY) / this.labZoomScale;
 
     const meta = this.labLayoutMeta;
+    const ratio = meta.ratio || 1.0;
 
-    // Detekce, zda uživatel klepl do 1. nebo 2. taktu
     if (meta.m2 && canvasX >= meta.x2) {
-      const localX = (canvasX - meta.x2) / meta.scale2;
-      const localY = (canvasY - meta.originY2) / meta.scale2;
+      const localX = (canvasX - meta.x2) / (meta.scale2 * ratio);
+      const localY = (canvasY - meta.originY2) / (meta.scale2 * ratio);
       return {
         x: Math.round(meta.m2.box.left + localX),
         y: Math.round(meta.m2.box.top + localY),
         page: meta.m2.page || 1
       };
     } else {
-      const localX = canvasX;
-      const localY = canvasY - meta.originY1;
+      const localX = canvasX / ratio;
+      const localY = (canvasY - meta.originY1) / ratio;
       return {
         x: Math.round(meta.m1.box.left + localX),
         y: Math.round(meta.m1.box.top + localY),
@@ -1612,7 +1640,6 @@ class GuitarTrainer {
     return defaultColor;
   }
 
-  // Pomocná metoda pro vykreslení ručních kreseb do výřezu v laboratoři
   renderDrawingsForMeasure(ctx, m, ox, oy, scale = 1.0) {
     if (!this.showAnnotations || !this.currentScore?.drawings) return;
     const pageKey = `page_${m.page || 1}`;
@@ -1620,6 +1647,11 @@ class GuitarTrainer {
     if (strokes.length === 0) return;
 
     ctx.save();
+    // Ořízneme kreslení přesně na oblast tohoto taktu, aby nepřetékalo do sousedních taktů
+    ctx.beginPath();
+    ctx.rect(ox, oy, m.box.width * scale, m.box.height * scale);
+    ctx.clip();
+
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
