@@ -5,7 +5,7 @@
 .play-fullscreen-panel {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 60px);
+  height: 100%;
   width: 100%;
   max-width: 100vw;
   margin: 0;
@@ -14,22 +14,37 @@
   position: relative;
 }
 
-/* Plátno */
 .canvas-box.play-canvas-box {
   flex: 1 1 auto;
   width: 100%;
-  height: calc(100% - 52px);
+  height: calc(100% - 56px);
   background: #09090b;
-  border: none;
-  border-radius: 0;
   overflow: hidden;
   position: relative;
   touch-action: none !important;
-  user-select: none;
-  -webkit-user-select: none;
   display: flex;
-  align-items: flex-start; /* <--- PŘILEPENÍ K HORNÍMU OKRAJI */
+  align-items: flex-start;
   justify-content: center;
+}
+
+/* Spodní lišta v Hraní bezpečně nad spodní hranou a systémovým pruhem */
+.docked-play-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(52px + env(safe-area-inset-bottom, 0px));
+  background: rgba(18, 18, 24, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  z-index: 100;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.6);
 }
 
 .canvas-viewport {
@@ -93,28 +108,6 @@ canvas#scoreCanvas {
 .floating-fs-btn:active {
   transform: scale(0.92);
   background: rgba(35, 35, 45, 0.95);
-}
-
-/* ======================================================== */
-/* SPODNÍ LIŠTA V HRANÍ - STÁLÁ VELIKOST A ČISTOTA          */
-/* ======================================================== */
-.docked-play-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 52px;
-  background: rgba(18, 18, 24, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  z-index: 100;
-  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.6);
 }
 
 /* Tlačítko se stejnou šířkou pro texty "Hraní" i "Edit" */

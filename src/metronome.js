@@ -208,6 +208,7 @@ class MetronomeController {
 
       this.updateLabTargetDisplay(this.labTargetBpm);
       this.updateLabTempoUI(this.currentBpm);
+      this.updateLabSummaryUI();
     }
 
     this.updateCircleUI(this.phase);
@@ -319,6 +320,7 @@ class MetronomeController {
 
     if (!this.isRunning && this.detectCurrentMode() === 'lab') {
       this.updateLabTempoUI(this.labStartBpm);
+      this.updateLabSummaryUI();
     }
   }
 
@@ -335,6 +337,7 @@ class MetronomeController {
     const lbl = document.getElementById('metroTargetVal');
     if (lbl) lbl.innerText = this.labTargetBpm;
     this.updateLabTargetDisplay(this.labTargetBpm);
+    this.updateLabSummaryUI();
   }
 
   adjustTargetBpm(delta) {
@@ -364,6 +367,7 @@ class MetronomeController {
     const startVal = startSlider ? Number(startSlider.value) : this.labStartBpm;
     this.labCurrentBpm = startVal;
     this.updateLabTempoUI(startVal);
+    this.updateLabSummaryUI();
   }
 
   resetLabDrill() {
@@ -381,6 +385,7 @@ class MetronomeController {
       this.updateCircleUI('idle');
       this.clearBeatLights();
     }
+    this.updateLabSummaryUI();
   }
 
   // ==========================================================
@@ -412,6 +417,7 @@ class MetronomeController {
     if (measuresValEl) measuresValEl.innerText = `${barsCount} ${barsCount === 1 ? 'takt' : (barsCount < 5 ? 'takty' : 'taktů')}`;
 
     this.updateSheetSelectors();
+    this.updateLabSummaryUI();
   }
 
   closeSheet() {
@@ -482,6 +488,7 @@ class MetronomeController {
       if (inp) inp.value = s;
     }
     this.updateSheetSelectors();
+    this.updateLabSummaryUI();
   }
 
   stepMeasures(delta) {
@@ -499,6 +506,7 @@ class MetronomeController {
     }
     const measuresValEl = document.getElementById('sheetMeasuresVal');
     if (measuresValEl) measuresValEl.innerText = `${bars} ${bars === 1 ? 'takt' : (bars < 5 ? 'takty' : 'taktů')}`;
+    this.updateLabSummaryUI();
   }
 
   setBeats(count) {
@@ -518,6 +526,7 @@ class MetronomeController {
       this.beatIndex = 0;
     }
     this.updateSheetSelectors();
+    this.updateLabSummaryUI();
   }
 
   setSoundType(sound) {
@@ -532,6 +541,23 @@ class MetronomeController {
     this.updateSheetSelectors();
     this.initAudio();
     this.playClickSound(this.audioCtx.currentTime + 0.05, this.accentEnabled, false);
+  }
+
+  updateLabSummaryUI() {
+    const sStart = document.getElementById('labSumStart');
+    if (sStart) sStart.innerText = `Start: ${this.labStartBpm}`;
+
+    const sTarget = document.getElementById('labSumTarget');
+    if (sTarget) sTarget.innerText = `🎯 Cíl: ${this.labTargetBpm}`;
+
+    const sStep = document.getElementById('labSumStep');
+    if (sStep) sStep.innerText = `+${this.labStepBpm} BPM`;
+
+    const sBars = document.getElementById('labSumBars');
+    if (sBars) sBars.innerText = `po ${this.labBarsCount} ${this.labBarsCount === 1 ? 't.' : 't.'}`;
+
+    const sBeats = document.getElementById('labSumBeats');
+    if (sBeats) sBeats.innerText = `${this.labBeats} ${this.labBeats === 1 ? 'doba' : (this.labBeats < 5 ? 'doby' : 'dob')}`;
   }
 
   updateSheetSelectors() {

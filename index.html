@@ -289,9 +289,10 @@
     </div>
   </div>
 
-  <!-- DOKOVACÍ METRONOM V LABORATOŘI -->
+  <!-- DOKOVACÍ METRONOM V LABORATOŘI S PŘEHLEDEM PARAMETRŮ -->
   <div class="docked-metronome" id="dockedMetronome" style="display:none;">
     <div class="metro-header-row">
+      <!-- Diody dob -->
       <div class="metro-beat-lights" id="metroBeatLights">
         <div class="beat-light"></div>
         <div class="beat-light"></div>
@@ -299,19 +300,29 @@
         <div class="beat-light"></div>
       </div>
 
-      <div class="metro-tempo-display">
-        <span class="tempo-current" id="metroCurrentBpmText">60</span>
-        <span class="tempo-unit">BPM</span>
+      <!-- Informační blok (aktuální tempo + parametry cvičení: Start, Cíl, Krok, Takty, Doby) -->
+      <div class="metro-info-block" onclick="window.app.metronome.openSheet()" title="Klepnutím otevřete nastavení tempa a cvičení">
+        <div class="metro-tempo-display">
+          <span class="tempo-current" id="metroCurrentBpmText">60</span>
+          <span class="tempo-unit">BPM</span>
+        </div>
+        <div class="metro-summary-chips" id="labMetroSummaryChips">
+          <span class="summary-chip" id="labSumStart">Start: 60</span>
+          <span class="summary-chip chip-target" id="labSumTarget">🎯 Cíl: 100</span>
+          <span class="summary-chip" id="labSumStep">+2 BPM</span>
+          <span class="summary-chip" id="labSumBars">po 1 t.</span>
+          <span class="summary-chip" id="labSumBeats">4 doby</span>
+        </div>
       </div>
 
-      <!-- Kruhové tlačítko s tempem pro otevření nastavení na celou šířku -->
+      <!-- Kruhové tlačítko pro otevření výsuvného nastavení -->
       <button class="metro-circle-btn metro-tempo-btn" id="labMetroSettingsBtn" onclick="window.app.metronome.openSheet()" title="Nastavení tempa a metronomu">
         <span class="tempo-btn-val" id="labMetroBpmDisplay">60</span>
         <span class="tempo-btn-sub">BPM</span>
       </button>
 
-      <!-- Spouštěcí kruhové tlačítko -->
-      <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()">
+      <!-- Spouštěcí kruhové tlačítko (Play / Stop / Pohár 🏆) -->
+      <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()" title="Spustit / Zastavit cvičení">
         <span class="circle-icon" id="metroCircleIcon">▶</span>
       </button>
     </div>

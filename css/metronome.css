@@ -9,19 +9,23 @@
   width: 100%;
   max-width: 950px;
   margin: 0 auto;
-  background: rgba(18, 18, 22, 0.94);
+  background: rgba(18, 18, 22, 0.96);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.8);
-  padding: 8px 12px;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 12px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   z-index: 100;
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
+}
+
+.docked-metronome .metro-body-panel {
+  display: none !important;
 }
 
 /* HORNÍ ŘÁDEK V PORTRAIT: DIODY VLEVO, TEMPO UPROSTŘED, TLAČÍTKO VPRAVO */
@@ -161,14 +165,6 @@
   color: var(--text-dim);
   text-transform: uppercase;
   line-height: 1;
-}
-
-/* TĚLO METRONOMU S POSUVNÍKY */
-.metro-body-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
 }
 
 /* POSUVNÍKY START A CÍL */
@@ -329,16 +325,16 @@
 /* ======================================================== */
 /* LANDSCAPE REŽIM METRONOMU (KRUHOVÁ TLAČÍTKA + POPUP)     */
 /* ======================================================== */
-@media (orientation: landscape) and (max-height: 520px) {
+/* Širší podpora pro landscape režim i na větších mobilech */
+@media (orientation: landscape) and (max-height: 700px) {
   .docked-metronome {
     left: auto !important;
     right: 12px !important;
-    bottom: 6px !important;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
     width: auto !important;
     max-width: none !important;
     background: transparent !important;
     backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
@@ -404,4 +400,55 @@
   .docked-metronome.open-landscape-panel .metro-controls-row {
     display: flex !important;
   }
+}
+
+/* INFORMAČNÍ BLOK V DOKOVACÍM METRONOMU */
+.metro-info-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  padding: 0 4px;
+  user-select: none;
+}
+.metro-info-block:active {
+  opacity: 0.85;
+}
+
+.metro-summary-chips {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  padding-top: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.metro-summary-chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* Jednotlivé informační štítky */
+.summary-chip {
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: var(--text-dim, #a1a1aa);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* Zlaté zvýraznění cíle */
+.summary-chip.chip-target {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.12);
 }
