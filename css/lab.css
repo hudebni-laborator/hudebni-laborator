@@ -315,19 +315,19 @@
   }
 }
 
-/* Plovoucí odznak aktivního mikro-posunu při dlouhém stisku */
+/* Plovoucí odznak aktivního 2D mikro-posunu při dlouhém stisku */
 .lab-nudge-badge {
   position: absolute;
   top: 10px;
   right: 14px;
-  background: rgba(18, 18, 24, 0.92);
+  background: rgba(18, 18, 24, 0.94);
   border: 1px solid #38bdf8;
   color: #38bdf8;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 8px;
   font-size: 0.78rem;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7), 0 0 10px rgba(56, 189, 248, 0.4);
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.75), 0 0 12px rgba(56, 189, 248, 0.45);
   pointer-events: none;
   z-index: 50;
   animation: fadeIn 0.15s ease-out;
