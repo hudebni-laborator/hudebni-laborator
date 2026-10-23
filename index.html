@@ -131,13 +131,23 @@
       <div class="page-turn-zone zone-right" id="zoneRight" onclick="window.app.changePage(1)"></div>
     </div>
 
-    <!-- EDITAČNÍ KRESLICÍ LIŠTA (přizpůsobená na šířku mobilu) -->
+    <!-- EDITAČNÍ KRESLICÍ LIŠTA V HRANÍ (bez textů) -->
     <div class="edit-draw-bar" id="editDrawBar" style="display:none;">
       <div class="draw-tool-group">
-        <button class="draw-tool-btn active" id="toolBoxBtn" onclick="window.app.setEditTool('box')" title="Označit takt do laboratoře">🔲 Takt</button>
-        <button class="draw-tool-btn" id="toolPenBtn" onclick="window.app.setEditTool('pen')" title="Kreslit do not">✏️ Tužka</button>
-        <button class="draw-tool-btn" id="toolWhiteoutBtn" onclick="window.app.setEditTool('whiteout')" title="Bělítko">🩹 Bělítko</button>
-        <button class="draw-tool-btn" id="toolEraserBtn" onclick="window.app.setEditTool('eraser')" title="Guma na drobné opravy">🧹 Guma</button>
+        <button class="draw-tool-btn active" id="toolBoxBtn" onclick="window.app.setEditTool('box')" title="Označit takt (box)">🔲</button>
+        <button class="draw-tool-btn" id="toolPenBtn" onclick="window.app.setEditTool('pen')" title="Tužka">
+          <svg class="tool-svg icon-pencil" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M3 21l3.75-1 11.5-11.5-2.75-2.75L4 17.25 3 21zm16.71-13.29a1 1 0 0 0 0-1.42l-1.58-1.58a1 1 0 0 0-1.42 0l-1.13 1.13 3 3 1.13-1.13z"/>
+          </svg>
+        </button>
+        <button class="draw-tool-btn" id="toolWhiteoutBtn" onclick="window.app.setEditTool('whiteout')" title="Bělítko">🩹</button>
+        <button class="draw-tool-btn" id="toolEraserBtn" onclick="window.app.setEditTool('eraser')" title="Guma">
+          <svg class="tool-svg icon-eraser-pink" viewBox="0 0 24 24" width="18" height="18" fill="none">
+            <path d="M7.5 21L2.5 16L13.5 5L21.5 13L15.5 21H7.5Z" fill="#f472b6" stroke="#db2777" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 6.5L19.5 14" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>
+            <path d="M4 17.5L7.5 21" stroke="#be185d" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
 
       <div class="draw-separator"></div>
@@ -151,13 +161,13 @@
       <div class="draw-separator"></div>
 
       <div class="draw-widths-group">
-        <button class="width-btn active" id="widthBtn1" onclick="window.app.setPenWidth(2, 1)" title="Tenká (prstoklady)">
+        <button class="width-btn active" id="widthBtn1" onclick="window.app.setPenWidth(2, 1)" title="Tenká">
           <span class="dot-indicator dot-1"></span>
         </button>
-        <button class="width-btn" id="widthBtn2" onclick="window.app.setPenWidth(4, 2)" title="Střední (smyky)">
+        <button class="width-btn" id="widthBtn2" onclick="window.app.setPenWidth(4, 2)" title="Střední">
           <span class="dot-indicator dot-2"></span>
         </button>
-        <button class="width-btn" id="widthBtn3" onclick="window.app.setPenWidth(7, 3)" title="Tlustá (crescenda)">
+        <button class="width-btn" id="widthBtn3" onclick="window.app.setPenWidth(7, 3)" title="Tlustá">
           <span class="dot-indicator dot-3"></span>
         </button>
       </div>
@@ -232,11 +242,22 @@
     </div>
 
     <!-- EDITAČNÍ KRESLICÍ LIŠTA V LABORATOŘI (Tužka se svícením, Bělítko, Guma) -->
+    <!-- EDITAČNÍ KRESLICÍ LIŠTA V LABORATOŘI (bez textů) -->
     <div class="lab-draw-bar" id="labDrawBar">
       <div class="draw-tool-group">
-        <button class="draw-tool-btn" id="labToolPenBtn" onclick="window.app.toggleLabPen()" title="Kreslit tužkou (klepnutím zapnout/vypnout)">✏️ Tužka</button>
-        <button class="draw-tool-btn" id="labToolWhiteoutBtn" onclick="window.app.toggleLabWhiteout()" title="Bělítko (přetřít barvou papíru)">🩹 Bělítko</button>
-        <button class="draw-tool-btn" id="labToolEraserBtn" onclick="window.app.toggleLabEraser()" title="Guma">🧹 Guma</button>
+        <button class="draw-tool-btn" id="labToolPenBtn" onclick="window.app.toggleLabPen()" title="Tužka">
+          <svg class="tool-svg icon-pencil" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M3 21l3.75-1 11.5-11.5-2.75-2.75L4 17.25 3 21zm16.71-13.29a1 1 0 0 0 0-1.42l-1.58-1.58a1 1 0 0 0-1.42 0l-1.13 1.13 3 3 1.13-1.13z"/>
+          </svg>
+        </button>
+        <button class="draw-tool-btn" id="labToolWhiteoutBtn" onclick="window.app.toggleLabWhiteout()" title="Bělítko">🩹</button>
+        <button class="draw-tool-btn" id="labToolEraserBtn" onclick="window.app.toggleLabEraser()" title="Guma">
+          <svg class="tool-svg icon-eraser-pink" viewBox="0 0 24 24" width="18" height="18" fill="none">
+            <path d="M7.5 21L2.5 16L13.5 5L21.5 13L15.5 21H7.5Z" fill="#f472b6" stroke="#db2777" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 6.5L19.5 14" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>
+            <path d="M4 17.5L7.5 21" stroke="#be185d" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
 
       <div class="draw-separator"></div>
@@ -250,13 +271,13 @@
       <div class="draw-separator"></div>
 
       <div class="draw-widths-group">
-        <button class="width-btn active" id="labWidthBtn1" onclick="window.app.setPenWidth(2, 1)" title="Tenká (prstoklad)">
+        <button class="width-btn active" id="labWidthBtn1" onclick="window.app.setPenWidth(2, 1)" title="Tenká">
           <span class="dot-indicator dot-1"></span>
         </button>
-        <button class="width-btn" id="labWidthBtn2" onclick="window.app.setPenWidth(4, 2)" title="Střední (smyky)">
+        <button class="width-btn" id="labWidthBtn2" onclick="window.app.setPenWidth(4, 2)" title="Střední">
           <span class="dot-indicator dot-2"></span>
         </button>
-        <button class="width-btn" id="labWidthBtn3" onclick="window.app.setPenWidth(7, 3)" title="Tlustá (dynamika)">
+        <button class="width-btn" id="labWidthBtn3" onclick="window.app.setPenWidth(7, 3)" title="Tlustá">
           <span class="dot-indicator dot-3"></span>
         </button>
       </div>
@@ -270,9 +291,18 @@
     </div>
 
     <!-- POHODLNÁ AKČNÍ LIŠTA -->
+    <!-- AKČNÍ LIŠTA LABORATOŘE: V landscape má vlevo informační proužek vedle 1:1 -->
     <div class="lab-action-bar">
-      <div class="lab-action-side">
+      <div class="lab-action-side lab-action-left">
         <button class="btn btn-sm" onclick="window.app.fitLabCanvas()" title="Přizpůsobit velikost do okénka" style="padding: 6px 8px;">🔍 1:1</button>
+        <!-- V landscape se zobrazí tady vedle 1:1 -->
+        <div class="lab-landscape-metro-info" id="labLandscapeMetroInfo" onclick="window.app.metronome.openSheet()" title="Klepnutím otevřete nastavení tempa a cvičení">
+          <span class="summary-chip" id="labSumStartLand">Start: 60</span>
+          <span class="summary-chip chip-target" id="labSumTargetLand">🎯 Cíl: 100</span>
+          <span class="summary-chip" id="labSumStepLand">+2 BPM</span>
+          <span class="summary-chip" id="labSumBarsLand">po 2 t.</span>
+          <span class="summary-chip" id="labSumBeatsLand">4 doby</span>
+        </div>
       </div>
 
       <div class="lab-nav-center">
@@ -281,7 +311,7 @@
         <button class="lab-nav-btn" onclick="window.app.nextLabMeasure()" title="Další takt">▶</button>
       </div>
 
-      <div class="lab-action-side" style="justify-content: flex-end;">
+      <div class="lab-action-side lab-action-right" style="justify-content: flex-end;">
         <button class="btn btn-accent btn-sm lab-resolve-btn" id="labResolveBtn" onclick="window.app.resolveCurrentLabMeasure()">
           ✔ Zvládnuto
         </button>
@@ -289,10 +319,9 @@
     </div>
   </div>
 
-  <!-- DOKOVACÍ METRONOM V LABORATOŘI S PŘEHLEDEM PARAMETRŮ -->
+  <!-- DOKOVACÍ METRONOM V LABORATOŘI S DVOUŘÁDKOVÝM PŘEHLEDEM V PORTRAIT -->
   <div class="docked-metronome" id="dockedMetronome" style="display:none;">
     <div class="metro-header-row">
-      <!-- Diody dob -->
       <div class="metro-beat-lights" id="metroBeatLights">
         <div class="beat-light"></div>
         <div class="beat-light"></div>
@@ -300,35 +329,32 @@
         <div class="beat-light"></div>
       </div>
 
-      <!-- Informační blok (aktuální tempo + parametry cvičení: Start, Cíl, Krok, Takty, Doby) -->
-      <div class="metro-info-block" onclick="window.app.metronome.openSheet()" title="Klepnutím otevřete nastavení tempa a cvičení">
-        <div class="metro-tempo-display">
-          <span class="tempo-current" id="metroCurrentBpmText">60</span>
-          <span class="tempo-unit">BPM</span>
-        </div>
-        <div class="metro-summary-chips" id="labMetroSummaryChips">
+      <!-- Informační blok v portrétu: 2 řádky bez duplicitního BPM -->
+      <div class="metro-info-block" id="metroInfoBlockPortrait" onclick="window.app.metronome.openSheet()" title="Klepnutím otevřete nastavení tempa a cvičení">
+        <div class="metro-summary-row">
           <span class="summary-chip" id="labSumStart">Start: 60</span>
           <span class="summary-chip chip-target" id="labSumTarget">🎯 Cíl: 100</span>
+        </div>
+        <div class="metro-summary-row">
           <span class="summary-chip" id="labSumStep">+2 BPM</span>
-          <span class="summary-chip" id="labSumBars">po 1 t.</span>
+          <span class="summary-chip" id="labSumBars">po 2 t.</span>
           <span class="summary-chip" id="labSumBeats">4 doby</span>
         </div>
       </div>
 
-      <!-- Kruhové tlačítko pro otevření výsuvného nastavení -->
+      <!-- Kruhové tlačítko s BPM -->
       <button class="metro-circle-btn metro-tempo-btn" id="labMetroSettingsBtn" onclick="window.app.metronome.openSheet()" title="Nastavení tempa a metronomu">
         <span class="tempo-btn-val" id="labMetroBpmDisplay">60</span>
         <span class="tempo-btn-sub">BPM</span>
       </button>
 
-      <!-- Spouštěcí kruhové tlačítko (Play / Stop / Pohár 🏆) -->
+      <!-- Spouštěcí kruhové tlačítko -->
       <button class="metro-circle-btn circle-idle" id="metroCircleBtn" onclick="window.app.toggleIncrementalMetronome()" title="Spustit / Zastavit cvičení">
         <span class="circle-icon" id="metroCircleIcon">▶</span>
       </button>
     </div>
   </div>
 
-  <!-- VÝSUVNÝ PANEL METRONOMU NA CELOU ŠÍŘKU S VOLIČI -->
   <!-- VÝSUVNÝ PANEL METRONOMU NA CELOU ŠÍŘKU S VOLIČI -->
   <div id="metroBottomSheet" class="metro-sheet-backdrop" style="display:none;" onclick="if(event.target===this) window.app.metronome.closeSheet()">
     <div class="metro-sheet-card">

@@ -348,8 +348,12 @@
     width: auto !important;
   }
 
-  .metro-beat-lights,
-  .metro-tempo-display {
+  .metro-beat-lights {
+    display: none !important;
+  }
+
+  /* V landscape se portrait 2řádkový blok skryje (přesune se vedle 1:1) */
+  .metro-info-block {
     display: none !important;
   }
 
@@ -402,7 +406,7 @@
   }
 }
 
-/* INFORMAČNÍ BLOK V DOKOVACÍM METRONOMU */
+/* INFORMAČNÍ BLOK V DOKOVACÍM METRONOMU V PORTRAIT (2 ŘÁDKY) */
 .metro-info-block {
   display: flex;
   flex-direction: column;
@@ -412,30 +416,24 @@
   min-width: 0;
   cursor: pointer;
   padding: 0 4px;
+  gap: 3px;
   user-select: none;
 }
 .metro-info-block:active {
   opacity: 0.85;
 }
 
-.metro-summary-chips {
+.metro-summary-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  max-width: 100%;
-  padding-top: 2px;
-  -webkit-overflow-scrolling: touch;
-}
-.metro-summary-chips::-webkit-scrollbar {
-  display: none;
+  width: 100%;
 }
 
-/* Jednotlivé informační štítky */
+/* Jednotlivé štítky */
 .summary-chip {
-  font-size: 0.67rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--text-dim, #a1a1aa);
   background: rgba(255, 255, 255, 0.06);
@@ -446,9 +444,146 @@
   line-height: 1.2;
 }
 
-/* Zlaté zvýraznění cíle */
 .summary-chip.chip-target {
   color: #fbbf24;
   border-color: rgba(245, 158, 11, 0.35);
   background: rgba(245, 158, 11, 0.12);
+}
+
+/* V portrétu je landscape lišta v action-bar skrytá */
+.lab-landscape-metro-info {
+  display: none;
+}
+
+/* Vektorové SVG ikonky v tlačítkách */
+.tool-svg {
+  display: inline-block;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+/* Kompaktní čtvercová tlačítka bez textu */
+.draw-tool-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.1rem !important;
+}
+
+/* ======================================================== */
+/* BAREVNÉ ODLIŠENÍ: START (AZUROVÁ) VS. CÍL (ZLATÁ)       */
+/* ======================================================== */
+
+/* --- 1. STARTOVNÍ TEMPO (Azurově modrá #38bdf8) --- */
+.val-start,
+#playStartVal,
+#metroStartVal,
+#sheetStartVal {
+  color: #38bdf8 !important;
+  font-weight: 800;
+}
+
+.range-start,
+#playTempoSlider,
+#metroStartBpm,
+#sheetStartSlider {
+  accent-color: #38bdf8 !important;
+}
+
+/* Kroužek posuvníku Start */
+.range-start::-webkit-slider-thumb,
+#playTempoSlider::-webkit-slider-thumb,
+#metroStartBpm::-webkit-slider-thumb,
+#sheetStartSlider::-webkit-slider-thumb {
+  background: #38bdf8 !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6) !important;
+}
+.range-start::-moz-range-thumb,
+#playTempoSlider::-moz-range-thumb,
+#metroStartBpm::-moz-range-thumb,
+#sheetStartSlider::-moz-range-thumb {
+  background: #38bdf8 !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6) !important;
+}
+
+/* Modrý štítek Start v liště Laboratoře */
+.summary-chip.chip-start {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+/* --- 2. CÍLOVÉ TEMPO (Sytě zlatá / jantarová #fbbf24 a #f59e0b) --- */
+.val-target,
+#playTargetVal,
+#metroTargetVal,
+#sheetTargetVal {
+  color: #fbbf24 !important;
+  font-weight: 800;
+}
+
+.range-target,
+#playTargetBpmSlider,
+#metroTargetBpm,
+#sheetTargetSlider {
+  accent-color: #f59e0b !important;
+}
+
+/* Kroužek posuvníku Cíl */
+.range-target::-webkit-slider-thumb,
+#playTargetBpmSlider::-webkit-slider-thumb,
+#metroTargetBpm::-webkit-slider-thumb,
+#sheetTargetSlider::-webkit-slider-thumb {
+  background: #f59e0b !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6) !important;
+}
+.range-target::-moz-range-thumb,
+#playTargetBpmSlider::-moz-range-thumb,
+#metroTargetBpm::-moz-range-thumb,
+#sheetTargetSlider::-moz-range-thumb {
+  background: #f59e0b !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6) !important;
+}
+
+/* Zlatý štítek Cíl v liště Laboratoře */
+.summary-chip.chip-target {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+/* Hlavička posuvníku v Bottom Sheetu */
+.metro-tempo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.slider-type-lbl {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dim, #a1a1aa);
+}
+.btn-even {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.btn-even:active {
+  background: #f59e0b;
+  color: #09090b;
 }

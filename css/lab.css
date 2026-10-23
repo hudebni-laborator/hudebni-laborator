@@ -218,7 +218,7 @@
 /* ======================================================== */
 /* LANDSCAPE REŽIM PRO LABORATOŘ                            */
 /* ======================================================== */
-@media (orientation: landscape) and (max-height: 520px) {
+@media (orientation: landscape) and (max-height: 700px) {
   header {
     display: none !important;
   }
@@ -233,7 +233,7 @@
   .lab-main-area {
     flex-direction: row !important;
     align-items: stretch !important;
-    height: calc(100vh - 90px) !important;
+    height: calc(100vh - 86px) !important;
   }
 
   .lab-top-row {
@@ -265,11 +265,47 @@
     margin-top: 2px !important;
   }
 
-  /* Rezerva proti překrytí: akční lišta končí bezpečně před metronomem */
+  /* AKČNÍ LIŠTA V LANDSCAPE: INFORMAČNÍ PROUŽEK VLEVO, ŠIPKY DOPRAVA */
   .lab-action-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
     padding: 2px 8px !important;
-    padding-right: 110px !important;
+    padding-right: 110px !important; /* Rezerva pro dvě kruhová tlačítka metronomu vpravo */
     margin-top: 2px !important;
+    gap: 8px !important;
+  }
+
+  /* Levá strana drží 🔍 1:1 a informační štítky */
+  .lab-action-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex: 0 0 auto !important;
+  }
+
+  /* Zobrazení informačního proužku v landscape vedle 1:1 */
+  .lab-landscape-metro-info {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    cursor: pointer !important;
+    user-select: none !important;
+  }
+  .lab-landscape-metro-info:active {
+    opacity: 0.85 !important;
+  }
+
+  /* ŠIPKY STRÁNKOVÁNÍ TAKTŮ SE POSUNOU ÚPLNĚ DOPRAVA K TLAČÍTKU ZVLÁDNUTO */
+  .lab-nav-center {
+    margin-left: auto !important; /* Toto automaticky odtlačí šipky doprava */
+    margin-right: 6px !important;
+    flex: 0 0 auto !important;
+    gap: 6px !important;
+  }
+
+  .lab-action-right {
+    flex: 0 0 auto !important;
   }
 
   .lab-nav-btn {

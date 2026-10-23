@@ -207,8 +207,8 @@ class MetronomeController {
       this.phase = 'leadin';
 
       this.updateLabTargetDisplay(this.labTargetBpm);
-      this.updateLabTempoUI(this.currentBpm);
       this.updateLabSummaryUI();
+      this.updateLabTempoUI(this.currentBpm);
     }
 
     this.updateCircleUI(this.phase);
@@ -532,6 +532,7 @@ class MetronomeController {
   setSoundType(sound) {
     this.soundType = sound;
     this.updateSheetSelectors();
+    this.updateLabSummaryUI();
     this.initAudio();
     this.playClickSound(this.audioCtx.currentTime + 0.05, true, false);
   }
@@ -539,25 +540,41 @@ class MetronomeController {
   toggleAccent() {
     this.accentEnabled = !this.accentEnabled;
     this.updateSheetSelectors();
+    this.updateLabSummaryUI();
     this.initAudio();
     this.playClickSound(this.audioCtx.currentTime + 0.05, this.accentEnabled, false);
   }
 
   updateLabSummaryUI() {
+    const startTxt = `Start: ${this.labStartBpm}`;
+    const targetTxt = `🎯 Cíl: ${this.labTargetBpm}`;
+    const stepTxt = `+${this.labStepBpm} BPM`;
+    const barsTxt = `po ${this.labBarsCount} ${this.labBarsCount === 1 ? 't.' : 't.'}`;
+    const beatsTxt = `${this.labBeats} ${this.labBeats === 1 ? 'doba' : (this.labBeats < 5 ? 'doby' : 'dob')}`;
+
+    // Aktualizace portrétních štítků
     const sStart = document.getElementById('labSumStart');
-    if (sStart) sStart.innerText = `Start: ${this.labStartBpm}`;
-
+    if (sStart) sStart.innerText = startTxt;
     const sTarget = document.getElementById('labSumTarget');
-    if (sTarget) sTarget.innerText = `🎯 Cíl: ${this.labTargetBpm}`;
-
+    if (sTarget) sTarget.innerText = targetTxt;
     const sStep = document.getElementById('labSumStep');
-    if (sStep) sStep.innerText = `+${this.labStepBpm} BPM`;
-
+    if (sStep) sStep.innerText = stepTxt;
     const sBars = document.getElementById('labSumBars');
-    if (sBars) sBars.innerText = `po ${this.labBarsCount} ${this.labBarsCount === 1 ? 't.' : 't.'}`;
-
+    if (sBars) sBars.innerText = barsTxt;
     const sBeats = document.getElementById('labSumBeats');
-    if (sBeats) sBeats.innerText = `${this.labBeats} ${this.labBeats === 1 ? 'doba' : (this.labBeats < 5 ? 'doby' : 'dob')}`;
+    if (sBeats) sBeats.innerText = beatsTxt;
+
+    // Aktualizace landscape štítků (vedle 🔍 1:1)
+    const slStart = document.getElementById('labSumStartLand');
+    if (slStart) slStart.innerText = startTxt;
+    const slTarget = document.getElementById('labSumTargetLand');
+    if (slTarget) slTarget.innerText = targetTxt;
+    const slStep = document.getElementById('labSumStepLand');
+    if (slStep) slStep.innerText = stepTxt;
+    const slBars = document.getElementById('labSumBarsLand');
+    if (slBars) slBars.innerText = barsTxt;
+    const slBeats = document.getElementById('labSumBeatsLand');
+    if (slBeats) slBeats.innerText = beatsTxt;
   }
 
   updateSheetSelectors() {
