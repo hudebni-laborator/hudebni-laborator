@@ -181,6 +181,7 @@ class GuitarTrainer {
         this.fitCanvasToScreen();
       }
       if (document.getElementById('labView')?.style.display === 'flex') {
+        this._lastRenderedClefKey = null;
         this.showMeasureInLab(this.labCurrentIndex);
       }
     });
@@ -590,6 +591,7 @@ class GuitarTrainer {
     this.pageCache.clear();
     this.resetActiveSelection();
     this.dismissAddPagePrompt();
+    this._lastRenderedClefKey = null; // Vynuluje paměť klíče pro novou skladbu
 
     if (score.isPdf && score.pdfData) {
       try {
@@ -1572,7 +1574,7 @@ class GuitarTrainer {
 
       // 1. Zpomalený 2D posun (lícování) s faktorem 2.5 pro maximální jemnost
       if (isNudging) {
-        const sensitivity = 2.5;
+        const sensitivity = 10.0;
         const deltaX = Math.round((e.clientX - nudgeStartX) / ((this.labZoomScale || 1.0) * sensitivity));
         const deltaY = Math.round((e.clientY - nudgeStartY) / ((this.labZoomScale || 1.0) * sensitivity));
         const measures = this.currentScore?.measures || [];
@@ -1957,51 +1959,57 @@ class GuitarTrainer {
     if (lens) lens.style.backgroundColor = paperColor;
     if (container) container.style.backgroundColor = paperColor;
 
-    // 1. Klíč & předznamenání
+    // 1. KLÍČ & PŘEDZNAMENÁNÍ (vykreslujeme POUZE při změně taktu/klíče, ne při tažení prstem!)
     const keySig = this.getKeySignatureForMeasure(this.labCurrentIndex);
-    if (keySig && this.labClefCanvas && this.labClefCtx) {
-      if (this.currentScore?.isPdf && this.pdfDoc) {
-        try {
-          const keyPage = await this.pdfDoc.getPage(keySig.page || 1);
-          const kScale = Math.min(8.0, 2.0 * dpr * 1.5);
-          const kRatio = kScale / 2.0;
-          const kW = Math.round(keySig.box.width * kRatio);
-          const kH = Math.round(keySig.box.height * kRatio);
-          const kX = Math.round(keySig.box.left * kRatio);
-          const kY = Math.round(keySig.box.top * kRatio);
+    const clefCacheKey = keySig ? `${keySig.id}_${curM.page || 1}_${paperColor}` : 'no_clef';
 
-          this.labClefCanvas.width = kW;
-          this.labClefCanvas.height = kH;
-          this.labClefCtx.fillStyle = paperColor;
-          this.labClefCtx.fillRect(0, 0, kW, kH);
+    if (this._lastRenderedClefKey !== clefCacheKey) {
+      this._lastRenderedClefKey = clefCacheKey;
 
-          const kViewport = keyPage.getViewport({ scale: kScale });
-          await keyPage.render({
-            canvasContext: this.labClefCtx,
-            viewport: kViewport,
-            transform: [1, 0, 0, 1, -kX, -kY]
-          }).promise;
-          if (clefWrap) clefWrap.style.display = 'inline-flex';
-        } catch (_) {}
-      } else {
-        const keyImg = await this.getPageImage(keySig.page || 1);
-        if (keyImg) {
-          if (clefWrap) clefWrap.style.display = 'inline-flex';
-          this.labClefCanvas.width = keySig.box.width;
-          this.labClefCanvas.height = keySig.box.height;
-          this.labClefCtx.fillStyle = paperColor;
-          this.labClefCtx.fillRect(0, 0, keySig.box.width, keySig.box.height);
-          this.labClefCtx.imageSmoothingEnabled = true;
-          this.labClefCtx.imageSmoothingQuality = 'high';
-          this.labClefCtx.drawImage(
-            keyImg,
-            keySig.box.left, keySig.box.top, keySig.box.width, keySig.box.height,
-            0, 0, keySig.box.width, keySig.box.height
-          );
+      if (keySig && this.labClefCanvas && this.labClefCtx) {
+        if (this.currentScore?.isPdf && this.pdfDoc) {
+          try {
+            const keyPage = await this.pdfDoc.getPage(keySig.page || 1);
+            const kScale = Math.min(8.0, 2.0 * dpr * 1.5);
+            const kRatio = kScale / 2.0;
+            const kW = Math.round(keySig.box.width * kRatio);
+            const kH = Math.round(keySig.box.height * kRatio);
+            const kX = Math.round(keySig.box.left * kRatio);
+            const kY = Math.round(keySig.box.top * kRatio);
+
+            this.labClefCanvas.width = kW;
+            this.labClefCanvas.height = kH;
+            this.labClefCtx.fillStyle = paperColor;
+            this.labClefCtx.fillRect(0, 0, kW, kH);
+
+            const kViewport = keyPage.getViewport({ scale: kScale });
+            await keyPage.render({
+              canvasContext: this.labClefCtx,
+              viewport: kViewport,
+              transform: [1, 0, 0, 1, -kX, -kY]
+            }).promise;
+            if (clefWrap) clefWrap.style.display = 'inline-flex';
+          } catch (_) {}
+        } else {
+          const keyImg = await this.getPageImage(keySig.page || 1);
+          if (keyImg) {
+            if (clefWrap) clefWrap.style.display = 'inline-flex';
+            this.labClefCanvas.width = keySig.box.width;
+            this.labClefCanvas.height = keySig.box.height;
+            this.labClefCtx.fillStyle = paperColor;
+            this.labClefCtx.fillRect(0, 0, keySig.box.width, keySig.box.height);
+            this.labClefCtx.imageSmoothingEnabled = true;
+            this.labClefCtx.imageSmoothingQuality = 'high';
+            this.labClefCtx.drawImage(
+              keyImg,
+              keySig.box.left, keySig.box.top, keySig.box.width, keySig.box.height,
+              0, 0, keySig.box.width, keySig.box.height
+            );
+          }
         }
+      } else {
+        if (clefWrap) clefWrap.style.display = 'none';
       }
-    } else {
-      if (clefWrap) clefWrap.style.display = 'none';
     }
 
     if (!this.labCanvas || !this.labCtx || !curImg) return;
