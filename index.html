@@ -232,11 +232,18 @@
       </div>
 
       <!-- Karta taktu s fixní výškou a podporou přiblížení (zoom/pan) -->
+      <!-- Karta taktu s fixní výškou a podporou přiblížení (zoom/pan) -->
       <div class="rect-loupe-container">
         <div class="rect-loupe-lens" id="rectLoupeLens">
           <div class="lab-viewport" id="labViewport">
             <canvas id="labCanvas"></canvas>
           </div>
+        </div>
+        <!-- Plovoucí madlo mikro-posunu druhého taktu -->
+        <div class="lab-split-nudge-bar" id="labSplitNudgeBar" style="display:none;">
+          <button class="btn-nudge" onclick="window.app.nudgeMeasure(1)" title="Posunout pravý takt nahoru">▲</button>
+          <span class="nudge-val-indicator" id="labNudgeVal">0</span>
+          <button class="btn-nudge" onclick="window.app.nudgeMeasure(-1)" title="Posunout pravý takt dolů">▼</button>
         </div>
       </div>
     </div>

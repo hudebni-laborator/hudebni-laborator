@@ -1,6 +1,6 @@
 /**
  * Spolehlivě najde Y-souřadnici středové linky osnovy uvnitř vybraného taktu.
- * Využívá adaptivní princip jako scanner.js + imunitu vůči trámcům not.
+ * Využívá vážení horizontální souvislosti pixelů, čímž eliminuje krátké pomocné linky a trámce.
  */
 function getStaffCenterYInBox(sourceCanvas, box) {
   if (!sourceCanvas || !box || box.width <= 0 || box.height <= 0) {
@@ -8,22 +8,22 @@ function getStaffCenterYInBox(sourceCanvas, box) {
   }
 
   const ctx = sourceCanvas.getContext('2d');
-  const cropX = Math.max(0, Math.round(box.left + box.width * 0.15));
-  const cropW = Math.max(10, Math.round(box.width * 0.70));
+  const cropX = Math.max(0, Math.round(box.left + box.width * 0.10));
+  const cropW = Math.max(10, Math.round(box.width * 0.80));
   const cropY = Math.max(0, Math.round(box.top));
   const cropH = Math.max(10, Math.min(sourceCanvas.height - cropY, Math.round(box.height)));
 
   const imgData = ctx.getImageData(cropX, cropY, cropW, cropH);
   const d = imgData.data;
 
-  // 1. Změříme průměrný jas papíru uvnitř taktu
+  // 1. Změříme průměrný jas papíru
   let sumB = 0, countB = 0;
   for (let i = 0; i < d.length; i += 16) {
     sumB += (d[i] + d[i + 1] + d[i + 2]) / 3;
     countB++;
   }
   const bgBright = countB > 0 ? (sumB / countB) : 230;
-  const darkThreshold = Math.min(150, Math.max(65, bgBright * 0.72));
+  const darkThreshold = Math.min(150, Math.max(65, bgBright * 0.74));
 
   // 2. Horizontální hustota tmavých pixelů pro každý řádek Y
   const rowFill = new Float32Array(cropH);
@@ -39,9 +39,9 @@ function getStaffCenterYInBox(sourceCanvas, box) {
     rowFill[y] = dark / cropW;
   }
 
-  // 3. Nalezení souvislých bloků linek osnovy
-  const minLineFill = 0.30;
-  const lineBlocks = [];
+  // 3. Detekce souvislých bloků linek s vážením jejich šířky
+  const minLineFill = 0.28;
+  const lineCandidates = [];
   let currentBlock = [];
 
   for (let y = 0; y < cropH; y++) {
@@ -49,71 +49,60 @@ function getStaffCenterYInBox(sourceCanvas, box) {
       currentBlock.push(y);
     } else {
       if (currentBlock.length > 0) {
-        lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+        const avgY = Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length);
+        const maxFill = Math.max(...currentBlock.map(py => rowFill[py]));
+        lineCandidates.push({ y: avgY, weight: maxFill });
         currentBlock = [];
       }
     }
   }
   if (currentBlock.length > 0) {
-    lineBlocks.push(Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length));
+    const avgY = Math.round(currentBlock.reduce((a, b) => a + b, 0) / currentBlock.length);
+    const maxFill = Math.max(...currentBlock.map(py => rowFill[py]));
+    lineCandidates.push({ y: avgY, weight: maxFill });
   }
 
-  // 4. Hledání skupiny 5 linek s rovnoměrnou roztečí
+  if (lineCandidates.length < 5) {
+    return Math.round(cropH / 2);
+  }
+
+  // 4. Hledání optimální pětice s rovnoměrnou roztečí a maximální horizontální souvislostí
   let bestCenter = null;
-  let minDiff = Infinity;
+  let bestScore = -Infinity;
 
-  // A) Kontrola sousedních pětic
-  for (let i = 0; i <= lineBlocks.length - 5; i++) {
-    const group = lineBlocks.slice(i, i + 5);
-    const s1 = group[1] - group[0];
-    const s2 = group[2] - group[1];
-    const s3 = group[3] - group[2];
-    const s4 = group[4] - group[3];
-    const avg = (s1 + s2 + s3 + s4) / 4;
+  // A) Test všech pětic z kandidátů s pevnou roztečí step
+  for (let i = 0; i < lineCandidates.length; i++) {
+    for (let j = i + 1; j < lineCandidates.length; j++) {
+      const step = lineCandidates[j].y - lineCandidates[i].y;
+      if (step < 7 || step > 45) continue;
 
-    if (avg >= 5 && avg <= 45 &&
-        Math.abs(s1 - avg) <= 5 && Math.abs(s2 - avg) <= 5 &&
-        Math.abs(s3 - avg) <= 5 && Math.abs(s4 - avg) <= 5) {
-      
-      const center = group[2]; // 3. linka
-      const distFromBoxMid = Math.abs(center - cropH / 2);
-      if (distFromBoxMid < minDiff) {
-        minDiff = distFromBoxMid;
-        bestCenter = center;
+      const matched = [lineCandidates[i]];
+      for (let k = 1; k < 5; k++) {
+        const target = lineCandidates[i].y + k * step;
+        const close = lineCandidates.find(c => Math.abs(c.y - target) <= 3);
+        if (close !== undefined) matched.push(close);
       }
-    }
-  }
 
-  // B) Pokud mezi linkami ležel trámec noty a sousední pětice selhala:
-  if (bestCenter === null && lineBlocks.length >= 5) {
-    for (let i = 0; i < lineBlocks.length; i++) {
-      for (let j = i + 1; j < lineBlocks.length; j++) {
-        const step = lineBlocks[j] - lineBlocks[i];
-        if (step < 6 || step > 45) continue;
+      if (matched.length === 5) {
+        const topY = matched[0].y;
+        const botY = matched[4].y;
+        const avgWeight = matched.reduce((acc, m) => acc + m.weight, 0) / 5;
 
-        const matched = [lineBlocks[i]];
-        for (let k = 1; k < 5; k++) {
-          const target = lineBlocks[i] + k * step;
-          const close = lineBlocks.find(p => Math.abs(p - target) <= 3);
-          if (close !== undefined) matched.push(close);
-        }
+        // Kontrola volného papíru nad 1. a pod 5. linkou (potvrzení okraje pětilinky)
+        const aboveY = Math.round(topY - step);
+        const belowY = Math.round(botY + step);
+        const freeAbove = aboveY >= 0 ? (1 - rowFill[aboveY]) : 0.8;
+        const freeBelow = belowY < cropH ? (1 - rowFill[belowY]) : 0.8;
 
-        if (matched.length === 5) {
-          const topL = matched[0];
-          const botL = matched[4];
-          const stepR = Math.round((botL - topL) / 4);
+        const center = matched[2].y; // 3. středová linka
+        const distFromMid = Math.abs(center - cropH / 2);
 
-          const isRealStaffBoundary = (topL - stepR >= 0 ? rowFill[topL - stepR] < 0.25 : true) &&
-                                      (botL + stepR < cropH ? rowFill[botL + stepR] < 0.25 : true);
+        // Skóre upřednostňuje linky běžící celým taktem a skutečné ohraničení osnovy
+        let score = (avgWeight * 80) + ((freeAbove + freeBelow) * 30) - (distFromMid * 0.08);
 
-          const center = matched[2];
-          const distFromBoxMid = Math.abs(center - cropH / 2);
-          let score = (isRealStaffBoundary ? 50 : 0) - distFromBoxMid * 0.1;
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestCenter = center;
-          }
+        if (score > bestScore) {
+          bestScore = score;
+          bestCenter = center;
         }
       }
     }
@@ -202,6 +191,18 @@ class GuitarTrainer {
         else this.resetActiveSelection();
       }
     });
+  }
+
+  async nudgeMeasure(delta) {
+    const isLandscape = window.innerWidth > window.innerHeight;
+    const measures = this.currentScore?.measures || [];
+    if (!isLandscape || this.labCurrentIndex + 1 >= measures.length) return;
+
+    const nextM = measures[this.labCurrentIndex + 1];
+    nextM.manualOffsetY = (nextM.manualOffsetY || 0) + delta;
+
+    await this.persistCurrentScore();
+    this.showMeasureInLab(this.labCurrentIndex, false);
   }
 
   togglePlayTempoPopup() {
@@ -1850,11 +1851,13 @@ class GuitarTrainer {
     const measures = this.currentScore?.measures || [];
     const clefWrap = document.getElementById('labClefWrap');
     const ind = document.getElementById('labMeasureIndicator');
+    const nudgeBar = document.getElementById('labSplitNudgeBar');
 
     if (measures.length === 0) {
       if (this.labCtx && this.labCanvas) this.labCtx.clearRect(0, 0, this.labCanvas.width, this.labCanvas.height);
       if (clefWrap) clefWrap.style.display = 'none';
       if (ind) ind.innerText = 'Prázdno';
+      if (nudgeBar) nudgeBar.style.display = 'none';
       this.labLayoutMeta = null;
       return;
     }
@@ -1930,6 +1933,7 @@ class GuitarTrainer {
 
     if (!nextM) {
       // --- REŽIM 1 TAKTU (Portrait nebo poslední takt) ---
+      if (nudgeBar) nudgeBar.style.display = 'none';
       if (ind) ind.innerText = `Takt #${curM.id}`;
 
       if (this.currentScore?.isPdf && this.pdfDoc) {
@@ -1980,16 +1984,31 @@ class GuitarTrainer {
       this.renderDrawingsForMeasure(this.labCtx, curM, 0, 0, this.labLayoutMeta.ratio || 1.0);
 
     } else {
-      // --- REŽIM 2 TAKTŮ (Landscape): PŘESNÉ SLÍCOVÁNÍ + IZOLOVANÁ PLÁTNA BEZ PŘELITÍ KLÍČE ---
+      // --- REŽIM 2 TAKTŮ (Landscape): KOREKCE SE ZAPOČTENÝM MIKRO-POSUNEM ---
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
       const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
       const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
-      const diff = staffCenter1 - staffCenter2;
+      // Započtení mikro-posunu pro 2. takt
+      const manualOffset = nextM.manualOffsetY || 0;
+      const diff = (staffCenter1 - staffCenter2) + manualOffset;
+
       const originY1 = diff < 0 ? -diff : 0;
       const originY2 = diff > 0 ? diff : 0;
+
+      // Zobrazení a pozicování madla se šipkami na spoji taktů
+      const nudgeVal = document.getElementById('labNudgeVal');
+      if (nudgeBar) {
+        nudgeBar.style.display = 'flex';
+        const splitPercent = (curM.box.width / (curM.box.width + nextM.box.width)) * 100;
+        nudgeBar.style.left = `calc(${splitPercent}% - 13px)`;
+      }
+      if (nudgeVal) {
+        nudgeVal.innerText = manualOffset === 0 ? '0' : (manualOffset > 0 ? `+${manualOffset}` : `${manualOffset}`);
+        nudgeVal.style.color = manualOffset === 0 ? '#94a3b8' : '#38bdf8';
+      }
 
       const totalW = curM.box.width + nextM.box.width;
       const totalH = Math.max(originY1 + curM.box.height, originY2 + nextM.box.height);
@@ -2025,7 +2044,7 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        // Pomocné plátno 2 (klíč před ním zůstane zcela odříznut)
+        // Pomocné plátno 2 (klíč z nového řádku zůstane fyzicky odříznut)
         const off2 = document.createElement('canvas');
         off2.width = m2W;
         off2.height = m2H;
@@ -2124,8 +2143,11 @@ class GuitarTrainer {
       }
     }
 
-    if (autoFit) this.fitLabCanvas();
-    else this.updateLabTransform();
+    if (autoFit) {
+      this.fitLabCanvas();
+    } else {
+      this.updateLabTransform();
+    }
   }
 
   async resolveCurrentLabMeasure() {
