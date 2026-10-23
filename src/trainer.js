@@ -1467,6 +1467,13 @@ class GuitarTrainer {
     let currentLabStroke = null;
     let currentLabTargetPage = null;
 
+    // Proměnné pro 2D lícování tažením
+    let longPressTimer = null;
+    let isNudging = false;
+    let nudgeStartX = 0;
+    let nudgeStartY = 0;
+    let nudgeStartOffsetX = 0;
+    let nudgeStartOffsetY = 0;
     let tapStartTime = 0;
     let tapStartPos = null;
 
@@ -1481,13 +1488,13 @@ class GuitarTrainer {
     lens.addEventListener('pointerdown', e => {
       tapStartTime = Date.now();
       tapStartPos = { x: e.clientX, y: e.clientY };
-
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (ongoingTouches.size === 1) {
         lens.setPointerCapture(e.pointerId);
         const hit = this.labCanvasToPageCoords(e.clientX, e.clientY);
 
+        // Pokud je zapnutá tužka nebo guma, pracujeme s nimi
         if (this.labTool === 'eraser' && hit) {
           isLabErasing = true;
           currentLabTargetPage = hit.page;
@@ -1515,8 +1522,36 @@ class GuitarTrainer {
           return;
         }
 
+        // Pokud jsme v landscape se dvěma takty a prst leží na pravé polovině (2. takt):
+        const isLandscape = window.innerWidth > window.innerHeight;
+        const measures = this.currentScore?.measures || [];
+        if (isLandscape && this.labCurrentIndex + 1 < measures.length) {
+          longPressTimer = setTimeout(() => {
+            isNudging = true;
+            isLabPanning = false;
+            nudgeStartX = e.clientX;
+            nudgeStartY = e.clientY;
+            const nextM = measures[this.labCurrentIndex + 1];
+            nudgeStartOffsetX = nextM.manualOffsetX || 0;
+            nudgeStartOffsetY = nextM.manualOffsetY || 0;
+
+            if (navigator.vibrate) navigator.vibrate(40); // Haptické potvrzení
+
+            const badge = document.getElementById('labNudgeBadge');
+            const badgeVal = document.getElementById('labNudgeBadgeVal');
+            if (badge) badge.style.display = 'block';
+            if (badgeVal) {
+              const xStr = nudgeStartOffsetX >= 0 ? `+${nudgeStartOffsetX}` : `${nudgeStartOffsetX}`;
+              const yStr = nudgeStartOffsetY >= 0 ? `+${nudgeStartOffsetY}` : `${nudgeStartOffsetY}`;
+              badgeVal.innerText = `X: ${xStr} px | Y: ${yStr} px`;
+            }
+          }, 400);
+        }
+
         isLabPanning = true;
       } else if (ongoingTouches.size === 2) {
+        if (longPressTimer) clearTimeout(longPressTimer);
+        isNudging = false;
         isLabDrawing = isLabErasing = isLabPanning = false;
         const t = Array.from(ongoingTouches.values());
         initialPinchDist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
@@ -1531,6 +1566,34 @@ class GuitarTrainer {
       const dy = e.clientY - prev.y;
       ongoingTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+      // Pokud se prst pohnul dříve než za 400 ms o více než 8 px, zrušíme dlouhý stisk
+      if (longPressTimer && tapStartPos && Math.hypot(e.clientX - tapStartPos.x, e.clientY - tapStartPos.y) > 8) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      // 1. REŽIM 2D LÍCOVÁNÍ (NUDGE X + Y)
+      if (isNudging) {
+        const deltaX = Math.round((e.clientX - nudgeStartX) / (this.labZoomScale || 1.0));
+        const deltaY = Math.round((e.clientY - nudgeStartY) / (this.labZoomScale || 1.0));
+        const measures = this.currentScore?.measures || [];
+        const nextM = measures[this.labCurrentIndex + 1];
+        if (nextM) {
+          nextM.manualOffsetX = nudgeStartOffsetX + deltaX;
+          nextM.manualOffsetY = nudgeStartOffsetY - deltaY;
+          this.showMeasureInLab(this.labCurrentIndex, false);
+
+          const badgeVal = document.getElementById('labNudgeBadgeVal');
+          if (badgeVal) {
+            const xStr = nextM.manualOffsetX >= 0 ? `+${nextM.manualOffsetX}` : `${nextM.manualOffsetX}`;
+            const yStr = nextM.manualOffsetY >= 0 ? `+${nextM.manualOffsetY}` : `${nextM.manualOffsetY}`;
+            badgeVal.innerText = `X: ${xStr} px | Y: ${yStr} px`;
+          }
+        }
+        return;
+      }
+
+      // 2. PINCH TO ZOOM
       if (ongoingTouches.size === 2) {
         const t = Array.from(ongoingTouches.values());
         const dist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
@@ -1551,6 +1614,7 @@ class GuitarTrainer {
         return;
       }
 
+      // 3. JEDNODUCHÝ POSUN / KRESLENÍ
       if (ongoingTouches.size === 1) {
         if (isLabPanning) {
           this.labPanX += dx;
@@ -1608,8 +1672,25 @@ class GuitarTrainer {
     });
 
     const finishLabPointer = async () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
       this.hideToolCursor();
 
+      // Pokud končí tažení pro lícování, uložíme posun
+      if (isNudging) {
+        isNudging = false;
+        const badge = document.getElementById('labNudgeBadge');
+        if (badge) badge.style.display = 'none';
+        await this.persistCurrentScore(); // Trvalé uložení X i Y do IndexedDB
+        ongoingTouches.clear();
+        tapStartPos = null;
+        return;
+      }
+
+      // Detekce krátkého klepnutí pro listování vlevo/vpravo
       if (tapStartPos && this.labTool === 'pan' && !isLabDrawing && !isLabErasing) {
         const elapsed = Date.now() - tapStartTime;
         const dist = Math.hypot(tapStartPos.x - tapStartPos.x, tapStartPos.y - tapStartPos.y);
@@ -1644,6 +1725,7 @@ class GuitarTrainer {
         currentLabTargetPage = null;
         this.showMeasureInLab(this.labCurrentIndex, false);
       }
+
       isLabErasing = false;
       isLabPanning = false;
       ongoingTouches.clear();
@@ -1652,7 +1734,10 @@ class GuitarTrainer {
 
     lens.addEventListener('pointerup', finishLabPointer);
     lens.addEventListener('pointercancel', finishLabPointer);
-    lens.addEventListener('pointerleave', () => this.hideToolCursor());
+    lens.addEventListener('pointerleave', () => {
+      if (longPressTimer) clearTimeout(longPressTimer);
+      this.hideToolCursor();
+    });
   }
 
   labCanvasToPageCoords(clientX, clientY) {
@@ -1988,29 +2073,23 @@ class GuitarTrainer {
       if (ind) ind.innerText = `Takty #${curM.id} - #${nextM.id}`;
       const nextImg = await this.getPageImage(nextM.page || 1);
 
+      // Zjistíme polohu linek
       const staffCenter1 = getStaffCenterYInBox(curImg, curM.box);
       const staffCenter2 = getStaffCenterYInBox(nextImg, nextM.box);
 
-      // Započtení mikro-posunu pro 2. takt
-      const manualOffset = nextM.manualOffsetY || 0;
-      const diff = (staffCenter1 - staffCenter2) + manualOffset;
+      // Započtení 2D posunu (svisle Y i vodorovně X)
+      const manualOffsetY = nextM.manualOffsetY || 0;
+      const manualOffsetX = nextM.manualOffsetX || 0;
 
+      const diff = (staffCenter1 - staffCenter2) + manualOffsetY;
       const originY1 = diff < 0 ? -diff : 0;
       const originY2 = diff > 0 ? diff : 0;
 
-      // Zobrazení a pozicování madla se šipkami na spoji taktů
-      const nudgeVal = document.getElementById('labNudgeVal');
-      if (nudgeBar) {
-        nudgeBar.style.display = 'flex';
-        const splitPercent = (curM.box.width / (curM.box.width + nextM.box.width)) * 100;
-        nudgeBar.style.left = `calc(${splitPercent}% - 13px)`;
-      }
-      if (nudgeVal) {
-        nudgeVal.innerText = manualOffset === 0 ? '0' : (manualOffset > 0 ? `+${manualOffset}` : `${manualOffset}`);
-        nudgeVal.style.color = manualOffset === 0 ? '#94a3b8' : '#38bdf8';
-      }
+      // X pozice 2. taktu posunutá o manualOffsetX
+      const baseSplitX = curM.box.width;
+      const originX2 = Math.max(20, baseSplitX + manualOffsetX);
 
-      const totalW = curM.box.width + nextM.box.width;
+      const totalW = originX2 + nextM.box.width;
       const totalH = Math.max(originY1 + curM.box.height, originY2 + nextM.box.height);
 
       if (this.currentScore?.isPdf && this.pdfDoc) {
@@ -2023,10 +2102,15 @@ class GuitarTrainer {
         const m2W = Math.round(nextM.box.width * ratio);
         const m2H = Math.round(nextM.box.height * ratio);
 
+        const splitX_px = Math.round(originX2 * ratio);
+        const totalW_px = Math.round(totalW * ratio);
+        const totalH_px = Math.round(totalH * ratio);
+        const posY1 = Math.round(originY1 * ratio);
+        const posY2 = Math.round(originY2 * ratio);
+
         // Pomocné plátno 1
         const off1 = document.createElement('canvas');
-        off1.width = m1W;
-        off1.height = m1H;
+        off1.width = m1W; off1.height = m1H;
         const off1Ctx = off1.getContext('2d');
         off1Ctx.fillStyle = paperColor;
         off1Ctx.fillRect(0, 0, m1W, m1H);
@@ -2044,10 +2128,9 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        // Pomocné plátno 2 (klíč z nového řádku zůstane fyzicky odříznut)
+        // Pomocné plátno 2
         const off2 = document.createElement('canvas');
-        off2.width = m2W;
-        off2.height = m2H;
+        off2.width = m2W; off2.height = m2H;
         const off2Ctx = off2.getContext('2d');
         off2Ctx.fillStyle = paperColor;
         off2Ctx.fillRect(0, 0, m2W, m2H);
@@ -2065,11 +2148,6 @@ class GuitarTrainer {
           }).promise;
         } catch (_) {}
 
-        const totalW_px = Math.round(totalW * ratio);
-        const totalH_px = Math.round(totalH * ratio);
-        const posY1 = Math.round(originY1 * ratio);
-        const posY2 = Math.round(originY2 * ratio);
-
         this.labCanvas.width = totalW_px;
         this.labCanvas.height = totalH_px;
         this.labLayoutMeta = {
@@ -2077,7 +2155,7 @@ class GuitarTrainer {
           m2: nextM,
           originY1: posY1,
           originY2: posY2,
-          x2: m1W,
+          x2: splitX_px,
           scale2: 1.0,
           ratio
         };
@@ -2086,7 +2164,7 @@ class GuitarTrainer {
         this.labCtx.fillRect(0, 0, totalW_px, totalH_px);
 
         this.labCtx.drawImage(off1, 0, posY1);
-        this.labCtx.drawImage(off2, m1W, posY2);
+        this.labCtx.drawImage(off2, splitX_px, posY2);
 
       } else {
         // Rastrové fotky
@@ -2095,7 +2173,7 @@ class GuitarTrainer {
           m2: nextM,
           originY1,
           originY2,
-          x2: curM.box.width,
+          x2: originX2,
           scale2: 1.0,
           ratio: 1.0
         };
@@ -2117,7 +2195,7 @@ class GuitarTrainer {
         this.labCtx.drawImage(
           nextImg,
           nextM.box.left, nextM.box.top, nextM.box.width, nextM.box.height,
-          curM.box.width, originY2, nextM.box.width, nextM.box.height
+          originX2, originY2, nextM.box.width, nextM.box.height
         );
 
         this.enhanceMeasurePixels(this.labCtx, totalW, totalH);
